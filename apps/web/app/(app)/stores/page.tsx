@@ -1,17 +1,11 @@
-import { Button } from '@mybizone/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@mybizone/ui/card';
-import { stores } from '@mybizone/db';
-import { withTenant } from '@mybizone/db/tenant';
-import { desc } from 'drizzle-orm';
-import Link from 'next/link';
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
+import { stores } from '@mybizone/db';
+import { withTenant } from '@mybizone/db/tenant';
+import { Button } from '@mybizone/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
+import { desc } from 'drizzle-orm';
+import Link from 'next/link';
 
 export default async function StoresPage() {
   const user = await requireUser();

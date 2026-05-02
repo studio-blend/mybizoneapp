@@ -2,12 +2,7 @@ import type { Database } from '@mybizone/db';
 import { account, session, user, verification } from '@mybizone/db';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import {
-  type MailerEnv,
-  createMailer,
-  resetPasswordTemplate,
-  verifyEmailTemplate,
-} from './email';
+import { type MailerEnv, createMailer, resetPasswordTemplate, verifyEmailTemplate } from './email';
 
 export interface AuthEnv extends MailerEnv {
   BETTER_AUTH_SECRET: string;

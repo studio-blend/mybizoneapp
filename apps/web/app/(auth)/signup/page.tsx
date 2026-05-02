@@ -44,7 +44,9 @@ export default function SignupPage() {
       <Card>
         <CardHeader>
           <CardTitle>Check your email</CardTitle>
-          <CardDescription>We sent a verification link. Click it to activate your account.</CardDescription>
+          <CardDescription>
+            We sent a verification link. Click it to activate your account.
+          </CardDescription>
         </CardHeader>
         <CardFooter>
           <Button asChild variant="outline" className="w-full">
@@ -65,7 +67,13 @@ export default function SignupPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="businessName">Business name</Label>
-            <Input id="businessName" name="businessName" required maxLength={120} placeholder="My Shop" />
+            <Input
+              id="businessName"
+              name="businessName"
+              required
+              maxLength={120}
+              placeholder="My Shop"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="name">Your name</Label>
@@ -77,7 +85,14 @@ export default function SignupPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" />
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardContent>

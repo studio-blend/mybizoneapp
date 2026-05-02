@@ -1,10 +1,4 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@mybizone/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 
 /**
  * Better Auth's verification link points to /api/auth/verify-email which sets

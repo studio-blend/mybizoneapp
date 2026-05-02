@@ -1,9 +1,9 @@
 'use server';
 
+import { safeAction } from '@/lib/server-action';
 import { auditLogs, stores } from '@mybizone/db';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { safeAction } from '@/lib/server-action';
 
 const CreateStoreSchema = z.object({
   name: z.string().min(1, 'name required').max(120),
@@ -11,31 +11,28 @@ const CreateStoreSchema = z.object({
   phone: z.string().max(30).optional(),
 });
 
-export const createStoreAction = safeAction(
-  CreateStoreSchema,
-  async (input, { user, tx }) => {
-    const [row] = await tx
-      .insert(stores)
-      .values({
-        businessId: user.businessId,
-        name: input.name,
-        address: input.address ?? null,
-        phone: input.phone ?? null,
-      })
-      .returning({ id: stores.id, name: stores.name });
-    if (!row) throw new Error('insert failed');
-
-    await tx.insert(auditLogs).values({
+export const createStoreAction = safeAction(CreateStoreSchema, async (input, { user, tx }) => {
+  const [row] = await tx
+    .insert(stores)
+    .values({
       businessId: user.businessId,
-      actorId: user.id,
-      action: 'store.create',
-      entity: 'store',
-      entityId: row.id,
-      after: { name: row.name },
-    });
+      name: input.name,
+      address: input.address ?? null,
+      phone: input.phone ?? null,
+    })
+    .returning({ id: stores.id, name: stores.name });
+  if (!row) throw new Error('insert failed');
 
-    revalidatePath('/stores');
-    revalidatePath('/dashboard');
-    return { id: row.id, name: row.name };
-  },
-);
+  await tx.insert(auditLogs).values({
+    businessId: user.businessId,
+    actorId: user.id,
+    action: 'store.create',
+    entity: 'store',
+    entityId: row.id,
+    after: { name: row.name },
+  });
+
+  revalidatePath('/stores');
+  revalidatePath('/dashboard');
+  return { id: row.id, name: row.name };
+});

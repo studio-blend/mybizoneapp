@@ -24,7 +24,10 @@ export function safeAction<TInput, TOutput>(
     const parsed = schema.safeParse(rawInput);
     if (!parsed.success) {
       const first = parsed.error.errors[0];
-      return { ok: false, error: first ? `${first.path.join('.')}: ${first.message}` : 'invalid input' };
+      return {
+        ok: false,
+        error: first ? `${first.path.join('.')}: ${first.message}` : 'invalid input',
+      };
     }
     try {
       const user = await requireUser();

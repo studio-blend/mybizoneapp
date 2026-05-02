@@ -1,10 +1,10 @@
 'use server';
 
+import { auth } from '@/lib/auth';
+import { db } from '@/lib/db';
 import { businesses, user as userTable } from '@mybizone/db';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { auth } from '@/lib/auth';
-import { db } from '@/lib/db';
 
 const SignupSchema = z.object({
   name: z.string().min(1, 'name required').max(100),
@@ -13,9 +13,7 @@ const SignupSchema = z.object({
   businessName: z.string().min(1, 'business name required').max(120),
 });
 
-export type SignupResult =
-  | { ok: true; needsVerification: true }
-  | { ok: false; error: string };
+export type SignupResult = { ok: true; needsVerification: true } | { ok: false; error: string };
 
 /**
  * Signup flow:

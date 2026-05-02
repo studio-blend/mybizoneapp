@@ -1,8 +1,8 @@
-import { redirect } from 'next/navigation';
-import { stores } from '@mybizone/db';
-import { withTenant } from '@mybizone/db/tenant';
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
+import { stores } from '@mybizone/db';
+import { withTenant } from '@mybizone/db/tenant';
+import { redirect } from 'next/navigation';
 import { NewStoreForm } from '../stores/new/form';
 
 /**
@@ -21,9 +21,7 @@ export default async function OnboardingPage() {
     <div className="mx-auto max-w-md space-y-4">
       <div className="text-center">
         <h1 className="text-2xl font-semibold">Welcome to MyBizOne</h1>
-        <p className="text-sm text-muted-foreground">
-          One last step — add your first store.
-        </p>
+        <p className="text-sm text-muted-foreground">One last step — add your first store.</p>
       </div>
       <NewStoreForm />
     </div>

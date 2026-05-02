@@ -1,3 +1,4 @@
+import postgres from 'postgres';
 /**
  * Two-tenant RLS proof: insert stores under business A and B.
  * Set app.business_id = A → only A's stores visible.
@@ -6,7 +7,6 @@
  * If this test fails, multi-tenancy is broken. M1 cannot ship without it green.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import postgres from 'postgres';
 
 const url = process.env.DATABASE_URL ?? 'postgres://mybizone:mybizone@localhost:5432/mybizone';
 const sql = postgres(url, { max: 1, prepare: false });
@@ -57,9 +57,10 @@ describe('RLS tenant isolation', () => {
       await tx`SELECT set_config('app.business_id', ${bizA}, true)`;
       return tx<{ name: string; business_id: string }[]>`SELECT name, business_id FROM stores`;
     });
+    const row = rows[0];
     expect(rows.length).toBe(1);
-    expect(rows[0]!.name).toBe('A-Main');
-    expect(rows[0]!.business_id).toBe(bizA);
+    expect(row?.name).toBe('A-Main');
+    expect(row?.business_id).toBe(bizA);
   });
 
   it('tenant B sees only B stores', async () => {
@@ -67,9 +68,10 @@ describe('RLS tenant isolation', () => {
       await tx`SELECT set_config('app.business_id', ${bizB}, true)`;
       return tx<{ name: string; business_id: string }[]>`SELECT name, business_id FROM stores`;
     });
+    const row = rows[0];
     expect(rows.length).toBe(1);
-    expect(rows[0]!.name).toBe('B-Main');
-    expect(rows[0]!.business_id).toBe(bizB);
+    expect(row?.name).toBe('B-Main');
+    expect(row?.business_id).toBe(bizB);
   });
 
   it('no tenant context → 0 rows visible', async () => {

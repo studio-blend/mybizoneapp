@@ -1,5 +1,6 @@
 'use client';
 
+import { resetPassword } from '@/lib/auth-client';
 import { Button } from '@mybizone/ui/button';
 import {
   Card,
@@ -14,12 +15,11 @@ import { Label } from '@mybizone/ui/label';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { resetPassword } from '@/lib/auth-client';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const token = params.get('token') ?? '';
+  const token = params?.get('token') ?? '';
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +54,14 @@ export default function ResetPasswordPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="password">New password</Label>
-            <Input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" />
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardContent>

@@ -1,5 +1,6 @@
 'use client';
 
+import { forgetPassword } from '@/lib/auth-client';
 import { Button } from '@mybizone/ui/button';
 import {
   Card,
@@ -13,7 +14,6 @@ import { Input } from '@mybizone/ui/input';
 import { Label } from '@mybizone/ui/label';
 import Link from 'next/link';
 import { useState } from 'react';
-import { forgetPassword } from '@/lib/auth-client';
 
 export default function ForgotPasswordPage() {
   const [pending, setPending] = useState(false);

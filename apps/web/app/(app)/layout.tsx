@@ -1,7 +1,7 @@
+import { requireUser } from '@/lib/session';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { LogoutButton } from './_components/logout-button';
-import { requireUser } from '@/lib/session';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();

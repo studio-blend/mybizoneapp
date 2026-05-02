@@ -29,9 +29,7 @@ async function run() {
     applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`;
 
-  const files = (await readdir(migrationsDir))
-    .filter((f) => f.endsWith('.sql'))
-    .sort();
+  const files = (await readdir(migrationsDir)).filter((f) => f.endsWith('.sql')).sort();
 
   const applied = new Set(
     (await sql<{ name: string }[]>`SELECT name FROM _migrations`).map((r) => r.name),

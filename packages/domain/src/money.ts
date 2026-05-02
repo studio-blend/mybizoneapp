@@ -16,5 +16,7 @@ export function paiseToRupees(paise: number): string {
 }
 
 export function round2(n: number): number {
-  return Math.round(n * 100) / 100;
+  // Add EPSILON before rounding so .005 boundaries round up despite float drift
+  // (e.g. 1.005 actually stores as 1.00499999... in IEEE 754).
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }

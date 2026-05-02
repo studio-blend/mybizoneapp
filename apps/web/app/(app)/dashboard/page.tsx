@@ -1,10 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
-import { stores } from '@mybizone/db';
-import { withTenant } from '@mybizone/db/tenant';
-import Link from 'next/link';
-import { Button } from '@mybizone/ui/button';
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
+import { stores } from '@mybizone/db';
+import { withTenant } from '@mybizone/db/tenant';
+import { Button } from '@mybizone/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
+import Link from 'next/link';
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -31,9 +31,7 @@ export default async function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            M1 shell green. Features land in M2.
-          </p>
+          <p className="text-sm text-muted-foreground">M1 shell green. Features land in M2.</p>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
