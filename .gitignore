@@ -40,3 +40,7 @@ test-results/
 # misc
 .turbo/
 .cache/
+
+# local file storage (STORAGE_BACKEND=local writes here in dev/self-host)
+/storage/
+/apps/web/storage/

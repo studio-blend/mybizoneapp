@@ -1,0 +1,22 @@
+{
+  "name": "@mybizone/storage",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./local-fs": "./src/local-fs.ts",
+    "./validate": "./src/validate.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@mybizone/config": "workspace:*",
+    "@types/node": "20.17.6",
+    "typescript": "5.6.3",
+    "vitest": "2.1.5"
+  }
+}

@@ -11,6 +11,8 @@ const schema = z.object({
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional().default(''),
   NEXT_PUBLIC_POSTHOG_HOST: z.string().optional().default('https://us.i.posthog.com'),
   STORAGE_BACKEND: z.enum(['local', 'r2']).default('local'),
+  STORAGE_DIR: z.string().optional().default('./storage'),
+  R2_BUCKET: z.string().optional().default(''),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
 
@@ -25,6 +27,8 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
   NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
   STORAGE_BACKEND: process.env.STORAGE_BACKEND,
+  STORAGE_DIR: process.env.STORAGE_DIR,
+  R2_BUCKET: process.env.R2_BUCKET,
   NODE_ENV: process.env.NODE_ENV,
 });
 

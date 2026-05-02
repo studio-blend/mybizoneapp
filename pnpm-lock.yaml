@@ -32,6 +32,9 @@ importers:
       '@mybizone/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@mybizone/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@mybizone/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -158,6 +161,21 @@ importers:
       '@mybizone/config':
         specifier: workspace:*
         version: link:../config
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.5
+        version: 2.1.5(@types/node@20.17.6)
+
+  packages/storage:
+    devDependencies:
+      '@mybizone/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: 20.17.6
+        version: 20.17.6
       typescript:
         specifier: 5.6.3
         version: 5.6.3
