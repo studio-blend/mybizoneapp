@@ -15,10 +15,14 @@ interface ActionContext {
  * with the given Zod schema, runs the body inside a tenant-scoped transaction
  * (RLS active for every query). Returns a typed result; errors are stringified
  * for the client without leaking stack traces.
+ *
+ * Schema generic is `ZodTypeAny` (not `ZodType<T>`) so transforms — which
+ * change input vs output types, e.g. `string | undefined → string | null` —
+ * type-check correctly.
  */
-export function safeAction<TInput, TOutput>(
-  schema: z.ZodType<TInput>,
-  handler: (input: TInput, ctx: ActionContext) => Promise<TOutput>,
+export function safeAction<TSchema extends z.ZodTypeAny, TOutput>(
+  schema: TSchema,
+  handler: (input: z.infer<TSchema>, ctx: ActionContext) => Promise<TOutput>,
 ) {
   return async (rawInput: unknown): Promise<ActionResult<TOutput>> => {
     const parsed = schema.safeParse(rawInput);
