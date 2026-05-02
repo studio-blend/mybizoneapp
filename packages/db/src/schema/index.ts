@@ -8,3 +8,4 @@ export * from './products';
 export * from './sales';
 export * from './invoices';
 export * from './invitations';
+export * from './bill-counters';
