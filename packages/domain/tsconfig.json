@@ -1,0 +1,4 @@
+{
+  "extends": "@mybizone/config/tsconfig/library.json",
+  "include": ["src/**/*", "tests/**/*"]
+}
