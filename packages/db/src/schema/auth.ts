@@ -1,5 +1,6 @@
 import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
+import { stores } from './stores';
 
 // Better Auth core tables. Names must be singular to match Better Auth Drizzle adapter defaults.
 
@@ -12,6 +13,9 @@ export const user = pgTable('user', {
   // Tenancy + role — custom additional fields surfaced via Better Auth `user.additionalFields`
   businessId: uuid('business_id').references(() => businesses.id, { onDelete: 'cascade' }),
   role: text('role').notNull().default('owner'), // owner | admin | employee
+  // store_id scopes employees to a single store. Owners/admins leave it NULL.
+  storeId: uuid('store_id').references(() => stores.id, { onDelete: 'set null' }),
+  active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
