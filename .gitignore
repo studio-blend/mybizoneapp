@@ -1,0 +1,42 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build
+.next/
+dist/
+out/
+build/
+*.tsbuildinfo
+
+# env
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# tests
+coverage/
+playwright-report/
+test-results/
+.playwright/
+
+# drizzle
+.drizzle/
+
+# misc
+.turbo/
+.cache/
