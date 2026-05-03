@@ -16,6 +16,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <Link href="/dashboard" className="hover:underline">
               Dashboard
             </Link>
+            <Link href="/sales/new" className="hover:underline">
+              POS
+            </Link>
+            <Link href="/sales" className="hover:underline">
+              Sales
+            </Link>
             <Link href="/products" className="hover:underline">
               Products
             </Link>
