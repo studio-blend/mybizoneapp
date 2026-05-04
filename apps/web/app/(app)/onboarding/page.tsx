@@ -1,29 +1,42 @@
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
-import { stores } from '@mybizone/db';
+import { businesses, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
+import { eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { NewStoreForm } from '../stores/new/form';
+import { OnboardingBusinessForm } from './_components/business-form';
+import { OnboardingProgress } from './_components/progress';
 
-/**
- * Onboarding lands here after first login. If they already have a store, skip
- * straight to dashboard. M2 will add a multi-step wizard (vertical, GST flag,
- * first product). For M1 we only ask for the first store.
- */
+export const dynamic = 'force-dynamic';
+
 export default async function OnboardingPage() {
   const user = await requireUser();
-  const existing = await withTenant(db, user.businessId, (tx) =>
-    tx.select({ id: stores.id }).from(stores).limit(1),
-  );
-  if (existing.length > 0) redirect('/dashboard');
+  const data = await withTenant(db, user.businessId, async (tx) => {
+    const [biz] = await tx
+      .select({ gstEnabled: businesses.gstEnabled, gstin: businesses.gstin })
+      .from(businesses)
+      .where(eq(businesses.id, user.businessId));
+    const storeRows = await tx.select({ id: stores.id }).from(stores).limit(1);
+    return { biz, hasStore: storeRows.length > 0 };
+  });
+
+  if (data.hasStore) redirect('/dashboard');
 
   return (
-    <div className="mx-auto max-w-md space-y-4">
+    <div className="mx-auto max-w-lg space-y-6">
       <div className="text-center">
         <h1 className="text-2xl font-semibold">Welcome to MyBizOne</h1>
-        <p className="text-sm text-muted-foreground">One last step — add your first store.</p>
+        <p className="text-sm text-muted-foreground">
+          Two quick steps and you're ready to record sales.
+        </p>
       </div>
-      <NewStoreForm />
+      <OnboardingProgress current={1} />
+      <OnboardingBusinessForm
+        initial={{
+          gstEnabled: data.biz?.gstEnabled ?? false,
+          gstin: data.biz?.gstin ?? '',
+        }}
+      />
     </div>
   );
 }

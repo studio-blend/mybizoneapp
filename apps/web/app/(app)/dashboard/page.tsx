@@ -6,6 +6,7 @@ import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { and, count, desc, eq, gte, lt, sql, sum } from 'drizzle-orm';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,11 @@ const LOW_STOCK_THRESHOLD = '5';
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  // Funnel fresh signups through the onboarding wizard until at least one store exists.
+  const setupCheck = await withTenant(db, user.businessId, (tx) =>
+    tx.select({ id: stores.id }).from(stores).limit(1),
+  );
+  if (setupCheck.length === 0) redirect('/onboarding');
   const data = await withTenant(db, user.businessId, async (tx) => {
     const storeRows = await tx.select({ id: stores.id, name: stores.name }).from(stores);
     if (storeRows.length === 0) {
