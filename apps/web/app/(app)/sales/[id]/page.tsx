@@ -1,11 +1,12 @@
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
-import { saleItems, sales, stores } from '@mybizone/db';
+import { businesses, invoices, saleItems, sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Card, CardContent, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
 import { and, asc, eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
+import { GenerateInvoiceButton } from './_components/generate-invoice-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,17 +47,31 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
       .from(saleItems)
       .where(eq(saleItems.saleId, params.id))
       .orderBy(asc(saleItems.createdAt));
-    return { row, items };
+    const [biz] = await tx
+      .select({ gstEnabled: businesses.gstEnabled })
+      .from(businesses)
+      .where(eq(businesses.id, user.businessId));
+    const [inv] = await tx
+      .select({ id: invoices.id, invoiceNo: invoices.invoiceNo, pdfKey: invoices.pdfKey })
+      .from(invoices)
+      .where(eq(invoices.saleId, params.id));
+    return { row, items, gstEnabled: biz?.gstEnabled ?? false, invoice: inv ?? null };
   });
 
   if (!data) notFound();
-  const { row, items } = data;
+  const { row, items, gstEnabled, invoice } = data;
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Bill {row.billNo}</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Bill {row.billNo}</CardTitle>
+            {gstEnabled && (
+              <GenerateInvoiceButton saleId={row.id} existingPdfKey={invoice?.pdfKey ?? null} />
+            )}
+          </div>
+          {invoice && <p className="text-xs text-muted-foreground">Invoice: {invoice.invoiceNo}</p>}
         </CardHeader>
         <CardContent className="grid gap-2 text-sm sm:grid-cols-3">
           <Field label="Date" value={new Date(row.createdAt).toLocaleString('en-IN')} />

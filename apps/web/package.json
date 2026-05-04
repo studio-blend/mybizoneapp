@@ -19,6 +19,7 @@
     "@mybizone/auth-config": "workspace:*",
     "@mybizone/db": "workspace:*",
     "@mybizone/domain": "workspace:*",
+    "@mybizone/pdf": "workspace:*",
     "@mybizone/storage": "workspace:*",
     "@mybizone/ui": "workspace:*",
     "better-auth": "1.1.1",

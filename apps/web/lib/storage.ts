@@ -14,7 +14,7 @@ export const storage = createStorage({
   R2_BUCKET: env.R2_BUCKET || undefined,
 });
 
-export type UploadCategory = 'products' | 'brands' | 'bills' | 'catalogues';
+export type UploadCategory = 'products' | 'brands' | 'bills' | 'catalogues' | 'invoices';
 
 const IMAGE_MIMES: ReadonlyArray<AllowedMime> = ['image/jpeg', 'image/png', 'image/webp'];
 const IMAGE_OR_PDF_MIMES: ReadonlyArray<AllowedMime> = [...IMAGE_MIMES, 'application/pdf'];
@@ -23,7 +23,7 @@ interface UploadInput {
   category: UploadCategory;
   businessId: string;
   body: Buffer;
-  /** Override mime allowlist; defaults to images-only except for catalogues + bills. */
+  /** Override mime allowlist; defaults to images-only except for catalogues, bills, invoices. */
   allowed?: ReadonlyArray<AllowedMime>;
   maxBytes?: number;
 }
@@ -38,7 +38,7 @@ interface UploadInput {
 export async function uploadFile(input: UploadInput): Promise<{ key: string; mime: AllowedMime }> {
   const allowed =
     input.allowed ??
-    (input.category === 'bills' || input.category === 'catalogues'
+    (input.category === 'bills' || input.category === 'catalogues' || input.category === 'invoices'
       ? IMAGE_OR_PDF_MIMES
       : IMAGE_MIMES);
   const { mime, ext } = validateUpload(input.body, { allowed, maxBytes: input.maxBytes });
