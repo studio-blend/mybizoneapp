@@ -17,5 +17,33 @@ services:
       timeout: 3s
       retries: 10
 
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mybizone-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://mybizone:mybizone@db:5432/mybizone
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-in-prod}
+      BETTER_AUTH_URL: http://localhost:3000
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_DIR: /app/storage
+      NODE_ENV: ${NODE_ENV:-production}
+      LAN_MODE: ${LAN_MODE:-false}
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
 volumes:
   dbdata:
+  storage:
