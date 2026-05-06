@@ -13,8 +13,8 @@ export default async function OnboardingStorePage() {
   const existing = await withTenant(db, user.businessId, (tx) =>
     tx.select({ id: stores.id }).from(stores).limit(1),
   );
-  // Already past step 2 — onboarding complete.
-  if (existing.length > 0) redirect('/dashboard');
+  // Already past step 2 — send to demo-sale.
+  if (existing.length > 0) redirect('/onboarding/demo-sale');
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -25,7 +25,7 @@ export default async function OnboardingStorePage() {
         </p>
       </div>
       <OnboardingProgress current={2} />
-      <NewStoreForm />
+      <NewStoreForm redirectTo="/onboarding/demo-sale" />
     </div>
   );
 }

@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { createStoreAction } from '../actions';
 
-export function NewStoreForm() {
+export function NewStoreForm({ redirectTo = '/stores' }: { redirectTo?: string }) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, setPending] = useState(false);
@@ -38,7 +38,7 @@ export function NewStoreForm() {
       return;
     }
     toast({ title: 'Store created', description: result.data.name });
-    router.push('/stores');
+    router.push(redirectTo);
     router.refresh();
   }
 

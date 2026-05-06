@@ -1,8 +1,8 @@
 interface Props {
-  current: 1 | 2;
+  current: 1 | 2 | 3;
 }
 
-const STEPS = ['Business', 'First store'];
+const STEPS = ['Business', 'First store', 'Demo sale'];
 
 export function OnboardingProgress({ current }: Props) {
   return (
