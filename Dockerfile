@@ -1,52 +1,34 @@
-# Build stage
-FROM node:20-alpine AS builder
-
-WORKDIR /build
-
-# Install pnpm
-RUN npm install -g pnpm@9.12.0
-
-# Copy root files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-
-# Copy all packages and apps (monorepo structure)
-COPY packages ./packages
-COPY apps ./apps
-
-# Install dependencies (frozen lockfile in CI/prod)
-RUN pnpm install --frozen-lockfile
-
-# Build all packages + app
-RUN pnpm build
-
-# Runtime stage
-FROM node:20-alpine AS runtime
+FROM node:20-alpine
 
 WORKDIR /app
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
-# Install pnpm for prod
-RUN npm install -g pnpm@9.12.0
+# Install pnpm + dumb-init
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate && apk add --no-cache dumb-init
 
-# Copy built app (standalone mode outputs to .next and public)
-COPY --from=builder --chown=nextjs:nodejs /build/apps/web/.next ./
-COPY --from=builder --chown=nextjs:nodejs /build/apps/web/public ./public
+# Copy root package files for pnpm to work
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Copy root package.json (server.js may reference it)
-COPY --chown=nextjs:nodejs package.json ./
+# Copy pre-built Next.js and packages (assumes `pnpm build` ran on host)
+COPY apps/web/.next apps/web/.next
+COPY apps/web/package.json apps/web/
+COPY packages packages/
+COPY node_modules node_modules/
 
-# Create storage directory for local FS uploads (prod self-host)
-RUN mkdir -p /app/storage && chown -R nextjs:nodejs /app/storage
+# Create storage directory
+RUN mkdir -p storage && chown -R nodejs:nodejs /app
 
 # Switch to non-root
-USER nextjs
+USER nodejs
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+  CMD node -e "require('http').get('http://localhost:3000/', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" || exit 1
 
-# Server runs standalone Next.js on port 3000
 EXPOSE 3000
-CMD ["node", "server.js"]
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["pnpm", "--filter", "@mybizone/web", "start"]
