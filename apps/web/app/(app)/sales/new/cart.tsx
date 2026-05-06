@@ -12,7 +12,7 @@ import { Textarea } from '@mybizone/ui/textarea';
 import { useToast } from '@mybizone/ui/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createSaleAction } from '../actions';
+import { createSaleAction, uploadSaleBillImageAction } from '../actions';
 
 interface ProductOption {
   id: string;
@@ -58,6 +58,7 @@ export function PosCart({ stores, products, gstEnabled }: Props) {
   const [notes, setNotes] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [billFile, setBillFile] = useState<File | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
 
@@ -187,12 +188,28 @@ export function PosCart({ stores, products, gstEnabled }: Props) {
       setError(result.error);
       return;
     }
+    const saleId = result.data.id;
     toast({
       title: `Sale ${result.data.billNo} recorded`,
       description: `Total ₹${result.data.total}`,
     });
     router.push('/sales');
     router.refresh();
+
+    if (billFile) {
+      const upFd = new FormData();
+      upFd.set('id', saleId);
+      upFd.set('file', billFile);
+      uploadSaleBillImageAction(upFd).then((upResult) => {
+        if (!upResult.ok) {
+          toast({
+            title: 'Bill image upload failed',
+            description: upResult.error,
+            variant: 'destructive',
+          });
+        }
+      });
+    }
   }
 
   return (
@@ -402,6 +419,16 @@ export function PosCart({ stores, products, gstEnabled }: Props) {
           )}
           <div className="border-t pt-3 text-base font-semibold">
             <Row label="Total" value={totals?.total.toFixed(2) ?? '—'} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="billImage">Bill image (optional)</Label>
+            <Input
+              id="billImage"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => setBillFile(e.target.files?.[0] ?? null)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="paymentMethod">Payment</Label>
