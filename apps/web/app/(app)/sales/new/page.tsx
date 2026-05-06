@@ -1,9 +1,9 @@
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
-import { businesses, products, stores } from '@mybizone/db';
+import { businesses, products, saleItems, sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { PosCart } from './cart';
 
@@ -36,7 +36,24 @@ export default async function NewSalePage() {
       .select({ gstEnabled: businesses.gstEnabled })
       .from(businesses)
       .where(eq(businesses.id, user.businessId));
-    return { stores: sts, products: ps, gstEnabled: biz?.gstEnabled ?? false };
+    // Recent products: last 50 sale_items by this user, deduplicated to 5 distinct product_ids.
+    const recent = await tx
+      .select({ productId: saleItems.productId })
+      .from(saleItems)
+      .innerJoin(sales, eq(sales.id, saleItems.saleId))
+      .where(and(eq(saleItems.businessId, user.businessId), eq(sales.employeeId, user.id)))
+      .orderBy(desc(sales.createdAt))
+      .limit(50);
+    const seen = new Set<string>();
+    const recentProductIds: string[] = [];
+    for (const { productId } of recent) {
+      if (productId && !seen.has(productId) && recentProductIds.length < 5) {
+        seen.add(productId);
+        recentProductIds.push(productId);
+      }
+    }
+
+    return { stores: sts, products: ps, gstEnabled: biz?.gstEnabled ?? false, recentProductIds };
   });
 
   if (data.stores.length === 0 || data.products.length === 0) {
@@ -60,5 +77,12 @@ export default async function NewSalePage() {
     );
   }
 
-  return <PosCart stores={data.stores} products={data.products} gstEnabled={data.gstEnabled} />;
+  return (
+    <PosCart
+      stores={data.stores}
+      products={data.products}
+      gstEnabled={data.gstEnabled}
+      recentProductIds={data.recentProductIds}
+    />
+  );
 }

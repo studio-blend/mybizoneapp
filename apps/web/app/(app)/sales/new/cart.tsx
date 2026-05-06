@@ -41,9 +41,10 @@ interface Props {
   stores: StoreOption[];
   products: ProductOption[];
   gstEnabled: boolean;
+  recentProductIds: string[];
 }
 
-export function PosCart({ stores, products, gstEnabled }: Props) {
+export function PosCart({ stores, products, gstEnabled, recentProductIds }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [storeId, setStoreId] = useState(stores[0]?.id ?? '');
@@ -67,6 +68,14 @@ export function PosCart({ stores, products, gstEnabled }: Props) {
     [products, storeId],
   );
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+
+  const recentProducts = useMemo(
+    () =>
+      recentProductIds
+        .map((id) => productById.get(id))
+        .filter((p): p is ProductOption => p !== undefined && p.storeId === storeId),
+    [recentProductIds, productById, storeId],
+  );
 
   // Search filter — matches name, sku, or barcode (case-insensitive substring).
   const matches = useMemo(() => {
@@ -236,6 +245,23 @@ export function PosCart({ stores, products, gstEnabled }: Props) {
                   ))}
                 </Select>
               </div>
+              {recentProducts.length > 0 && (
+                <div className="space-y-1 sm:col-span-2">
+                  <p className="text-xs text-muted-foreground">Recent</p>
+                  <div className="flex flex-wrap gap-2">
+                    {recentProducts.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => addLine(p.id)}
+                        className="rounded-full border bg-muted px-3 py-1 text-xs hover:bg-accent"
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="search">
                   Add product (press <kbd className="rounded border px-1">/</kbd>)
