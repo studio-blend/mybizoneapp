@@ -23,6 +23,7 @@ let categoryA = '';
 let brandA = '';
 let productA = '';
 let saleA = '';
+let catalogueA = '';
 
 beforeAll(async () => {
   // Seed two tenants (as superuser — RLS bypassed for setup convenience).
@@ -69,6 +70,12 @@ beforeAll(async () => {
     await tx`
       INSERT INTO invitations (business_id, email, role, token, expires_at)
       VALUES (${bizA}, 'inv-a@example.com', 'employee', 'tok-a', NOW() + INTERVAL '7 days')`;
+    const catFileKeyA = `catalogues/${bizA}/test-a.pdf`;
+    const [cat] = await tx<{ id: string }[]>`
+      INSERT INTO catalogues (business_id, name, file_key)
+      VALUES (${bizA}, 'Cat-A-PDF', ${catFileKeyA}) RETURNING id`;
+    if (!cat) throw new Error('catalogue A seed failed');
+    catalogueA = cat.id;
   });
 
   // Seed under tenant B
@@ -97,6 +104,10 @@ beforeAll(async () => {
     await tx`
       INSERT INTO invitations (business_id, email, role, token, expires_at)
       VALUES (${bizB}, 'inv-b@example.com', 'employee', 'tok-b', NOW() + INTERVAL '7 days')`;
+    const catFileKeyB = `catalogues/${bizB}/test-b.pdf`;
+    await tx`
+      INSERT INTO catalogues (business_id, name, file_key)
+      VALUES (${bizB}, 'Cat-B-PDF', ${catFileKeyB})`;
   });
 });
 
@@ -192,6 +203,36 @@ describe('RLS — catalog + sales + invoices + invitations', () => {
     ).rejects.toThrow();
   });
 
+  it('catalogues: tenant A sees only A catalogues', async () => {
+    const rows = await sql.begin(async (tx) => {
+      await tx`SET LOCAL ROLE app_user`;
+      await tx`SELECT set_config('app.business_id', ${bizA}, true)`;
+      return tx<{ name: string }[]>`SELECT name FROM catalogues`;
+    });
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.name).toBe('Cat-A-PDF');
+  });
+
+  it('catalogues: tenant B sees only B catalogues', async () => {
+    const rows = await sql.begin(async (tx) => {
+      await tx`SET LOCAL ROLE app_user`;
+      await tx`SELECT set_config('app.business_id', ${bizB}, true)`;
+      return tx<{ name: string }[]>`SELECT name FROM catalogues`;
+    });
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.name).toBe('Cat-B-PDF');
+  });
+
+  it('catalogues: cross-tenant insert rejected', async () => {
+    await expect(
+      sql.begin(async (tx) => {
+        await tx`SET LOCAL ROLE app_user`;
+        await tx`SELECT set_config('app.business_id', ${bizA}, true)`;
+        await tx`INSERT INTO catalogues (business_id, name, file_key) VALUES (${bizB}, 'leak', 'catalogues/x/x.pdf')`;
+      }),
+    ).rejects.toThrow();
+  });
+
   it('no tenant context: every table returns 0 rows', async () => {
     const counts = await sql.begin(async (tx) => {
       await tx`SET LOCAL ROLE app_user`;
@@ -216,7 +257,10 @@ describe('RLS — catalog + sales + invoices + invitations', () => {
       const [{ c: invitesC } = { c: 'x' }] = await tx<
         { c: string }[]
       >`SELECT COUNT(*)::text AS c FROM invitations`;
-      return { categoriesC, brandsC, productsC, salesC, itemsC, invoicesC, invitesC };
+      const [{ c: cataloguesC } = { c: 'x' }] = await tx<
+        { c: string }[]
+      >`SELECT COUNT(*)::text AS c FROM catalogues`;
+      return { categoriesC, brandsC, productsC, salesC, itemsC, invoicesC, invitesC, cataloguesC };
     });
     for (const v of Object.values(counts)) expect(v).toBe('0');
   });
