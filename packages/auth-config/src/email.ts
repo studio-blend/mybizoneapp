@@ -43,6 +43,32 @@ export function resetPasswordTemplate(url: string, name: string) {
   return { subject, text, html };
 }
 
+export function invitationEmailTemplate(
+  acceptUrl: string,
+  inviterName: string,
+  businessName: string,
+  role: string,
+) {
+  const subject = `You've been invited to join ${businessName} on MyBizOne`;
+  const text = [
+    `Hi,`,
+    ``,
+    `${inviterName} has invited you to join ${businessName} as ${role === 'admin' ? 'an admin' : 'an employee'}.`,
+    ``,
+    `Click the link below to accept (valid for 7 days):`,
+    acceptUrl,
+    ``,
+    `If you weren't expecting this, you can safely ignore it.`,
+  ].join('\n');
+  const html = [
+    `<p>Hi,</p>`,
+    `<p>${escapeHtml(inviterName)} has invited you to join <strong>${escapeHtml(businessName)}</strong> as ${role === 'admin' ? 'an admin' : 'an employee'}.</p>`,
+    `<p><a href="${acceptUrl}">Accept invitation</a> (valid for 7 days)</p>`,
+    `<p>If you weren't expecting this, you can safely ignore it.</p>`,
+  ].join('');
+  return { subject, text, html };
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')

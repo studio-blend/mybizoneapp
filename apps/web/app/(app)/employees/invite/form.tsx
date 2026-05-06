@@ -52,7 +52,7 @@ export function InviteForm({ stores }: Props) {
       <CardHeader>
         <CardTitle>Invite teammate</CardTitle>
         <CardDescription>
-          They'll get an email link valid for 7 days. In dev the link logs to the server console.
+          They'll receive an email with a link valid for 7 days.
         </CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit}>

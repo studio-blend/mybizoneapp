@@ -1,8 +1,11 @@
 'use server';
 
 import { randomBytes } from 'node:crypto';
+import { env } from '@/lib/env';
+import { sendMail } from '@/lib/mailer';
 import { safeAction } from '@/lib/server-action';
-import { auditLogs, invitations, user as userTable } from '@mybizone/db';
+import { invitationEmailTemplate } from '@mybizone/auth-config/email';
+import { auditLogs, businesses, invitations, user as userTable } from '@mybizone/db';
 import { and, eq, ne } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -17,13 +20,14 @@ const InviteInput = z.object({
   storeId: optionalUuid,
 });
 
-/**
- * Create an invitation: opaque token + 7-day TTL. Email is logged to console
- * in dev (matches M1 verification flow); Resend wiring lands with the M3 cutover.
- */
 export const createInvitationAction = safeAction(InviteInput, async (input, { user, tx }) => {
   const token = randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  const [biz] = await tx
+    .select({ name: businesses.name })
+    .from(businesses)
+    .where(eq(businesses.id, user.businessId));
 
   const [row] = await tx
     .insert(invitations)
@@ -48,11 +52,14 @@ export const createInvitationAction = safeAction(InviteInput, async (input, { us
     after: { email: input.email, role: input.role },
   });
 
-  // Dev-mode email surrogate. M3 swaps for Resend.
-  if (process.env.NODE_ENV !== 'production') {
-    const url = `${process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'}/accept-invite/${row.token}`;
-    console.warn(`[invite] ${input.email} → ${url}`);
-  }
+  const acceptUrl = `${env.BETTER_AUTH_URL}/accept-invite/${row.token}`;
+  const { subject, html, text } = invitationEmailTemplate(
+    acceptUrl,
+    user.name,
+    biz?.name ?? 'your team',
+    input.role,
+  );
+  await sendMail({ to: input.email, subject, html, text });
 
   revalidatePath('/employees');
   return { id: row.id, token: row.token };
