@@ -24,6 +24,7 @@ export default async function EditProductPage({ params }: { params: { id: string
         unitType: products.unitType,
         unitSymbol: products.unitSymbol,
         price: products.price,
+        costPrice: products.costPrice,
         inventory: products.inventory,
         hsnCode: products.hsnCode,
         gstRate: products.gstRate,

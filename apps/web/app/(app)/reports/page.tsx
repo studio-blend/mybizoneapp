@@ -94,7 +94,29 @@ export default async function ReportsPage() {
       .orderBy(products.inventory)
       .limit(50);
 
-    return { byDay, topProducts, byPayment, lowStock };
+    // Profit estimation: only items with cost_price_at_sale contribute.
+    // Returns null profit when no items have cost data.
+    const [profitRow] = await tx
+      .select({
+        estimatedProfit: sql<string>`sum(CASE WHEN ${saleItems.costPriceAtSale} IS NOT NULL THEN ${saleItems.lineTotal} - ${saleItems.costPriceAtSale} * ${saleItems.qty} ELSE 0 END)`.as(
+          'estimated_profit',
+        ),
+        coveredItems: sql<number>`count(CASE WHEN ${saleItems.costPriceAtSale} IS NOT NULL THEN 1 END)::int`.as(
+          'covered_items',
+        ),
+        totalItems: sql<number>`count(*)::int`.as('total_items'),
+      })
+      .from(saleItems)
+      .innerJoin(sales, eq(sales.id, saleItems.saleId))
+      .where(
+        and(
+          eq(saleItems.businessId, user.businessId),
+          gte(sales.createdAt, since),
+          eq(sales.status, 'completed'),
+        ),
+      );
+
+    return { byDay, topProducts, byPayment, lowStock, profitRow };
   });
 
   const maxRevenue = data.byDay.reduce((m, r) => Math.max(m, Number(r.revenue ?? 0)), 0);
@@ -153,6 +175,28 @@ export default async function ReportsPage() {
           )}
         </CardContent>
       </Card>
+
+      {data.profitRow && data.profitRow.totalItems > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Profit (estimated)</CardTitle>
+            <CardDescription>
+              Based on {data.profitRow.coveredItems} of {data.profitRow.totalItems} line items with
+              cost price set.{' '}
+              {data.profitRow.coveredItems < data.profitRow.totalItems && (
+                <Link href="/products" className="underline">
+                  Set cost prices on products
+                </Link>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-semibold">
+              ₹ {Number(data.profitRow.estimatedProfit ?? 0).toFixed(2)}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

@@ -61,6 +61,7 @@ export const saleItems = pgTable(
     gstRate: numeric('gst_rate', { precision: 5, scale: 2 }),
     lineTotal: numeric('line_total', { precision: 12, scale: 2 }).notNull(),
     gstAmount: numeric('gst_amount', { precision: 10, scale: 2 }).notNull().default('0'),
+    costPriceAtSale: numeric('cost_price_at_sale', { precision: 10, scale: 2 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

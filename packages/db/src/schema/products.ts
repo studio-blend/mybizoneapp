@@ -26,6 +26,7 @@ export const products = pgTable(
     unitType: text('unit_type').notNull(), // 'piece' | 'weight' | 'length' | 'area' | 'volume'
     unitSymbol: text('unit_symbol').notNull(), // 'pc' | 'kg' | 'g' | 'm' | 'cm' | 'sqft' | 'litre' | ...
     price: numeric('price', { precision: 10, scale: 2 }).notNull(),
+    costPrice: numeric('cost_price', { precision: 10, scale: 2 }),
     inventory: numeric('inventory', { precision: 12, scale: 3 }).notNull().default('0'),
     hsnCode: text('hsn_code'),
     gstRate: numeric('gst_rate', { precision: 5, scale: 2 }),

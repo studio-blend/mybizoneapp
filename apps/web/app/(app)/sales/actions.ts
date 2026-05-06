@@ -66,6 +66,7 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
       name: products.name,
       unitSymbol: products.unitSymbol,
       price: products.price,
+      costPrice: products.costPrice,
       hsnCode: products.hsnCode,
       gstRate: products.gstRate,
       active: products.active,
@@ -158,6 +159,7 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
       gstRate: p.gstRate,
       lineTotal: calcLine.lineTotal.toFixed(2),
       gstAmount: calcLine.gstAmount.toFixed(2),
+      costPriceAtSale: p.costPrice,
     });
 
     const decrement = await tx

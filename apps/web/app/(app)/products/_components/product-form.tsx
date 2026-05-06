@@ -41,6 +41,7 @@ interface Initial {
   unitType: string;
   unitSymbol: string;
   price: string;
+  costPrice: string | null;
   inventory: string;
   hsnCode: string | null;
   gstRate: string | null;
@@ -83,6 +84,7 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
       unitType: fd.get('unitType'),
       unitSymbol: fd.get('unitSymbol'),
       price: fd.get('price'),
+      costPrice: fd.get('costPrice') ?? '',
       inventory: fd.get('inventory'),
       hsnCode: fd.get('hsnCode'),
       gstRate: fd.get('gstRate') ?? '',
@@ -247,6 +249,17 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                 placeholder="99.50"
                 required
                 defaultValue={initial?.price ?? ''}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="costPrice">Cost price ₹ (optional)</Label>
+              <Input
+                id="costPrice"
+                name="costPrice"
+                type="text"
+                inputMode="decimal"
+                placeholder="60.00"
+                defaultValue={initial?.costPrice ?? ''}
               />
             </div>
             <div className="space-y-2">
