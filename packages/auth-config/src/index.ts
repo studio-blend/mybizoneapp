@@ -7,6 +7,7 @@ import { type MailerEnv, createMailer, resetPasswordTemplate, verifyEmailTemplat
 export interface AuthEnv extends MailerEnv {
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
+  LAN_MODE?: boolean;
 }
 
 export function createAuth(db: Database, env: AuthEnv) {
@@ -55,7 +56,7 @@ export function createAuth(db: Database, env: AuthEnv) {
 
     advanced: {
       cookiePrefix: 'mybizone',
-      useSecureCookies: env.BETTER_AUTH_URL.startsWith('https://'),
+      useSecureCookies: !env.LAN_MODE && env.BETTER_AUTH_URL.startsWith('https://'),
     },
   });
 }

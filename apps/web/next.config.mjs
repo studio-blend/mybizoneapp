@@ -11,6 +11,7 @@ const nextConfig = {
   transpilePackages: ['@mybizone/ui', '@mybizone/db', '@mybizone/auth-config', '@mybizone/domain'],
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';
+    const isLAN = process.env.LAN_MODE === 'true';
     const csp = [
       "default-src 'self'",
       `script-src 'self'${isProd ? '' : " 'unsafe-eval' 'unsafe-inline'"}`,
@@ -30,10 +31,12 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload',
-          },
+          ...(isLAN ? [] : [
+            {
+              key: 'Strict-Transport-Security',
+              value: 'max-age=63072000; includeSubDomains; preload',
+            },
+          ]),
           { key: 'Content-Security-Policy', value: csp },
         ],
       },

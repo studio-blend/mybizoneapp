@@ -13,6 +13,7 @@ const schema = z.object({
   STORAGE_BACKEND: z.enum(['local', 'r2']).default('local'),
   STORAGE_DIR: z.string().optional().default('./storage'),
   R2_BUCKET: z.string().optional().default(''),
+  LAN_MODE: z.enum(['true', 'false']).default('false').transform(v => v === 'true'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
 
@@ -29,6 +30,7 @@ const parsed = schema.safeParse({
   STORAGE_BACKEND: process.env.STORAGE_BACKEND,
   STORAGE_DIR: process.env.STORAGE_DIR,
   R2_BUCKET: process.env.R2_BUCKET,
+  LAN_MODE: process.env.LAN_MODE,
   NODE_ENV: process.env.NODE_ENV,
 });
 
