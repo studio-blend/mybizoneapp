@@ -10,3 +10,4 @@ export * from './invoices';
 export * from './invitations';
 export * from './bill-counters';
 export * from './catalogues';
+export * from './usage-snapshots';

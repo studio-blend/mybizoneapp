@@ -3,3 +3,4 @@ export * from './catalog';
 export * from './sale';
 export * from './gst';
 export * from './profit';
+export * from './plans';

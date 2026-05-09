@@ -17,4 +17,5 @@ export function createPgClient(connectionString: string) {
 }
 
 export * from './schema';
+export * from './usage';
 export { schema };
