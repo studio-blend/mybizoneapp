@@ -23,6 +23,8 @@ const schema = z.object({
   RAZORPAY_WEBHOOK_SECRET: z.string().optional().default(''),
   RAZORPAY_PLAN_ID_MONTHLY: z.string().optional().default(''),
   RAZORPAY_PLAN_ID_ANNUAL: z.string().optional().default(''),
+  // License key for self-hosted LAN deployments
+  LICENSE_KEY: z.string().optional().default(''),
 });
 
 const parsed = schema.safeParse({
@@ -42,6 +44,7 @@ const parsed = schema.safeParse({
   RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
   RAZORPAY_PLAN_ID_MONTHLY: process.env.RAZORPAY_PLAN_ID_MONTHLY,
   RAZORPAY_PLAN_ID_ANNUAL: process.env.RAZORPAY_PLAN_ID_ANNUAL,
+  LICENSE_KEY: process.env.LICENSE_KEY,
   STORAGE_BACKEND: process.env.STORAGE_BACKEND,
   STORAGE_DIR: process.env.STORAGE_DIR,
   R2_BUCKET: process.env.R2_BUCKET,

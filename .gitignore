@@ -44,3 +44,6 @@ test-results/
 # local file storage (STORAGE_BACKEND=local writes here in dev/self-host)
 /storage/
 /apps/web/storage/
+
+# license signing key — never commit the private key
+scripts/.license-private-key.pem

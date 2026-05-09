@@ -6,7 +6,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./email": "./src/email.ts"
+    "./email": "./src/email.ts",
+    "./license-public-key": "./src/license-public-key.ts",
+    "./license": "./src/license.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
