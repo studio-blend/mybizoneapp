@@ -12,6 +12,8 @@ export interface AuthEnv extends MailerEnv {
 
 export function createAuth(db: Database, env: AuthEnv) {
   const sendMail = createMailer(env);
+  // LAN deployments with no email backend: skip verification entirely.
+  const skipEmailVerification = env.LAN_MODE === true && !env.RESEND_API_KEY;
 
   return betterAuth({
     secret: env.BETTER_AUTH_SECRET,
@@ -22,9 +24,19 @@ export function createAuth(db: Database, env: AuthEnv) {
       schema: { user, session, account, verification },
     }),
 
+    databaseHooks: skipEmailVerification
+      ? {
+          user: {
+            create: {
+              before: async (u) => ({ data: { ...u, emailVerified: true } }),
+            },
+          },
+        }
+      : undefined,
+
     emailAndPassword: {
       enabled: true,
-      requireEmailVerification: true,
+      requireEmailVerification: !skipEmailVerification,
       autoSignIn: false,
       minPasswordLength: 8,
       sendResetPassword: async ({ user: u, url }) => {
@@ -34,9 +46,10 @@ export function createAuth(db: Database, env: AuthEnv) {
     },
 
     emailVerification: {
-      sendOnSignUp: true,
+      sendOnSignUp: !skipEmailVerification,
       autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user: u, url }) => {
+        if (skipEmailVerification) return;
         const { subject, html, text } = verifyEmailTemplate(url, u.name);
         await sendMail({ to: u.email, subject, html, text });
       },
