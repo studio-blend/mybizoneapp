@@ -9,6 +9,7 @@ RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json biome.json ./
 COPY apps apps/
 COPY packages packages/
+COPY scripts scripts/
 
 # Install all deps (needed to build packages + Next.js app)
 RUN --mount=type=cache,target=/root/.pnpm-store \
@@ -42,17 +43,18 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001 && \
 # Copy installed deps + built artifacts from builder
 COPY --from=builder --chown=nodejs:nodejs /app /app
 
-# Storage volume mount point
-RUN mkdir -p storage && chown -R nodejs:nodejs /app/storage
+# Storage volume mount point + make entrypoint executable
+RUN mkdir -p storage && chown -R nodejs:nodejs /app/storage && \
+    chmod +x /app/scripts/docker-entrypoint.sh
 
 USER nodejs
 
 WORKDIR /app/apps/web
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=5 \
-  CMD node -e "require('http').get('http://localhost:3000/', (r) => {if (r.statusCode >= 500) throw new Error(r.statusCode)})" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => { let d=''; r.on('data', c => d+=c); r.on('end', () => { try { const b=JSON.parse(d); if(b.status!=='ok') process.exit(1); } catch { process.exit(1); } }); }).on('error', () => process.exit(1))"
 
 EXPOSE 3000
 
-ENTRYPOINT ["dumb-init", "--"]
+ENTRYPOINT ["dumb-init", "--", "/app/scripts/docker-entrypoint.sh"]
 CMD ["node_modules/.bin/next", "start", "-p", "3000"]
