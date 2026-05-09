@@ -90,6 +90,11 @@ NODE_ENV=production
 # Email — leave blank for now (invitations log to console, you read them via `docker logs`)
 RESEND_API_KEY=
 EMAIL_FROM=MyBizOne <noreply@mybizone.local>
+
+# Support — WhatsApp number shown on error page (country code + number, no +/spaces)
+# Example: 919876543210 for +91 98765 43210
+# NOTE: changing this requires `docker compose build` to take effect (baked at build time).
+NEXT_PUBLIC_SUPPORT_WHATSAPP=91XXXXXXXXXX
 ```
 
 Save and close.
@@ -113,13 +118,22 @@ This will:
 
 ---
 
-## 5. Run database migrations (REQUIRED on first run)
+## 5. Run database migrations (REQUIRED on first run AND after `down -v`)
+
+**Critical:** without this, the `user` table doesn't exist and signup will fail with HTTP 500. Symptom: "Better Auth error: relation user does not exist" in app logs.
 
 ```powershell
 docker compose exec app pnpm --filter @mybizone/db migrate
 ```
 
-Should print 9 migration names ending with `Done`. If it fails: `docker compose logs db` to check Postgres is up.
+Should print 9 `apply` lines ending with `migrations: up to date`. If it fails: `docker compose logs db` to check Postgres is up.
+
+**When to re-run:**
+- First-time install (always)
+- After `docker compose down -v` (volumes wiped → fresh DB → no schema)
+- After pulling code with new migration files (rare)
+
+**When NOT to re-run:** routine restarts (`down` without `-v`, or `restart`) preserve volumes.
 
 ---
 
@@ -140,11 +154,7 @@ Screenshot whatever error shows up. WhatsApp it to yourself for debugging later.
 ## 7. Initial setup (15 min)
 
 1. Click **Sign up**. Create your father's account using his email.
-2. Email verification: since RESEND_API_KEY is blank, the verification link prints to logs. Get it:
-   ```powershell
-   docker compose logs app | findstr "verify-email"
-   ```
-   Copy the URL, paste into browser, verify.
+2. Sign in immediately — email verification is skipped in LAN_MODE (no RESEND_API_KEY). No link needed.
 3. Onboarding wizard: enter business GST + first store name + address.
 4. Add 5–10 representative products from the shop (with current inventory counts).
 5. Make 1 test sale through POS to verify the flow works end-to-end.

@@ -15,6 +15,7 @@ const schema = z.object({
   R2_BUCKET: z.string().optional().default(''),
   LAN_MODE: z.enum(['true', 'false']).default('false').transform(v => v === 'true'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  NEXT_PUBLIC_SUPPORT_WHATSAPP: z.string().optional().default(''),
 });
 
 const parsed = schema.safeParse({
@@ -27,6 +28,7 @@ const parsed = schema.safeParse({
   SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN,
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
   NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+  NEXT_PUBLIC_SUPPORT_WHATSAPP: process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP,
   STORAGE_BACKEND: process.env.STORAGE_BACKEND,
   STORAGE_DIR: process.env.STORAGE_DIR,
   R2_BUCKET: process.env.R2_BUCKET,

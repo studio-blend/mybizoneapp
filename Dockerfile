@@ -21,6 +21,10 @@ ENV DATABASE_URL=postgres://build:build@localhost:5432/build \
     BETTER_AUTH_URL=http://localhost:3000 \
     NODE_ENV=production
 
+# NEXT_PUBLIC_* vars are baked into the JS bundle at build time — pass via build arg.
+ARG NEXT_PUBLIC_SUPPORT_WHATSAPP
+ENV NEXT_PUBLIC_SUPPORT_WHATSAPP=${NEXT_PUBLIC_SUPPORT_WHATSAPP}
+
 # Build workspace packages first (web depends on them), then the web app
 RUN pnpm --filter @mybizone/domain build && \
     pnpm --filter @mybizone/config build && \
