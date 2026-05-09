@@ -6,9 +6,14 @@ const PROTECTED_PREFIXES = ['/dashboard', '/stores', '/onboarding'];
 
 function buildCsp(): string {
   const isProd = process.env.NODE_ENV === 'production';
+  const isLAN = process.env.LAN_MODE === 'true';
+  // LAN_MODE: relax script-src so Next.js inline hydration scripts work without
+  // wiring nonces. Acceptable for private-network deployments; for public
+  // internet-facing deploys we should switch to nonce-based CSP.
+  const allowInlineScript = !isProd || isLAN;
   return [
     "default-src 'self'",
-    `script-src 'self'${isProd ? '' : " 'unsafe-eval' 'unsafe-inline'"}`,
+    `script-src 'self'${allowInlineScript ? " 'unsafe-eval' 'unsafe-inline'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
