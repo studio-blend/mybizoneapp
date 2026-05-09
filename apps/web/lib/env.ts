@@ -16,6 +16,13 @@ const schema = z.object({
   LAN_MODE: z.enum(['true', 'false']).default('false').transform(v => v === 'true'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   NEXT_PUBLIC_SUPPORT_WHATSAPP: z.string().optional().default(''),
+  // Razorpay — optional; billing features are disabled when these are unset.
+  RAZORPAY_KEY_ID: z.string().optional().default(''),
+  NEXT_PUBLIC_RAZORPAY_KEY_ID: z.string().optional().default(''),
+  RAZORPAY_KEY_SECRET: z.string().optional().default(''),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional().default(''),
+  RAZORPAY_PLAN_ID_MONTHLY: z.string().optional().default(''),
+  RAZORPAY_PLAN_ID_ANNUAL: z.string().optional().default(''),
 });
 
 const parsed = schema.safeParse({
@@ -29,6 +36,12 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
   NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
   NEXT_PUBLIC_SUPPORT_WHATSAPP: process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP,
+  RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
+  NEXT_PUBLIC_RAZORPAY_KEY_ID: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+  RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
+  RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
+  RAZORPAY_PLAN_ID_MONTHLY: process.env.RAZORPAY_PLAN_ID_MONTHLY,
+  RAZORPAY_PLAN_ID_ANNUAL: process.env.RAZORPAY_PLAN_ID_ANNUAL,
   STORAGE_BACKEND: process.env.STORAGE_BACKEND,
   STORAGE_DIR: process.env.STORAGE_DIR,
   R2_BUCKET: process.env.R2_BUCKET,
