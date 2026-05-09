@@ -1,12 +1,13 @@
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
-import { products, sales, stores } from '@mybizone/db';
+import { invoices, products, sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { and, count, desc, eq, gte, lt, sql, sum } from 'drizzle-orm';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { GuidedTour } from './_components/GuidedTour';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export default async function DashboardPage() {
   const data = await withTenant(db, user.businessId, async (tx) => {
     const storeRows = await tx.select({ id: stores.id, name: stores.name }).from(stores);
     if (storeRows.length === 0) {
-      return { storeRows, kpis: null, recent: [], topProducts: [], lowStock: [] };
+      return { storeRows, kpis: null, recent: [], lowStock: [], tour: { hasProducts: false, hasSales: false, hasInvoices: false } };
     }
 
     const today = new Date();
@@ -84,6 +85,11 @@ export default async function DashboardPage() {
       .orderBy(desc(sales.createdAt))
       .limit(5);
 
+    const [invoiceAgg] = await tx
+      .select({ total: count(invoices.id) })
+      .from(invoices)
+      .where(eq(invoices.businessId, user.businessId));
+
     return {
       storeRows,
       kpis: {
@@ -94,6 +100,11 @@ export default async function DashboardPage() {
       },
       recent,
       lowStock,
+      tour: {
+        hasProducts: Number(productAgg?.total ?? 0) > 0,
+        hasSales: Number(todayAgg?.salesCount ?? 0) > 0 || recent.length > 0,
+        hasInvoices: Number(invoiceAgg?.total ?? 0) > 0,
+      },
     };
   });
 
@@ -128,6 +139,12 @@ export default async function DashboardPage() {
           <Link href="/sales/new">New sale</Link>
         </Button>
       </div>
+
+      <GuidedTour
+        hasProducts={data.tour.hasProducts}
+        hasSales={data.tour.hasSales}
+        hasInvoices={data.tour.hasInvoices}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Revenue today" value={`₹ ${formatMoney(k?.todayRevenue)}`} />
