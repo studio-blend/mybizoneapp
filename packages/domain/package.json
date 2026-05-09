@@ -10,7 +10,8 @@
     "./catalog": "./src/catalog.ts",
     "./sale": "./src/sale.ts",
     "./gst": "./src/gst.ts",
-    "./profit": "./src/profit.ts"
+    "./profit": "./src/profit.ts",
+    "./plans": "./src/plans.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

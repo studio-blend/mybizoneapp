@@ -22,6 +22,7 @@ import { Textarea } from '@mybizone/ui/textarea';
 import { useToast } from '@mybizone/ui/use-toast';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useMemo, useState } from 'react';
+import { UpgradeAlert } from '@/components/upgrade-alert';
 import { createProductAction, updateProductAction, uploadProductImageAction } from '../actions';
 
 interface Option {
@@ -308,7 +309,7 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
               )}
             </div>
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          <UpgradeAlert error={error} />
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={pending}>

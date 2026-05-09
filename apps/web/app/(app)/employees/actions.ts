@@ -6,7 +6,8 @@ import { sendMail } from '@/lib/mailer';
 import { safeAction } from '@/lib/server-action';
 import { invitationEmailTemplate } from '@mybizone/auth-config/email';
 import { auditLogs, businesses, invitations, user as userTable } from '@mybizone/db';
-import { and, eq, ne } from 'drizzle-orm';
+import { type Plan, checkLimit, isValidPlan } from '@mybizone/domain/plans';
+import { and, count, eq, ne } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -24,10 +25,20 @@ export const createInvitationAction = safeAction(InviteInput, async (input, { us
   const token = randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  const [biz] = await tx
-    .select({ name: businesses.name })
-    .from(businesses)
-    .where(eq(businesses.id, user.businessId));
+  const [bizRows, userCountRows] = await Promise.all([
+    tx.select({ name: businesses.name, plan: businesses.plan }).from(businesses).where(eq(businesses.id, user.businessId)),
+    tx
+      .select({ n: count() })
+      .from(userTable)
+      .where(and(eq(userTable.businessId, user.businessId), eq(userTable.active, true))),
+  ]);
+  const biz = bizRows[0];
+
+  const plan: Plan = isValidPlan(biz?.plan) ? (biz.plan as Plan) : 'free';
+  const gate = checkLimit(plan, 'users', userCountRows[0]?.n ?? 0);
+  if (!gate.allowed) {
+    throw new Error(`upgrade required: user limit of ${gate.limit} reached on the free plan`);
+  }
 
   const [row] = await tx
     .insert(invitations)

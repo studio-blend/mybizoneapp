@@ -1,5 +1,6 @@
 'use client';
 
+import { UpgradeAlert } from '@/components/upgrade-alert';
 import { Button } from '@mybizone/ui/button';
 import {
   Card,
@@ -79,7 +80,7 @@ export function InviteForm({ stores }: Props) {
               ))}
             </Select>
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          <UpgradeAlert error={error} />
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={pending}>

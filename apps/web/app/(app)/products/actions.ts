@@ -4,10 +4,11 @@ import { db } from '@/lib/db';
 import { type ActionResult, safeAction } from '@/lib/server-action';
 import { requireUser } from '@/lib/session';
 import { uploadFile } from '@/lib/storage';
-import { auditLogs, products } from '@mybizone/db';
+import { auditLogs, bumpUsage, businesses, products } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { isValidUnit } from '@mybizone/domain/catalog';
-import { and, eq } from 'drizzle-orm';
+import { type Plan, checkLimit, isValidPlan } from '@mybizone/domain/plans';
+import { and, count, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -55,6 +56,21 @@ const unitErrorPath = { path: ['unitSymbol'], message: 'unit symbol does not mat
 const ProductInput = ProductBase.refine(unitMatches, unitErrorPath);
 
 export const createProductAction = safeAction(ProductInput, async (input, { user, tx }) => {
+  const [bizRows, countRows] = await Promise.all([
+    tx.select({ plan: businesses.plan }).from(businesses).where(eq(businesses.id, user.businessId)),
+    tx
+      .select({ n: count() })
+      .from(products)
+      .where(and(eq(products.businessId, user.businessId), eq(products.active, true))),
+  ]);
+  const plan: Plan = isValidPlan(bizRows[0]?.plan) ? (bizRows[0].plan as Plan) : 'free';
+  const gate = checkLimit(plan, 'products', countRows[0]?.n ?? 0);
+  if (!gate.allowed) {
+    throw new Error(
+      `upgrade required: product limit of ${gate.limit} reached on the free plan`,
+    );
+  }
+
   const [row] = await tx
     .insert(products)
     .values({
@@ -77,14 +93,17 @@ export const createProductAction = safeAction(ProductInput, async (input, { user
     .returning({ id: products.id, name: products.name });
   if (!row) throw new Error('insert failed');
 
-  await tx.insert(auditLogs).values({
-    businessId: user.businessId,
-    actorId: user.id,
-    action: 'product.create',
-    entity: 'product',
-    entityId: row.id,
-    after: { name: row.name, price: input.price, inventory: input.inventory },
-  });
+  await Promise.all([
+    tx.insert(auditLogs).values({
+      businessId: user.businessId,
+      actorId: user.id,
+      action: 'product.create',
+      entity: 'product',
+      entityId: row.id,
+      after: { name: row.name, price: input.price, inventory: input.inventory },
+    }),
+    bumpUsage(user.businessId, tx, { productCount: 1 }),
+  ]);
 
   revalidatePath('/products');
   return { id: row.id, name: row.name };
@@ -164,15 +183,18 @@ export const deleteProductAction = safeAction(DeleteProductInput, async (input, 
     .set({ active: false, updatedAt: new Date() })
     .where(and(eq(products.id, input.id), eq(products.businessId, user.businessId)));
 
-  await tx.insert(auditLogs).values({
-    businessId: user.businessId,
-    actorId: user.id,
-    action: 'product.delete',
-    entity: 'product',
-    entityId: input.id,
-    before,
-    after: { active: false },
-  });
+  await Promise.all([
+    tx.insert(auditLogs).values({
+      businessId: user.businessId,
+      actorId: user.id,
+      action: 'product.delete',
+      entity: 'product',
+      entityId: input.id,
+      before,
+      after: { active: false },
+    }),
+    bumpUsage(user.businessId, tx, { productCount: -1 }),
+  ]);
 
   revalidatePath('/products');
   return { ok: true };
