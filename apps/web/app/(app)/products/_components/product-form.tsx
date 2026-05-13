@@ -43,6 +43,13 @@ interface Initial {
   unitSymbol: string;
   price: string;
   costPrice: string | null;
+  mrp: string | null;
+  wholesalePrice: string | null;
+  rate1: string | null;
+  rate2: string | null;
+  rate3: string | null;
+  rate4: string | null;
+  minStock: string | null;
   inventory: string;
   hsnCode: string | null;
   gstRate: string | null;
@@ -86,6 +93,13 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
       unitSymbol: fd.get('unitSymbol'),
       price: fd.get('price'),
       costPrice: fd.get('costPrice') ?? '',
+      mrp: fd.get('mrp') ?? '',
+      wholesalePrice: fd.get('wholesalePrice') ?? '',
+      rate1: fd.get('rate1') ?? '',
+      rate2: fd.get('rate2') ?? '',
+      rate3: fd.get('rate3') ?? '',
+      rate4: fd.get('rate4') ?? '',
+      minStock: fd.get('minStock') ?? '',
       inventory: fd.get('inventory'),
       hsnCode: fd.get('hsnCode'),
       gstRate: fd.get('gstRate') ?? '',
@@ -262,6 +276,38 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                 placeholder="60.00"
                 defaultValue={initial?.costPrice ?? ''}
               />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <p className="text-sm font-medium">Pricing tiers (optional)</p>
+              <p className="text-xs text-muted-foreground">Set different prices for different customer types. Leave blank to use the main Price above.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mrp">MRP ₹</Label>
+              <Input id="mrp" name="mrp" type="text" inputMode="decimal" placeholder="120.00" defaultValue={initial?.mrp ?? ''} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="wholesalePrice">Wholesale ₹</Label>
+              <Input id="wholesalePrice" name="wholesalePrice" type="text" inputMode="decimal" placeholder="80.00" defaultValue={initial?.wholesalePrice ?? ''} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rate1">Rate 1 ₹</Label>
+              <Input id="rate1" name="rate1" type="text" inputMode="decimal" defaultValue={initial?.rate1 ?? ''} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rate2">Rate 2 ₹</Label>
+              <Input id="rate2" name="rate2" type="text" inputMode="decimal" defaultValue={initial?.rate2 ?? ''} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rate3">Rate 3 ₹</Label>
+              <Input id="rate3" name="rate3" type="text" inputMode="decimal" defaultValue={initial?.rate3 ?? ''} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rate4">Rate 4 ₹</Label>
+              <Input id="rate4" name="rate4" type="text" inputMode="decimal" defaultValue={initial?.rate4 ?? ''} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="minStock">Min stock (reorder level)</Label>
+              <Input id="minStock" name="minStock" type="text" inputMode="decimal" placeholder="5.000" defaultValue={initial?.minStock ?? ''} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="inventory">Inventory ({initial?.unitSymbol ?? 'units'})</Label>

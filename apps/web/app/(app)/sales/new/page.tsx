@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
-import { businesses, products, saleItems, sales, stores } from '@mybizone/db';
+import { businesses, customers, products, saleItems, sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { and, asc, desc, eq } from 'drizzle-orm';
@@ -53,7 +53,17 @@ export default async function NewSalePage() {
       }
     }
 
-    return { stores: sts, products: ps, gstEnabled: biz?.gstEnabled ?? false, recentProductIds };
+    const cs = await tx
+      .select({
+        id: customers.id,
+        name: customers.name,
+        outstandingBalance: customers.outstandingBalance,
+      })
+      .from(customers)
+      .where(eq(customers.businessId, user.businessId))
+      .orderBy(asc(customers.name));
+
+    return { stores: sts, products: ps, gstEnabled: biz?.gstEnabled ?? false, recentProductIds, customers: cs };
   });
 
   if (data.stores.length === 0 || data.products.length === 0) {
@@ -83,6 +93,7 @@ export default async function NewSalePage() {
       products={data.products}
       gstEnabled={data.gstEnabled}
       recentProductIds={data.recentProductIds}
+      customers={data.customers}
     />
   );
 }

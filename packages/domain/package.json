@@ -11,7 +11,8 @@
     "./sale": "./src/sale.ts",
     "./gst": "./src/gst.ts",
     "./profit": "./src/profit.ts",
-    "./plans": "./src/plans.ts"
+    "./plans": "./src/plans.ts",
+    "./bill-series": "./src/bill-series.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

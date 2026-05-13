@@ -1,6 +1,7 @@
-import { index, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { boolean, date, index, jsonb, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { user } from './auth';
 import { businesses } from './businesses';
+import { customers } from './customers';
 import { products } from './products';
 import { stores } from './stores';
 
@@ -17,6 +18,9 @@ export const sales = pgTable(
       .notNull()
       .references(() => stores.id, { onDelete: 'restrict' }),
     employeeId: text('employee_id').references(() => user.id, { onDelete: 'set null' }),
+    customerId: uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+    // financialYear stores '2025-26' to enable fast FY-scoped bill number queries.
+    financialYear: text('financial_year'),
     billNo: text('bill_no').notNull(),
     customerName: text('customer_name'),
     customerPhone: text('customer_phone'),
@@ -25,7 +29,18 @@ export const sales = pgTable(
     discount: numeric('discount', { precision: 12, scale: 2 }).notNull().default('0'),
     taxTotal: numeric('tax_total', { precision: 12, scale: 2 }).notNull().default('0'),
     total: numeric('total', { precision: 12, scale: 2 }).notNull(),
-    paymentMethod: text('payment_method').notNull(), // 'cash' | 'upi' | 'card' | 'other'
+    paymentMethod: text('payment_method').notNull(), // 'cash' | 'upi' | 'card_debit' | 'card_credit' | 'finance_emi' | 'cheque' | 'credit' | 'other'
+    // M8: structured payment breakdown — UPI ref, last4 + bank, EMI details, cheque no., etc.
+    paymentDetails: jsonb('payment_details'),
+    // M8: bill_type controls inventory + GST behaviour:
+    //   'gst_bill' — standard sale, decrements stock, GST shown
+    //   'non_gst_bill' — sale without GST line items
+    //   'estimate' — quotation-style, NO stock decrement, NO bill series
+    billType: text('bill_type').notNull().default('gst_bill'),
+    // M8: dueDate populated for estimates + EMI bills; null otherwise.
+    dueDate: date('due_date'),
+    // M8: paymentStatus tracks settlement progress: 'paid' | 'partial' | 'due' | 'overdue'.
+    paymentStatus: text('payment_status').notNull().default('paid'),
     billImageKey: text('bill_image_key'),
     notes: text('notes'),
     status: text('status').notNull().default('completed'), // 'completed' | 'voided' | 'refunded'
@@ -62,6 +77,11 @@ export const saleItems = pgTable(
     lineTotal: numeric('line_total', { precision: 12, scale: 2 }).notNull(),
     gstAmount: numeric('gst_amount', { precision: 10, scale: 2 }).notNull().default('0'),
     costPriceAtSale: numeric('cost_price_at_sale', { precision: 10, scale: 2 }),
+    // M8: per-line ₹ discount (subtracted from lineSubtotal before GST calc).
+    itemDiscount: numeric('item_discount', { precision: 10, scale: 2 }).notNull().default('0'),
+    // M8: free items — line displayed on bill with lineTotal=0.
+    isFreeItem: boolean('is_free_item').notNull().default(false),
+    freeQty: numeric('free_qty', { precision: 12, scale: 3 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

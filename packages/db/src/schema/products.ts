@@ -27,6 +27,14 @@ export const products = pgTable(
     unitSymbol: text('unit_symbol').notNull(), // 'pc' | 'kg' | 'g' | 'm' | 'cm' | 'sqft' | 'litre' | ...
     price: numeric('price', { precision: 10, scale: 2 }).notNull(),
     costPrice: numeric('cost_price', { precision: 10, scale: 2 }),
+    mrp: numeric('mrp', { precision: 10, scale: 2 }),
+    wholesalePrice: numeric('wholesale_price', { precision: 10, scale: 2 }),
+    rate1: numeric('rate_1', { precision: 10, scale: 2 }),
+    rate2: numeric('rate_2', { precision: 10, scale: 2 }),
+    rate3: numeric('rate_3', { precision: 10, scale: 2 }),
+    rate4: numeric('rate_4', { precision: 10, scale: 2 }),
+    // minStock is the reorder level; dashboard alerts when inventory drops below this.
+    minStock: numeric('min_stock', { precision: 12, scale: 3 }),
     inventory: numeric('inventory', { precision: 12, scale: 3 }).notNull().default('0'),
     hsnCode: text('hsn_code'),
     gstRate: numeric('gst_rate', { precision: 5, scale: 2 }),

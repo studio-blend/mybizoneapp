@@ -146,3 +146,90 @@ describe('calculateSaleTotals — invariants & errors', () => {
     ).toThrow(/discount/);
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// M8: free items + item discount + non-GST mode
+// ────────────────────────────────────────────────────────────
+describe('calculateSaleTotals — M8 free items', () => {
+  it('isFreeItem=true zeroes lineTotal and gstAmount but keeps lineSubtotal', () => {
+    const out = calculateSaleTotals({
+      lines: [
+        { qty: 1, unitPrice: 100, gstRate: 18 },
+        { qty: 1, unitPrice: 50, gstRate: 18, isFreeItem: true },
+      ],
+      gstEnabled: true,
+    });
+    const free = out.lines[1];
+    expect(free?.lineSubtotal).toBe(50);
+    expect(free?.lineTotal).toBe(0);
+    expect(free?.gstAmount).toBe(0);
+    expect(free?.lineDiscount).toBe(50);
+    // Total is just the non-free line: 100 + 18% GST = 118
+    expect(out.total).toBe(118);
+    expect(out.taxTotal).toBe(18);
+  });
+
+  it('all-free cart yields zero total', () => {
+    const out = calculateSaleTotals({
+      lines: [{ qty: 1, unitPrice: 100, gstRate: 18, isFreeItem: true }],
+      gstEnabled: true,
+    });
+    expect(out.total).toBe(0);
+    expect(out.taxTotal).toBe(0);
+    expect(out.discount).toBe(100);
+  });
+});
+
+describe('calculateSaleTotals — M8 item discount', () => {
+  it('itemDiscount reduces taxable base for that line', () => {
+    const out = calculateSaleTotals({
+      lines: [{ qty: 1, unitPrice: 100, gstRate: 18, itemDiscount: 20 }],
+      gstEnabled: true,
+    });
+    // taxable 80, gst 14.4, total 94.4
+    expect(out.taxableAmount).toBe(80);
+    expect(out.taxTotal).toBe(14.4);
+    expect(out.total).toBe(94.4);
+    expect(out.discount).toBe(20);
+    expect(out.lines[0]?.lineDiscount).toBe(20);
+  });
+
+  it('itemDiscount + bill discount compose: GST applied after both', () => {
+    const out = calculateSaleTotals({
+      lines: [{ qty: 1, unitPrice: 100, gstRate: 18, itemDiscount: 20 }],
+      discount: 10,
+      gstEnabled: true,
+    });
+    // post-item 80, post-bill 70, gst 12.6, total 82.6
+    expect(out.taxableAmount).toBe(70);
+    expect(out.taxTotal).toBe(12.6);
+    expect(out.total).toBe(82.6);
+    expect(out.discount).toBe(30);
+  });
+
+  it('rejects itemDiscount > lineSubtotal', () => {
+    expect(() =>
+      calculateSaleTotals({
+        lines: [{ qty: 1, unitPrice: 50, gstRate: null, itemDiscount: 100 }],
+        gstEnabled: false,
+      }),
+    ).toThrow(/itemDiscount/);
+  });
+});
+
+describe('calculateSaleTotals — M8 non-GST mode', () => {
+  it('gstEnabled=false → taxTotal=0 even with gstRate set on lines', () => {
+    const out = calculateSaleTotals({
+      lines: [
+        { qty: 2, unitPrice: 100, gstRate: 18 },
+        { qty: 1, unitPrice: 50, gstRate: 5 },
+      ],
+      gstEnabled: false,
+    });
+    expect(out.taxTotal).toBe(0);
+    expect(out.cgst).toBe(0);
+    expect(out.sgst).toBe(0);
+    expect(out.igst).toBe(0);
+    expect(out.total).toBe(250);
+  });
+});

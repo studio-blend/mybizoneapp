@@ -25,6 +25,14 @@ const schema = z.object({
   RAZORPAY_PLAN_ID_ANNUAL: z.string().optional().default(''),
   // License key for self-hosted LAN deployments
   LICENSE_KEY: z.string().optional().default(''),
+  // Portable desktop mode — set by the Go launcher before starting Next.js
+  PORTABLE_MODE: z.enum(['true', 'false']).default('false').transform(v => v === 'true'),
+  // Whether the one-time setup wizard has been completed (written to config.json by launcher)
+  SETUP_COMPLETE: z.enum(['true', 'false']).default('true').transform(v => v === 'true'),
+  // Port the server is listening on (informational — used by /settings/system)
+  PORT: z.string().optional().default('3000'),
+  // App version injected at build time by the release CI job
+  NEXT_PUBLIC_APP_VERSION: z.string().optional().default('dev'),
 });
 
 const parsed = schema.safeParse({
@@ -45,6 +53,10 @@ const parsed = schema.safeParse({
   RAZORPAY_PLAN_ID_MONTHLY: process.env.RAZORPAY_PLAN_ID_MONTHLY,
   RAZORPAY_PLAN_ID_ANNUAL: process.env.RAZORPAY_PLAN_ID_ANNUAL,
   LICENSE_KEY: process.env.LICENSE_KEY,
+  PORTABLE_MODE: process.env.PORTABLE_MODE,
+  SETUP_COMPLETE: process.env.SETUP_COMPLETE,
+  PORT: process.env.PORT,
+  NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION,
   STORAGE_BACKEND: process.env.STORAGE_BACKEND,
   STORAGE_DIR: process.env.STORAGE_DIR,
   R2_BUCKET: process.env.R2_BUCKET,

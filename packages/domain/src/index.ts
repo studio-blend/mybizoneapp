@@ -4,3 +4,4 @@ export * from './sale';
 export * from './gst';
 export * from './profit';
 export * from './plans';
+export * from './bill-series';

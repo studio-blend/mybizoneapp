@@ -79,6 +79,7 @@ export default async function ReportsPage() {
         id: products.id,
         name: products.name,
         inventory: products.inventory,
+        minStock: products.minStock,
         unitSymbol: products.unitSymbol,
         storeName: stores.name,
       })
@@ -88,7 +89,7 @@ export default async function ReportsPage() {
         and(
           eq(products.businessId, user.businessId),
           eq(products.active, true),
-          sql`${products.inventory} <= 5`,
+          sql`${products.inventory} <= COALESCE(${products.minStock}, 5)`,
         ),
       )
       .orderBy(products.inventory)
@@ -136,6 +137,27 @@ export default async function ReportsPage() {
             <Link href="/api/sales/export">Sales CSV</Link>
           </Button>
         </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Button asChild variant="outline">
+          <Link href="/reports/profit-margin">Profit Margin</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/reports/min-stock">Low Stock Report</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/reports/closing-stock">Closing Stock</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/reports/gst">GST Report</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/reports/outstanding">Outstanding</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/reports/trends">Trends</Link>
+        </Button>
       </div>
 
       <Card>
@@ -272,7 +294,7 @@ export default async function ReportsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Low stock</CardTitle>
-          <CardDescription>Inventory at or below 5 units.</CardDescription>
+          <CardDescription>Items at or below reorder level.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -281,12 +303,13 @@ export default async function ReportsPage() {
                 <TableHead>Product</TableHead>
                 <TableHead>Store</TableHead>
                 <TableHead className="text-right">Inventory</TableHead>
+                <TableHead className="text-right">Reorder level</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.lowStock.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
                     No low-stock items.
                   </TableCell>
                 </TableRow>
@@ -301,6 +324,9 @@ export default async function ReportsPage() {
                     <TableCell className="text-muted-foreground">{p.storeName ?? '—'}</TableCell>
                     <TableCell className="text-right">
                       {p.inventory} {p.unitSymbol}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {p.minStock ?? '5'} {p.unitSymbol}
                     </TableCell>
                   </TableRow>
                 ))

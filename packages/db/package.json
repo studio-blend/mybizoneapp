@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
-    "./tenant": "./src/tenant.ts"
+    "./tenant": "./src/tenant.ts",
+    "./bill-series-repo": "./src/bill-series-repo.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -32,26 +32,54 @@ interface StoreOption {
   name: string;
 }
 
+interface CustomerOption {
+  id: string;
+  name: string;
+  outstandingBalance: string;
+}
+
 interface CartLine {
   productId: string;
   qty: string;
+  itemDiscount: string;
+  isFreeItem: boolean;
 }
+
+type BillType = 'gst_bill' | 'non_gst_bill' | 'estimate';
+type PaymentType =
+  | 'cash'
+  | 'upi'
+  | 'card_debit'
+  | 'card_credit'
+  | 'finance_emi'
+  | 'cheque'
+  | 'credit'
+  | 'other';
 
 interface Props {
   stores: StoreOption[];
   products: ProductOption[];
   gstEnabled: boolean;
   recentProductIds: string[];
+  customers: CustomerOption[];
 }
 
-export function PosCart({ stores, products, gstEnabled, recentProductIds }: Props) {
+function todayPlusDays(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export function PosCart({ stores, products, gstEnabled, recentProductIds, customers }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [storeId, setStoreId] = useState(stores[0]?.id ?? '');
   const [search, setSearch] = useState('');
   const [lines, setLines] = useState<CartLine[]>([]);
   const [discount, setDiscount] = useState('0');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card' | 'other'>('cash');
+  const [billType, setBillType] = useState<BillType>('gst_bill');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentType>('cash');
+  const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerGstin, setCustomerGstin] = useState('');
@@ -60,8 +88,25 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [billFile, setBillFile] = useState<File | null>(null);
+  // Payment-type-specific fields
+  const [upiRef, setUpiRef] = useState('');
+  const [cardLast4, setCardLast4] = useState('');
+  const [cardBank, setCardBank] = useState('');
+  const [financeCompany, setFinanceCompany] = useState('');
+  const [downPayment, setDownPayment] = useState('0');
+  const [tenureMonths, setTenureMonths] = useState('12');
+  const [emiAmount, setEmiAmount] = useState('0');
+  const [financeRef, setFinanceRef] = useState('');
+  const [chequeNo, setChequeNo] = useState('');
+  const [chequeBank, setChequeBank] = useState('');
+  const [chequeDate, setChequeDate] = useState('');
+  const [dueDate, setDueDate] = useState(todayPlusDays(30));
   const searchRef = useRef<HTMLInputElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
+
+  // Effective GST mode: false for non_gst_bill regardless of business setting.
+  const effectiveGstEnabled = gstEnabled && billType !== 'non_gst_bill';
+  const showDueDate = billType === 'estimate' || paymentMethod === 'finance_emi';
 
   const productsByStore = useMemo(
     () => products.filter((p) => p.storeId === storeId),
@@ -96,7 +141,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
     if (lines.length === 0) return null;
     try {
       return calculateSaleTotals({
-        gstEnabled,
+        gstEnabled: effectiveGstEnabled,
         isInterstate,
         discount: Number(discount) || 0,
         lines: lines.map((l) => {
@@ -106,13 +151,15 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
             qty: Number(l.qty) || 0,
             unitPrice: Number(p.price),
             gstRate: p.gstRate ? Number(p.gstRate) : null,
+            itemDiscount: Number(l.itemDiscount) || 0,
+            isFreeItem: l.isFreeItem,
           };
         }),
       });
     } catch {
       return null;
     }
-  }, [lines, discount, gstEnabled, isInterstate, productById]);
+  }, [lines, discount, effectiveGstEnabled, isInterstate, productById]);
 
   function addLine(productId: string) {
     setLines((prev) => {
@@ -122,7 +169,10 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
           l.productId === productId ? { ...l, qty: bumpQty(l.qty, productId) } : l,
         );
       }
-      return [...prev, { productId, qty: defaultQty(productId) }];
+      return [
+        ...prev,
+        { productId, qty: defaultQty(productId), itemDiscount: '0', isFreeItem: false },
+      ];
     });
     setSearch('');
     searchRef.current?.focus();
@@ -152,6 +202,18 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
     setLines((prev) => prev.map((l) => (l.productId === productId ? { ...l, qty } : l)));
   }
 
+  function setItemDiscount(productId: string, value: string) {
+    setLines((prev) =>
+      prev.map((l) => (l.productId === productId ? { ...l, itemDiscount: value } : l)),
+    );
+  }
+
+  function setFree(productId: string, free: boolean) {
+    setLines((prev) =>
+      prev.map((l) => (l.productId === productId ? { ...l, isFreeItem: free } : l)),
+    );
+  }
+
   // Global keyboard shortcuts: '/' focuses search, F2 submits.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -173,6 +235,33 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  function buildPaymentDetails(): Record<string, unknown> | undefined {
+    switch (paymentMethod) {
+      case 'upi':
+        return upiRef ? { upiRef } : undefined;
+      case 'card_debit':
+      case 'card_credit':
+        if (!cardLast4 && !cardBank) return undefined;
+        return { last4: cardLast4 || undefined, bank: cardBank || undefined };
+      case 'finance_emi':
+        return {
+          financeCompany,
+          downPayment,
+          tenureMonths: Number(tenureMonths) || 0,
+          emiAmount,
+          reference: financeRef || undefined,
+        };
+      case 'cheque':
+        return {
+          chequeNo,
+          bank: chequeBank || undefined,
+          chequeDate: chequeDate || undefined,
+        };
+      default:
+        return undefined;
+    }
+  }
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -180,9 +269,15 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
       setError('Add at least one product');
       return;
     }
+    // Finance/EMI requires finance company.
+    if (paymentMethod === 'finance_emi' && !financeCompany.trim()) {
+      setError('Finance company is required for EMI sales');
+      return;
+    }
     setPending(true);
     const result = await createSaleAction({
       storeId,
+      customerId: customerId || '',
       customerName,
       customerPhone,
       customerGstin,
@@ -190,7 +285,16 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
       discount: discount || '0',
       notes,
       isInterstate,
-      lines: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
+      billType,
+      paymentDetails: buildPaymentDetails(),
+      paymentStatus: paymentMethod === 'credit' || paymentMethod === 'finance_emi' ? 'due' : 'paid',
+      dueDate: showDueDate ? dueDate : undefined,
+      lines: lines.map((l) => ({
+        productId: l.productId,
+        qty: l.qty,
+        itemDiscount: l.itemDiscount || '0',
+        isFreeItem: l.isFreeItem,
+      })),
     });
     setPending(false);
     if (!result.ok) {
@@ -231,6 +335,18 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
+                <Label htmlFor="billType">Bill type</Label>
+                <Select
+                  id="billType"
+                  value={billType}
+                  onChange={(e) => setBillType(e.target.value as BillType)}
+                >
+                  <option value="gst_bill">GST Bill</option>
+                  <option value="non_gst_bill">Non-GST Bill</option>
+                  <option value="estimate">Estimate</option>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="storeId">Store</Label>
                 <Select
                   id="storeId"
@@ -245,6 +361,11 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
                   ))}
                 </Select>
               </div>
+              {billType === 'estimate' && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:col-span-2">
+                  Estimate mode: no stock will be deducted and no bill number is issued.
+                </div>
+              )}
               {recentProducts.length > 0 && (
                 <div className="space-y-1 sm:col-span-2">
                   <p className="text-xs text-muted-foreground">Recent</p>
@@ -262,7 +383,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
                   </div>
                 </div>
               )}
-              <div className="space-y-2">
+              <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="search">
                   Add product (press <kbd className="rounded border px-1">/</kbd>)
                 </Label>
@@ -310,16 +431,18 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
-                  <TableHead className="w-32 text-right">Qty</TableHead>
-                  <TableHead className="w-28 text-right">Price</TableHead>
+                  <TableHead className="w-24 text-right">Qty</TableHead>
+                  <TableHead className="w-24 text-right">Price</TableHead>
+                  <TableHead className="w-24 text-right">Disc ₹</TableHead>
+                  <TableHead className="w-20 text-center">Free</TableHead>
                   <TableHead className="w-28 text-right">Subtotal</TableHead>
-                  <TableHead className="w-16" />
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {lines.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                       Cart empty. Search above or press <kbd className="rounded border px-1">/</kbd>
                       .
                     </TableCell>
@@ -328,7 +451,9 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
                   lines.map((l) => {
                     const p = productById.get(l.productId);
                     if (!p) return null;
-                    const subtotal = (Number(p.price) * (Number(l.qty) || 0)).toFixed(2);
+                    const rawSubtotal = Number(p.price) * (Number(l.qty) || 0);
+                    const itemDisc = Number(l.itemDiscount) || 0;
+                    const net = l.isFreeItem ? 0 : Math.max(rawSubtotal - itemDisc, 0);
                     return (
                       <TableRow key={l.productId}>
                         <TableCell>
@@ -342,11 +467,32 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
                             value={l.qty}
                             onChange={(e) => setQty(l.productId, e.target.value)}
                             inputMode="decimal"
-                            className="w-24 text-right"
+                            className="w-20 text-right"
                           />
                         </TableCell>
-                        <TableCell className="text-right">{p.price}</TableCell>
-                        <TableCell className="text-right">{subtotal}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={l.isFreeItem ? 'text-muted-foreground line-through' : ''}>
+                            {p.price}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            value={l.itemDiscount}
+                            onChange={(e) => setItemDiscount(l.productId, e.target.value)}
+                            inputMode="decimal"
+                            disabled={l.isFreeItem}
+                            className="w-20 text-right"
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <input
+                            type="checkbox"
+                            aria-label="Free item"
+                            checked={l.isFreeItem}
+                            onChange={(e) => setFree(l.productId, e.target.checked)}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">{net.toFixed(2)}</TableCell>
                         <TableCell className="text-right">
                           <Button
                             type="button"
@@ -388,7 +534,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
                   onChange={(e) => setCustomerPhone(e.target.value)}
                 />
               </div>
-              {gstEnabled && (
+              {effectiveGstEnabled && (
                 <div className="space-y-2">
                   <Label htmlFor="customerGstin">Customer GSTIN</Label>
                   <Input
@@ -414,7 +560,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
         <CardContent className="space-y-4 text-sm">
           <Row label="Subtotal" value={totals?.subtotal.toFixed(2) ?? '—'} />
           <div className="space-y-2">
-            <Label htmlFor="discount">Discount (₹)</Label>
+            <Label htmlFor="discount">Bill discount (₹)</Label>
             <Input
               id="discount"
               value={discount}
@@ -422,7 +568,8 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
               inputMode="decimal"
             />
           </div>
-          {gstEnabled && (
+          <Row label="Total discount" value={totals?.discount.toFixed(2) ?? '—'} />
+          {effectiveGstEnabled && (
             <>
               <Row label="Taxable" value={totals?.taxableAmount.toFixed(2) ?? '—'} />
               {isInterstate ? (
@@ -462,18 +609,169 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds }: Prop
               id="paymentMethod"
               value={paymentMethod}
               onChange={(e) => {
-                const v = e.target.value;
-                if (v === 'cash' || v === 'upi' || v === 'card' || v === 'other') {
-                  setPaymentMethod(v);
-                }
+                const v = e.target.value as PaymentType;
+                setPaymentMethod(v);
+                if (v !== 'credit' && v !== 'finance_emi') setCustomerId('');
               }}
             >
               <option value="cash">Cash</option>
               <option value="upi">UPI</option>
-              <option value="card">Card</option>
+              <option value="card_debit">Debit Card</option>
+              <option value="card_credit">Credit Card</option>
+              <option value="finance_emi">Finance/EMI</option>
+              <option value="cheque">Cheque</option>
+              <option value="credit">Credit (on account)</option>
               <option value="other">Other</option>
             </Select>
           </div>
+
+          {paymentMethod === 'upi' && (
+            <div className="space-y-2">
+              <Label htmlFor="upiRef">UPI Ref</Label>
+              <Input
+                id="upiRef"
+                value={upiRef}
+                onChange={(e) => setUpiRef(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+          )}
+
+          {(paymentMethod === 'card_debit' || paymentMethod === 'card_credit') && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="cardLast4">Last 4 digits</Label>
+                <Input
+                  id="cardLast4"
+                  value={cardLast4}
+                  onChange={(e) => setCardLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  inputMode="numeric"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cardBank">Bank name</Label>
+                <Input
+                  id="cardBank"
+                  value={cardBank}
+                  onChange={(e) => setCardBank(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {paymentMethod === 'finance_emi' && (
+            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+              <div className="space-y-2">
+                <Label htmlFor="financeCompany">Finance company *</Label>
+                <Input
+                  id="financeCompany"
+                  value={financeCompany}
+                  onChange={(e) => setFinanceCompany(e.target.value)}
+                  required={paymentMethod === 'finance_emi'}
+                />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="downPayment">Down payment ₹</Label>
+                  <Input
+                    id="downPayment"
+                    value={downPayment}
+                    onChange={(e) => setDownPayment(e.target.value)}
+                    inputMode="decimal"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tenureMonths">Tenure (months)</Label>
+                  <Input
+                    id="tenureMonths"
+                    value={tenureMonths}
+                    onChange={(e) => setTenureMonths(e.target.value.replace(/\D/g, ''))}
+                    inputMode="numeric"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="emiAmount">EMI amount ₹</Label>
+                  <Input
+                    id="emiAmount"
+                    value={emiAmount}
+                    onChange={(e) => setEmiAmount(e.target.value)}
+                    inputMode="decimal"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="financeRef">Reference</Label>
+                  <Input
+                    id="financeRef"
+                    value={financeRef}
+                    onChange={(e) => setFinanceRef(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {paymentMethod === 'cheque' && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="chequeNo">Cheque no.</Label>
+                <Input id="chequeNo" value={chequeNo} onChange={(e) => setChequeNo(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="chequeBank">Bank</Label>
+                <Input
+                  id="chequeBank"
+                  value={chequeBank}
+                  onChange={(e) => setChequeBank(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="chequeDate">Cheque date</Label>
+                <Input
+                  id="chequeDate"
+                  type="date"
+                  value={chequeDate}
+                  onChange={(e) => setChequeDate(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {(paymentMethod === 'credit' || paymentMethod === 'finance_emi') && (
+            <div className="space-y-2">
+              <Label htmlFor="creditCustomer">
+                Customer {paymentMethod === 'credit' ? '(required for credit)' : '(optional)'}
+              </Label>
+              <Select
+                id="creditCustomer"
+                value={customerId}
+                onChange={(e) => setCustomerId(e.target.value)}
+                required={paymentMethod === 'credit'}
+              >
+                <option value="">Select customer…</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {Number(c.outstandingBalance) > 0 ? ` — ₹${c.outstandingBalance} due` : ''}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+
+          {showDueDate && (
+            <div className="space-y-2">
+              <Label htmlFor="dueDate">Due date</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+          )}
+
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={pending || lines.length === 0}>
             {pending ? 'Saving…' : 'Save bill (F2)'}
