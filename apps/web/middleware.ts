@@ -43,6 +43,11 @@ function applySecurityHeaders(res: NextResponse): NextResponse {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Allow /setup in LAN_MODE without auth — wizard runs before any tenant exists.
+  if (process.env.LAN_MODE === 'true' && pathname.startsWith('/setup')) {
+    return applySecurityHeaders(NextResponse.next());
+  }
+
   const isProtected = PROTECTED_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );

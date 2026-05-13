@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { href: '/stores', label: 'Stores' },
   { href: '/employees', label: 'Team' },
   { href: '/settings/billing', label: 'Billing' },
+  { href: '/settings/system', label: 'System' },
 ];
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
