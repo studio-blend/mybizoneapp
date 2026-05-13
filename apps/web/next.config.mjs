@@ -5,6 +5,8 @@ import { withSentryConfig } from '@sentry/nextjs';
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // standalone bundles server.js + only-used node_modules for portable/Docker deploys
+  output: 'standalone',
   experimental: {
     serverActions: { bodySizeLimit: '2mb' },
   },

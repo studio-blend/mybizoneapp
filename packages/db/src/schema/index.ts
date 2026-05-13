@@ -26,3 +26,4 @@ export * from './purchase-returns';
 export * from './expense-entries';
 export * from './emi-schedules';
 export * from './opening-balances';
+export * from './e-invoices';

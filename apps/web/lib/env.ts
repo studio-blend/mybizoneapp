@@ -33,6 +33,11 @@ const schema = z.object({
   PORT: z.string().optional().default('3000'),
   // App version injected at build time by the release CI job
   NEXT_PUBLIC_APP_VERSION: z.string().optional().default('dev'),
+  // GSTN e-invoice API credentials
+  GSTN_USERNAME: z.string().optional().default(''),
+  GSTN_CLIENT_ID: z.string().optional().default(''),
+  GSTN_CLIENT_SECRET: z.string().optional().default(''),
+  GSTN_SANDBOX: z.string().optional().default('true'),
 });
 
 const parsed = schema.safeParse({
@@ -62,6 +67,10 @@ const parsed = schema.safeParse({
   R2_BUCKET: process.env.R2_BUCKET,
   LAN_MODE: process.env.LAN_MODE,
   NODE_ENV: process.env.NODE_ENV,
+  GSTN_USERNAME: process.env.GSTN_USERNAME,
+  GSTN_CLIENT_ID: process.env.GSTN_CLIENT_ID,
+  GSTN_CLIENT_SECRET: process.env.GSTN_CLIENT_SECRET,
+  GSTN_SANDBOX: process.env.GSTN_SANDBOX,
 });
 
 if (!parsed.success) {
