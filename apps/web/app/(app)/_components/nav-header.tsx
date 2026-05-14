@@ -82,7 +82,7 @@ function Dropdown({ group }: { group: NavGroup }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
-  const isActive = group.items.some((i) => pathname.startsWith(i.href));
+  const isActive = group.items.some((i) => pathname?.startsWith(i.href));
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -110,7 +110,7 @@ function Dropdown({ group }: { group: NavGroup }) {
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className={`block px-4 py-2 text-sm hover:bg-muted transition-colors ${pathname.startsWith(item.href) ? 'font-semibold text-primary' : ''}`}
+              className={`block px-4 py-2 text-sm hover:bg-muted transition-colors ${pathname?.startsWith(item.href) ? 'font-semibold text-primary' : ''}`}
             >
               {item.label}
             </Link>
@@ -128,7 +128,7 @@ interface NavHeaderProps {
 export function NavHeader({ email }: NavHeaderProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isOnboarding = pathname.startsWith('/onboarding');
+  const isOnboarding = pathname?.startsWith('/onboarding');
 
   if (isOnboarding) {
     return (
