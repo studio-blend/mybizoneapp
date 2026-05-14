@@ -38,6 +38,8 @@ const schema = z.object({
   GSTN_CLIENT_ID: z.string().optional().default(''),
   GSTN_CLIENT_SECRET: z.string().optional().default(''),
   GSTN_SANDBOX: z.string().optional().default('true'),
+  // Backup directory for LAN/desktop mode (defaults to <cwd>/../../backups)
+  BACKUP_DIR: z.string().optional().default(''),
 });
 
 const parsed = schema.safeParse({
@@ -71,6 +73,7 @@ const parsed = schema.safeParse({
   GSTN_CLIENT_ID: process.env.GSTN_CLIENT_ID,
   GSTN_CLIENT_SECRET: process.env.GSTN_CLIENT_SECRET,
   GSTN_SANDBOX: process.env.GSTN_SANDBOX,
+  BACKUP_DIR: process.env.BACKUP_DIR,
 });
 
 if (!parsed.success) {

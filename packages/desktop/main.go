@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -12,8 +14,13 @@ import (
 	"time"
 
 	"github.com/getlantern/systray"
+	"github.com/mybizone/desktop/backup"
+	"github.com/mybizone/desktop/updater"
 	"github.com/pkg/browser"
 )
+
+// Version is set via ldflags: -X main.Version=v1.0.0
+var Version = "dev"
 
 // Config holds the persistent configuration written by the /setup wizard.
 type Config struct {
@@ -33,6 +40,15 @@ var (
 )
 
 func main() {
+	// Parse flags
+	showVersion := flag.Bool("version", false, "Print version and exit")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(Version)
+		os.Exit(0)
+	}
+
 	// Resolve app directory (where MyBizOne.exe lives)
 	exe, _ := os.Executable()
 	appDir = filepath.Dir(exe)
@@ -100,6 +116,40 @@ func startBackend() {
 	} else {
 		browser.OpenURL(fmt.Sprintf("http://localhost:%d/dashboard", cfg.Port))
 	}
+
+	// Schedule daily backups (1-minute offset to let app stabilize)
+	backup.ScheduleDailyBackup(backup.Config{
+		BackupDir:     getDataDir() + "/backups",
+		PgDumpPath:    getPgDumpPath(),
+		DatabaseURL:   os.Getenv("DATABASE_URL"),
+		RetentionDays: 30,
+	})
+
+	// Check for updates at startup and every 24h
+	go func() {
+		time.Sleep(30 * time.Second) // let app stabilize
+		latest, url, hasUpdate, err := updater.CheckForUpdate(Version)
+		if err == nil && hasUpdate {
+			log.Printf("Update available: %s — %s", latest, url)
+			openBrowserURL(url)
+		}
+		ticker := time.NewTicker(24 * time.Hour)
+		for range ticker.C {
+			latest, url, hasUpdate, err = updater.CheckForUpdate(Version)
+			if err == nil && hasUpdate {
+				log.Printf("Update available: %s", latest)
+			}
+		}
+	}()
+}
+
+func getDataDir() string {
+	return dataDir()
+}
+
+func getPgDumpPath() string {
+	pgBin := filepath.Join(appDir, "postgres", "bin")
+	return filepath.Join(pgBin, pgExe("pg_dump"))
 }
 
 func dataDir() string {
@@ -201,7 +251,7 @@ func startNode() {
 		fmt.Sprintf("PORTABLE_MODE=true"),
 		fmt.Sprintf("SETUP_COMPLETE=%s", boolStr(cfg.SetupDone)),
 		fmt.Sprintf("LICENSE_KEY=%s", cfg.LicenseKey),
-		fmt.Sprintf("NEXT_PUBLIC_APP_VERSION=%s", appVersion()),
+		fmt.Sprintf("NEXT_PUBLIC_APP_VERSION=%s", Version),
 	)
 	nodeCmd.Dir = filepath.Join(appDir, "app")
 	nodeCmd.Stdout = os.Stdout
@@ -251,6 +301,10 @@ func openBrowser() {
 	} else {
 		url += "/dashboard"
 	}
+	browser.OpenURL(url)
+}
+
+func openBrowserURL(url string) {
 	browser.OpenURL(url)
 }
 
@@ -304,13 +358,4 @@ func boolStr(b bool) string {
 		return "true"
 	}
 	return "false"
-}
-
-func appVersion() string {
-	versionFile := filepath.Join(appDir, "VERSION")
-	data, err := os.ReadFile(versionFile)
-	if err != nil {
-		return "dev"
-	}
-	return string(data)
 }

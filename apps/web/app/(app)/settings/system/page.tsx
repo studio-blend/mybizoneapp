@@ -1,4 +1,5 @@
 import { env } from '@/lib/env';
+import { BackupSection } from './backup-section';
 
 export default function SystemSettingsPage() {
   if (!env.LAN_MODE) {
@@ -95,6 +96,9 @@ export default function SystemSettingsPage() {
           </div>
         </dl>
       </div>
+
+      {/* Backup & Restore */}
+      <BackupSection />
     </div>
   );
 }
