@@ -35,9 +35,12 @@ const NAV_ITEMS = [
   { href: '/brands', label: 'Brands' },
   { href: '/catalogues', label: 'Catalogues' },
   { href: '/stores', label: 'Stores' },
-  { href: '/employees', label: 'Team' },
+  { href: '/departments', label: 'Departments' },
+  { href: '/team', label: 'Team' },
+  { href: '/employees', label: 'Employees' },
   { href: '/settings/billing', label: 'Billing' },
   { href: '/settings/system', label: 'System' },
+  { href: '/settings/transfer', label: 'Ownership' },
 ];
 
 export default async function AppLayout({ children }: { children: ReactNode }) {

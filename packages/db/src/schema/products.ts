@@ -2,6 +2,7 @@ import { boolean, index, numeric, pgTable, text, timestamp, uuid } from 'drizzle
 import { brands } from './brands';
 import { businesses } from './businesses';
 import { categories } from './categories';
+import { departments } from './departments';
 import { stores } from './stores';
 
 // Inventory + price live as NUMERIC so fractional units (1.5 kg, 2.75 m) round-trip without float drift.
@@ -39,6 +40,7 @@ export const products = pgTable(
     hsnCode: text('hsn_code'),
     gstRate: numeric('gst_rate', { precision: 5, scale: 2 }),
     imageKey: text('image_key'),
+    departmentId: uuid('department_id').references(() => departments.id, { onDelete: 'set null' }),
     active: boolean('active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

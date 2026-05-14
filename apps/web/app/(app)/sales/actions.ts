@@ -1,6 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { getUserRoles } from '@/lib/get-user-roles';
 import { type ActionResult, safeAction } from '@/lib/server-action';
 import { requireUser } from '@/lib/session';
 import { uploadFile } from '@/lib/storage';
@@ -17,6 +18,7 @@ import {
 } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { financialYear, formatBillNo } from '@mybizone/domain/bill-series';
+import { hasPermission } from '@mybizone/domain';
 import { calculateSaleTotals } from '@mybizone/domain/sale';
 import { and, eq, gte, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
@@ -108,6 +110,12 @@ interface CreateSaleResult {
  * Either every step persists or none does — no partial inventory drift.
  */
 export const createSaleAction = safeAction(CreateSaleInput, async (input, { user, tx }) => {
+  // Permission gate: super_admin always passes; others need create_sale
+  const myRoles = await getUserRoles(user);
+  if (!hasPermission(myRoles, 'create_sale')) {
+    throw new Error('Permission denied — you do not have access to create sales');
+  }
+
   // Snapshot product rows — RLS already scopes to tenant, store check verifies the cart's store.
   const productRows = await tx
     .select({

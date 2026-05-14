@@ -1,5 +1,6 @@
 import { integer, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
+import { departments } from './departments';
 
 // Atomic per-tenant bill number counters, scoped to doc_type + financial_year.
 // financialYear format: '2025-26' (April→March Indian FY).
@@ -19,6 +20,7 @@ export const billSeries = pgTable(
     // prefix: e.g. 'GST', 'QT', 'DC', 'RET' — used to build the bill number string
     prefix: text('prefix').notNull().default('GST'),
     lastSeq: integer('last_seq').notNull().default(0),
+    departmentId: uuid('department_id').references(() => departments.id, { onDelete: 'set null' }),
   },
   (t) => ({
     uniqueSeries: unique('bill_series_unique').on(t.businessId, t.docType, t.financialYear),

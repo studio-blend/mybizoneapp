@@ -29,3 +29,5 @@ export * from './opening-balances';
 export * from './e-invoices';
 export * from './customer-tags';
 export * from './campaigns';
+export * from './departments';
+export * from './user-roles';

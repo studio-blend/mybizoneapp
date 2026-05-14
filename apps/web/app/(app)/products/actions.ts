@@ -1,12 +1,14 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { getUserRoles } from '@/lib/get-user-roles';
 import { type ActionResult, safeAction } from '@/lib/server-action';
 import { requireUser } from '@/lib/session';
 import { uploadFile } from '@/lib/storage';
 import { auditLogs, bumpUsage, businesses, products } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { isValidUnit } from '@mybizone/domain/catalog';
+import { hasPermission } from '@mybizone/domain';
 import { type Plan, checkLimit, isValidPlan } from '@mybizone/domain/plans';
 import { and, count, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
@@ -63,6 +65,12 @@ const unitErrorPath = { path: ['unitSymbol'], message: 'unit symbol does not mat
 const ProductInput = ProductBase.refine(unitMatches, unitErrorPath);
 
 export const createProductAction = safeAction(ProductInput, async (input, { user, tx }) => {
+  // Permission gate: super_admin always passes; others need manage_products
+  const myRoles = await getUserRoles(user);
+  if (!hasPermission(myRoles, 'manage_products')) {
+    throw new Error('Permission denied — you do not have access to create products');
+  }
+
   const [bizRows, countRows] = await Promise.all([
     tx.select({ plan: businesses.plan }).from(businesses).where(eq(businesses.id, user.businessId)),
     tx
@@ -126,6 +134,12 @@ export const createProductAction = safeAction(ProductInput, async (input, { user
 const UpdateProductInput = ProductBase.extend({ id: uuid }).refine(unitMatches, unitErrorPath);
 
 export const updateProductAction = safeAction(UpdateProductInput, async (input, { user, tx }) => {
+  // Permission gate: super_admin always passes; others need manage_products
+  const myRoles = await getUserRoles(user);
+  if (!hasPermission(myRoles, 'manage_products')) {
+    throw new Error('Permission denied — you do not have access to update products');
+  }
+
   const [before] = await tx
     .select({ name: products.name, price: products.price })
     .from(products)

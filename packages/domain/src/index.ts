@@ -5,3 +5,4 @@ export * from './gst';
 export * from './profit';
 export * from './plans';
 export * from './bill-series';
+export * from './permissions';
