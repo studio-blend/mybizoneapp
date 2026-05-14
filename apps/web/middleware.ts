@@ -5,15 +5,12 @@ const SESSION_COOKIE_SECURE = '__Secure-mybizone.session_token';
 const PROTECTED_PREFIXES = ['/dashboard', '/stores', '/onboarding'];
 
 function buildCsp(): string {
-  const isProd = process.env.NODE_ENV === 'production';
-  const isLAN = process.env.LAN_MODE === 'true';
-  // LAN_MODE: relax script-src so Next.js inline hydration scripts work without
-  // wiring nonces. Acceptable for private-network deployments; for public
-  // internet-facing deploys we should switch to nonce-based CSP.
-  const allowInlineScript = !isProd || isLAN;
+  // 'unsafe-inline' + 'unsafe-eval' are required for Next.js App Router's inline
+  // hydration scripts. Without them React never mounts and forms fall back to
+  // native GET. Switch to nonce-based CSP post-launch for stricter enforcement.
   return [
     "default-src 'self'",
-    `script-src 'self'${allowInlineScript ? " 'unsafe-eval' 'unsafe-inline'" : ''}`,
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
