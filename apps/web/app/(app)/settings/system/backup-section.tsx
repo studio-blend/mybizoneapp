@@ -1,32 +1,45 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { triggerBackupAction, restoreBackupAction } from './actions';
 
 type BackupStatus = { lastBackup: string | null; count: number };
-
 type BackupResult = { success?: boolean; filename?: string; error?: string } | null;
 type RestoreResult = { success?: boolean; error?: string } | null;
 
 export function BackupSection() {
   const [status, setStatus] = useState<BackupStatus | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [backupPending, setBackupPending] = useState(false);
+  const [backupResult, setBackupResult] = useState<BackupResult>(null);
+  const [restorePending, setRestorePending] = useState(false);
+  const [restoreResult, setRestoreResult] = useState<RestoreResult>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  // Server actions via useActionState
-  const [backupResult, backupDispatch, backupPending] = useActionState<BackupResult, FormData>(
-    async (_prev: BackupResult) => {
-      return await triggerBackupAction();
-    },
-    null,
-  );
+  async function handleBackup(e: React.FormEvent) {
+    e.preventDefault();
+    setBackupPending(true);
+    setBackupResult(null);
+    const result = await triggerBackupAction();
+    setBackupResult(result);
+    setBackupPending(false);
+    if (result?.success) fetchStatus();
+  }
 
-  const [restoreResult, restoreDispatch, restorePending] = useActionState<RestoreResult, FormData>(
-    async (_prev: RestoreResult, formData: FormData) => {
-      return await restoreBackupAction(_prev, formData);
-    },
-    null,
-  );
+  async function handleRestore(e: React.FormEvent) {
+    e.preventDefault();
+    const file = fileRef.current?.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    setRestorePending(true);
+    setRestoreResult(null);
+    const result = await restoreBackupAction(null, formData);
+    setRestoreResult(result);
+    setRestorePending(false);
+  }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   async function fetchStatus() {
     setLoadingStatus(true);
     try {
@@ -42,14 +55,8 @@ export function BackupSection() {
 
   useEffect(() => {
     fetchStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Refresh status after a successful backup
-  useEffect(() => {
-    if (backupResult?.success) {
-      fetchStatus();
-    }
-  }, [backupResult]);
 
   const lastBackupLabel = loadingStatus
     ? 'Loading...'
@@ -76,7 +83,7 @@ export function BackupSection() {
 
       {/* Back Up Now */}
       <div className="flex items-center gap-3">
-        <form action={backupDispatch}>
+        <form onSubmit={handleBackup}>
           <button
             type="submit"
             disabled={backupPending}
@@ -110,8 +117,9 @@ export function BackupSection() {
         <p className="text-xs text-muted-foreground">
           Upload a <code>.sql.gz</code> backup file. This will overwrite the current database.
         </p>
-        <form action={restoreDispatch} className="flex items-center gap-3">
+        <form onSubmit={handleRestore} className="flex items-center gap-3">
           <input
+            ref={fileRef}
             type="file"
             name="file"
             accept=".gz,.sql.gz"

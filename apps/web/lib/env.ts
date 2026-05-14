@@ -77,8 +77,12 @@ const parsed = schema.safeParse({
 });
 
 if (!parsed.success) {
-  console.error('Invalid environment variables:', parsed.error.flatten().fieldErrors);
-  throw new Error('Invalid env. See .env.example.');
+  if (process.env.SKIP_ENV_VALIDATION) {
+    console.warn('[env] Skipping validation — SKIP_ENV_VALIDATION is set');
+  } else {
+    console.error('Invalid environment variables:', parsed.error.flatten().fieldErrors);
+    throw new Error('Invalid env. See .env.example.');
+  }
 }
 
-export const env = parsed.data;
+export const env = (parsed.success ? parsed.data : {}) as z.infer<typeof schema>;
