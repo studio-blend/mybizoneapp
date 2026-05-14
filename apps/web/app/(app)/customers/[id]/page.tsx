@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
-import { customers, openingBalances, sales } from '@mybizone/db';
+import { customerNotes, customerTags, customers, openingBalances, sales } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { financialYear } from '@mybizone/domain/bill-series';
 import { Button } from '@mybizone/ui/button';
@@ -16,6 +16,8 @@ import { and, desc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { OpeningBalanceForm } from './_components/opening-balance-form';
+import { CustomerNotesSection } from './_components/customer-notes-section';
+import { CustomerTagsSection } from './_components/customer-tags-section';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,11 +57,38 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
       .orderBy(desc(sales.createdAt))
       .limit(20);
 
-    return { customer, opening, fy, recentSales };
+    const tags = await tx
+      .select({ id: customerTags.id, tag: customerTags.tag })
+      .from(customerTags)
+      .where(
+        and(
+          eq(customerTags.customerId, customer.id),
+          eq(customerTags.businessId, user.businessId),
+        ),
+      );
+
+    const notes = await tx
+      .select({
+        id: customerNotes.id,
+        note: customerNotes.note,
+        createdAt: customerNotes.createdAt,
+        createdBy: customerNotes.createdBy,
+      })
+      .from(customerNotes)
+      .where(
+        and(
+          eq(customerNotes.customerId, customer.id),
+          eq(customerNotes.businessId, user.businessId),
+        ),
+      )
+      .orderBy(desc(customerNotes.createdAt))
+      .limit(20);
+
+    return { customer, opening, fy, recentSales, tags, notes };
   });
 
   if (!data) notFound();
-  const { customer, opening, fy, recentSales } = data;
+  const { customer, opening, fy, recentSales, tags, notes } = data;
 
   return (
     <div className="space-y-6">
@@ -107,6 +136,39 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
           </CardContent>
         </Card>
       </div>
+
+      {/* Tags */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Tags</CardTitle>
+          <CardDescription>Categorise this customer for segmentation and campaigns.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CustomerTagsSection
+            customerId={customer.id}
+            initialTags={tags}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Notes timeline */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Notes</CardTitle>
+          <CardDescription>Internal notes about this customer (not visible to them).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CustomerNotesSection
+            customerId={customer.id}
+            initialNotes={notes.map((n) => ({
+              id: n.id,
+              note: n.note,
+              createdAt: n.createdAt,
+              createdBy: n.createdBy,
+            }))}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

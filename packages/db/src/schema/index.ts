@@ -27,3 +27,5 @@ export * from './expense-entries';
 export * from './emi-schedules';
 export * from './opening-balances';
 export * from './e-invoices';
+export * from './customer-tags';
+export * from './campaigns';

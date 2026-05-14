@@ -1,21 +1,38 @@
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
-import { customers } from '@mybizone/db';
+import { customerTags, customers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
-import { asc, eq, sum } from 'drizzle-orm';
+import { asc, eq, inArray, sum } from 'drizzle-orm';
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { DeleteCustomerButton } from './_components/delete-button';
+import { TagFilter } from './_components/tag-filter';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CustomersPage() {
+export default async function CustomersPage({
+  searchParams,
+}: {
+  searchParams: { tag?: string };
+}) {
   const user = await requireUser();
+  const activeTag = searchParams.tag ?? null;
 
   const [rows, totals] = await withTenant(db, user.businessId, async (tx) => {
-    const list = await tx
+    // If filtering by tag, get customer IDs with that tag first
+    let filteredIds: string[] | null = null;
+    if (activeTag) {
+      const tagRows = await tx
+        .select({ customerId: customerTags.customerId })
+        .from(customerTags)
+        .where(eq(customerTags.tag, activeTag));
+      filteredIds = tagRows.map((r) => r.customerId);
+    }
+
+    const query = tx
       .select({
         id: customers.id,
         name: customers.name,
@@ -25,8 +42,16 @@ export default async function CustomersPage() {
         outstandingBalance: customers.outstandingBalance,
       })
       .from(customers)
-      .where(eq(customers.businessId, user.businessId))
+      .where(
+        filteredIds !== null
+          ? filteredIds.length > 0
+            ? inArray(customers.id, filteredIds)
+            : eq(customers.id, '00000000-0000-0000-0000-000000000000') // empty result
+          : eq(customers.businessId, user.businessId),
+      )
       .orderBy(asc(customers.name));
+
+    const list = await query;
 
     const [agg] = await tx
       .select({
@@ -59,16 +84,27 @@ export default async function CustomersPage() {
         </CardContent>
       </Card>
 
+      {/* Tag filter */}
+      <Suspense>
+        <TagFilter current={activeTag} />
+      </Suspense>
+
       {rows.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>No customers yet</CardTitle>
-            <CardDescription>Add customers to track credit limits and outstanding balances.</CardDescription>
+            <CardTitle>{activeTag ? `No customers tagged "${activeTag}"` : 'No customers yet'}</CardTitle>
+            <CardDescription>
+              {activeTag
+                ? 'Try a different tag filter or clear the filter to see all customers.'
+                : 'Add customers to track credit limits and outstanding balances.'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button asChild>
-              <Link href="/customers/new">Create customer</Link>
-            </Button>
+            {!activeTag && (
+              <Button asChild>
+                <Link href="/customers/new">Create customer</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -88,7 +124,11 @@ export default async function CustomersPage() {
               <TableBody>
                 {rows.map((c) => (
                   <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/customers/${c.id}`} className="hover:underline">
+                        {c.name}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{c.phone ?? '—'}</TableCell>
                     <TableCell className="capitalize text-muted-foreground">{c.rateCategory}</TableCell>
                     <TableCell className="text-right">₹{Number(c.creditLimit).toFixed(2)}</TableCell>

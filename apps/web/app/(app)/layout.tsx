@@ -29,6 +29,7 @@ const NAV_ITEMS = [
   { href: '/products/barcode', label: 'Barcodes' },
   { href: '/damage-logs', label: 'Damage' },
   { href: '/customers', label: 'Customers' },
+  { href: '/cms', label: 'CMS' },
   { href: '/suppliers', label: 'Suppliers' },
   { href: '/categories', label: 'Categories' },
   { href: '/brands', label: 'Brands' },
