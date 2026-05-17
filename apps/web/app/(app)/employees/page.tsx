@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybi
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
 import { asc, desc, eq } from 'drizzle-orm';
 import Link from 'next/link';
+import { LockButton } from './_components/lock-button';
+import { ResetPasswordButton } from './_components/reset-password-button';
 import { RevokeInvitationButton } from './_components/revoke-button';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +25,9 @@ export default async function EmployeesPage() {
         active: userTable.active,
         storeId: userTable.storeId,
         emailVerified: userTable.emailVerified,
+        empId: userTable.empId,
+        lockedAt: userTable.lockedAt,
+        mustChangePassword: userTable.mustChangePassword,
       })
       .from(userTable)
       .where(eq(userTable.businessId, user.businessId))
@@ -47,21 +52,29 @@ export default async function EmployeesPage() {
   });
 
   const storeNames = new Map(data.stores.map((s) => [s.id, s.name]));
+  const isOwnerOrAdmin = ['owner', 'admin'].includes(user.role);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Team</h1>
-        <Button asChild>
-          <Link href="/employees/invite">Invite teammate</Link>
-        </Button>
+        {isOwnerOrAdmin && (
+          <div className="flex gap-2">
+            <Button asChild>
+              <Link href="/employees/new">Add Employee</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/employees/invite">Send Invite</Link>
+            </Button>
+          </div>
+        )}
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Members</CardTitle>
           <CardDescription>
-            Owners and admins can edit any product, employees scope to their store.
+            Owners and admins have full access. Employees are scoped to their store.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -69,56 +82,74 @@ export default async function EmployeesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Emp ID</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Store</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-32 text-right">Actions</TableHead>
+                {isOwnerOrAdmin && <TableHead className="w-48 text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.employees.map((e) => (
-                <TableRow key={e.id} className={e.active ? '' : 'opacity-50'}>
-                  <TableCell className="font-medium">{e.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.email}</TableCell>
-                  <TableCell>{e.role}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {e.storeId ? (storeNames.get(e.storeId) ?? '—') : '—'}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {!e.active && <span className="text-destructive">deactivated</span>}
-                    {e.active && !e.emailVerified && (
-                      <span className="text-muted-foreground">unverified</span>
+              {data.employees.map((e) => {
+                const locked = !!e.lockedAt;
+                const isMe = e.id === user.id;
+                const isOwner = e.role === 'owner';
+                return (
+                  <TableRow key={e.id} className={!e.active ? 'opacity-50' : ''}>
+                    <TableCell className="font-medium">{e.name}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {e.empId ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{e.email}</TableCell>
+                    <TableCell className="capitalize">{e.role}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {e.storeId ? (storeNames.get(e.storeId) ?? '—') : '—'}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {!e.active && <span className="text-destructive font-medium">deactivated</span>}
+                      {e.active && locked && <span className="text-orange-600 font-medium">locked</span>}
+                      {e.active && !locked && e.mustChangePassword && (
+                        <span className="text-yellow-600">pwd reset pending</span>
+                      )}
+                      {e.active && !locked && !e.mustChangePassword && (
+                        <span className="text-muted-foreground">active</span>
+                      )}
+                    </TableCell>
+                    {isOwnerOrAdmin && (
+                      <TableCell className="text-right">
+                        {isMe || isOwner ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <div className="flex justify-end gap-1">
+                            {e.empId && (
+                              <>
+                                <LockButton id={e.id} name={e.name} locked={locked} />
+                                <ResetPasswordButton id={e.id} name={e.name} />
+                              </>
+                            )}
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/employees/${e.id}/edit`}>Edit</Link>
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
                     )}
-                    {e.active && e.emailVerified && (
-                      <span className="text-muted-foreground">active</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {e.id === user.id || e.role === 'owner' ? (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ) : (
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/employees/${e.id}/edit`}>Edit</Link>
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Pending invitations</CardTitle>
-          <CardDescription>Open links expire 7 days after creation.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {data.pending.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground">No pending invitations.</p>
-          ) : (
+      {data.pending.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending invitations</CardTitle>
+            <CardDescription>Open links expire 7 days after creation.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -147,9 +178,9 @@ export default async function EmployeesPage() {
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

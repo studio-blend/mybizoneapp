@@ -16,6 +16,9 @@ const schema = z.object({
   LAN_MODE: z.enum(['true', 'false']).default('false').transform(v => v === 'true'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   NEXT_PUBLIC_SUPPORT_WHATSAPP: z.string().optional().default(''),
+  // Google OAuth — optional; social sign-in is disabled when unset.
+  GOOGLE_CLIENT_ID: z.string().optional().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().optional().default(''),
   // Razorpay — optional; billing features are disabled when these are unset.
   RAZORPAY_KEY_ID: z.string().optional().default(''),
   NEXT_PUBLIC_RAZORPAY_KEY_ID: z.string().optional().default(''),
@@ -53,6 +56,8 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
   NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
   NEXT_PUBLIC_SUPPORT_WHATSAPP: process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP,
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
   NEXT_PUBLIC_RAZORPAY_KEY_ID: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
   RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,

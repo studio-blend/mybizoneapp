@@ -15,6 +15,8 @@ function getAuth(): Auth {
       RESEND_API_KEY: env.RESEND_API_KEY || undefined,
       EMAIL_FROM: env.EMAIL_FROM,
       LAN_MODE: env.LAN_MODE,
+      GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID || undefined,
+      GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET || undefined,
     });
   }
   return globalThis.__mybizone_auth;

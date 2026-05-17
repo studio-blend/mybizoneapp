@@ -8,6 +8,8 @@ export interface AuthEnv extends MailerEnv {
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
   LAN_MODE?: boolean;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 }
 
 export function createAuth(db: Database, env: AuthEnv) {
@@ -55,10 +57,22 @@ export function createAuth(db: Database, env: AuthEnv) {
       },
     },
 
+    socialProviders: env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            clientId: env.GOOGLE_CLIENT_ID,
+            clientSecret: env.GOOGLE_CLIENT_SECRET,
+          },
+        }
+      : undefined,
+
     user: {
       additionalFields: {
         businessId: { type: 'string', required: false, input: false },
         role: { type: 'string', required: false, defaultValue: 'owner', input: false },
+        empId: { type: 'string', required: false, input: false },
+        mustChangePassword: { type: 'boolean', required: false, defaultValue: false, input: false },
+        active: { type: 'boolean', required: false, defaultValue: true, input: false },
       },
     },
 

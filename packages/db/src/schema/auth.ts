@@ -1,4 +1,4 @@
-import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
 import { stores } from './stores';
 
@@ -16,6 +16,11 @@ export const user = pgTable('user', {
   // store_id scopes employees to a single store. Owners/admins leave it NULL.
   storeId: uuid('store_id').references(() => stores.id, { onDelete: 'set null' }),
   active: boolean('active').notNull().default(true),
+  // Employee-specific fields (null for owners/admins)
+  empId: text('emp_id').unique(),
+  failedAttempts: integer('failed_attempts').notNull().default(0),
+  lockedAt: timestamp('locked_at', { withTimezone: true }),
+  mustChangePassword: boolean('must_change_password').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

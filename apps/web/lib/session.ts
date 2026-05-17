@@ -9,6 +9,9 @@ export interface AppUser {
   emailVerified: boolean;
   businessId: string | null;
   role: string;
+  empId: string | null;
+  mustChangePassword: boolean;
+  active: boolean;
 }
 
 /**
@@ -24,6 +27,9 @@ export async function getSessionUser(): Promise<AppUser | null> {
     emailVerified: boolean;
     businessId: string | null;
     role: string;
+    empId: string | null;
+    mustChangePassword: boolean;
+    active: boolean;
   };
   return {
     id: u.id,
@@ -32,6 +38,9 @@ export async function getSessionUser(): Promise<AppUser | null> {
     emailVerified: u.emailVerified,
     businessId: u.businessId ?? null,
     role: u.role ?? 'owner',
+    empId: u.empId ?? null,
+    mustChangePassword: u.mustChangePassword ?? false,
+    active: u.active ?? true,
   };
 }
 

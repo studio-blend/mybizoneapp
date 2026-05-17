@@ -69,6 +69,38 @@ export function invitationEmailTemplate(
   return { subject, text, html };
 }
 
+export function employeeWelcomeTemplate(
+  name: string,
+  empId: string,
+  initialPassword: string,
+  loginUrl: string,
+) {
+  const subject = 'Your MyBizOne employee account is ready';
+  const text = [
+    `Hi ${name},`,
+    ``,
+    `Your employee account has been created. Here are your login details:`,
+    ``,
+    `Employee ID: ${empId}`,
+    `Initial Password: ${initialPassword}`,
+    `Login URL: ${loginUrl}`,
+    ``,
+    `You will be asked to change your password on first login.`,
+    `Keep these credentials secure.`,
+  ].join('\n');
+  const html = [
+    `<p>Hi ${escapeHtml(name)},</p>`,
+    `<p>Your employee account has been created. Here are your login details:</p>`,
+    `<table style="border-collapse:collapse">`,
+    `<tr><td style="padding:4px 12px 4px 0"><strong>Employee ID</strong></td><td style="font-family:monospace">${escapeHtml(empId)}</td></tr>`,
+    `<tr><td style="padding:4px 12px 4px 0"><strong>Initial Password</strong></td><td style="font-family:monospace">${escapeHtml(initialPassword)}</td></tr>`,
+    `</table>`,
+    `<p><a href="${loginUrl}">Log in to MyBizOne</a></p>`,
+    `<p>You will be asked to change your password on first login. Keep these credentials secure.</p>`,
+  ].join('');
+  return { subject, text, html };
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')

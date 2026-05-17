@@ -2,7 +2,13 @@ import { type NextRequest, NextResponse } from 'next/server';
 
 const SESSION_COOKIE = 'mybizone.session_token';
 const SESSION_COOKIE_SECURE = '__Secure-mybizone.session_token';
-const PROTECTED_PREFIXES = ['/dashboard', '/stores', '/onboarding'];
+const PROTECTED_PREFIXES = [
+  '/dashboard', '/stores', '/onboarding',
+  '/products', '/categories', '/brands', '/catalogues',
+  '/sales', '/returns', '/quotations', '/purchases', '/purchase-returns',
+  '/expenses', '/customers', '/suppliers', '/employees', '/team',
+  '/reports', '/settings', '/departments', '/help',
+];
 
 function buildCsp(): string {
   // 'unsafe-inline' + 'unsafe-eval' are required for Next.js App Router's inline
