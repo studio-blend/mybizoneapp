@@ -11,7 +11,6 @@ export interface AppUser {
   role: string;
   empId: string | null;
   mustChangePassword: boolean;
-  active: boolean;
 }
 
 /**
@@ -29,7 +28,6 @@ export async function getSessionUser(): Promise<AppUser | null> {
     role: string;
     empId: string | null;
     mustChangePassword: boolean;
-    active: boolean;
   };
   return {
     id: u.id,
@@ -40,7 +38,6 @@ export async function getSessionUser(): Promise<AppUser | null> {
     role: u.role ?? 'owner',
     empId: u.empId ?? null,
     mustChangePassword: u.mustChangePassword ?? false,
-    active: u.active ?? true,
   };
 }
 

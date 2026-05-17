@@ -57,14 +57,16 @@ export function createAuth(db: Database, env: AuthEnv) {
       },
     },
 
-    socialProviders: env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
       ? {
-          google: {
-            clientId: env.GOOGLE_CLIENT_ID,
-            clientSecret: env.GOOGLE_CLIENT_SECRET,
+          socialProviders: {
+            google: {
+              clientId: env.GOOGLE_CLIENT_ID,
+              clientSecret: env.GOOGLE_CLIENT_SECRET,
+            },
           },
         }
-      : undefined,
+      : {}),
 
     user: {
       additionalFields: {
@@ -72,7 +74,6 @@ export function createAuth(db: Database, env: AuthEnv) {
         role: { type: 'string', required: false, defaultValue: 'owner', input: false },
         empId: { type: 'string', required: false, input: false },
         mustChangePassword: { type: 'boolean', required: false, defaultValue: false, input: false },
-        active: { type: 'boolean', required: false, defaultValue: true, input: false },
       },
     },
 
