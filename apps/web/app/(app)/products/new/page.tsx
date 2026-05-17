@@ -21,7 +21,12 @@ export default async function NewProductPage() {
       .from(stores)
       .orderBy(asc(stores.name));
     const cats = await tx
-      .select({ id: categories.id, name: categories.name })
+      .select({
+        id: categories.id,
+        name: categories.name,
+        parentId: categories.parentId,
+        attributes: categories.attributes,
+      })
       .from(categories)
       .orderBy(asc(categories.name));
     const brs = await tx

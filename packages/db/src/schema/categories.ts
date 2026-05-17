@@ -2,12 +2,15 @@ import {
   type AnyPgColumn,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
+
+export type CategoryAttribute = { name: string; unit?: string };
 import { businesses } from './businesses';
 import { stores } from './stores';
 
@@ -26,6 +29,8 @@ export const categories = pgTable(
     }),
     name: text('name').notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
+    // User-defined dimension specs for this category, e.g. [{name:"Capacity",unit:"Ton"}]
+    attributes: jsonb('attributes').$type<CategoryAttribute[]>().default([]),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

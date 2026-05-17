@@ -21,6 +21,7 @@ export default async function CategoriesPage() {
         parentId: categories.parentId,
         storeId: categories.storeId,
         sortOrder: categories.sortOrder,
+        attributes: categories.attributes,
       })
       .from(categories)
       .orderBy(asc(categories.sortOrder), asc(categories.name));
@@ -34,8 +35,35 @@ export default async function CategoriesPage() {
     };
   });
 
-  // Build display labels: prefix sub-categories with their parent name.
-  const byId = new Map(rows.map((r) => [r.id, r.name]));
+  // Build tree: top-level first, then each child under its parent
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const topLevel = rows.filter((r) => !r.parentId);
+  const childrenOf = new Map<string, typeof rows>();
+  for (const r of rows) {
+    if (r.parentId) {
+      const arr = childrenOf.get(r.parentId) ?? [];
+      arr.push(r);
+      childrenOf.set(r.parentId, arr);
+    }
+  }
+
+  // Flatten into display order: parent → its children (indent level 1)
+  const ordered: Array<{ row: (typeof rows)[number]; depth: number }> = [];
+  for (const top of topLevel) {
+    ordered.push({ row: top, depth: 0 });
+    for (const child of childrenOf.get(top.id) ?? []) {
+      ordered.push({ row: child, depth: 1 });
+      // Support depth-2 children
+      for (const grandchild of childrenOf.get(child.id) ?? []) {
+        ordered.push({ row: grandchild, depth: 2 });
+      }
+    }
+  }
+  // Append any orphaned rows not reached via top-level traversal
+  const seen = new Set(ordered.map((o) => o.row.id));
+  for (const r of rows) {
+    if (!seen.has(r.id)) ordered.push({ row: r, depth: 0 });
+  }
 
   return (
     <div className="space-y-6">
@@ -67,33 +95,74 @@ export default async function CategoriesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Parent</TableHead>
+                  <TableHead>Attributes / Dimensions</TableHead>
                   <TableHead>Store</TableHead>
-                  <TableHead className="w-32">Sort</TableHead>
+                  <TableHead className="w-16 text-right">Sort</TableHead>
                   <TableHead className="w-32 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {c.parentId ? (byId.get(c.parentId) ?? '—') : '—'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {c.storeId ? (storeNames.get(c.storeId) ?? '—') : 'All stores'}
-                    </TableCell>
-                    <TableCell>{c.sortOrder}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/categories/${c.id}/edit`}>Edit</Link>
-                        </Button>
-                        <DeleteCategoryButton id={c.id} name={c.name} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {ordered.map(({ row: c, depth }) => {
+                  const attrs = (c.attributes ?? []) as { name: string; unit?: string }[];
+                  return (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">
+                        <span
+                          className="flex items-center gap-1.5"
+                          style={{ paddingLeft: depth * 20 }}
+                        >
+                          {depth > 0 && (
+                            <svg
+                              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 5l7 7-7 7"
+                              />
+                            </svg>
+                          )}
+                          {c.name}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {attrs.length > 0 ? (
+                          <span className="flex flex-wrap gap-1">
+                            {attrs.map((a) => (
+                              <span
+                                key={a.name}
+                                className="inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-xs"
+                              >
+                                {a.name}
+                                {a.unit && (
+                                  <span className="text-muted-foreground">({a.unit})</span>
+                                )}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {c.storeId ? (storeNames.get(c.storeId) ?? '—') : 'All stores'}
+                      </TableCell>
+                      <TableCell className="text-right">{c.sortOrder}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/categories/${c.id}/edit`}>Edit</Link>
+                          </Button>
+                          <DeleteCategoryButton id={c.id} name={c.name} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>

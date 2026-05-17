@@ -10,11 +10,22 @@ const uuid = z.string().uuid();
 const blank = z.literal('');
 const optionalUuid = z.union([uuid, blank]).transform((v) => (v === '' ? null : v));
 
+const AttributeSchema = z.array(
+  z.object({ name: z.string().max(60), unit: z.string().max(20).optional().default('') }),
+).default([]);
+
 const CategoryInput = z.object({
   name: z.string().min(1, 'name required').max(120),
   parentId: optionalUuid,
   storeId: optionalUuid,
   sortOrder: z.coerce.number().int().min(0).max(9999).default(0),
+  attributes: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v) return [];
+      try { return AttributeSchema.parse(JSON.parse(v)); } catch { return []; }
+    }),
 });
 
 export const createCategoryAction = safeAction(CategoryInput, async (input, { user, tx }) => {
@@ -26,6 +37,7 @@ export const createCategoryAction = safeAction(CategoryInput, async (input, { us
       parentId: input.parentId,
       storeId: input.storeId,
       sortOrder: input.sortOrder,
+      attributes: input.attributes,
     })
     .returning({ id: categories.id, name: categories.name });
   if (!row) throw new Error('insert failed');
@@ -49,6 +61,13 @@ const UpdateCategoryInput = z.object({
   parentId: optionalUuid,
   storeId: optionalUuid,
   sortOrder: z.coerce.number().int().min(0).max(9999).default(0),
+  attributes: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v) return [];
+      try { return AttributeSchema.parse(JSON.parse(v)); } catch { return []; }
+    }),
 });
 
 export const updateCategoryAction = safeAction(UpdateCategoryInput, async (input, { user, tx }) => {
@@ -69,6 +88,7 @@ export const updateCategoryAction = safeAction(UpdateCategoryInput, async (input
       parentId: input.parentId,
       storeId: input.storeId,
       sortOrder: input.sortOrder,
+      attributes: input.attributes,
       updatedAt: new Date(),
     })
     .where(and(eq(categories.id, input.id), eq(categories.businessId, user.businessId)))

@@ -5,16 +5,79 @@ import { withTenant } from '@mybizone/db/tenant';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
-import { desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray } from 'drizzle-orm';
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { DeleteProductButton } from './_components/delete-button';
+import { ProductFilters } from './_components/product-filters';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProductsPage() {
+/** Recursively collect a category id and all its descendant ids. */
+function collectDescendants(
+  allCats: { id: string; parentId: string | null }[],
+  rootId: string,
+): string[] {
+  const result: string[] = [rootId];
+  const queue = [rootId];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const c of allCats) {
+      if (c.parentId === current) {
+        result.push(c.id);
+        queue.push(c.id);
+      }
+    }
+  }
+  return result;
+}
+
+interface Props {
+  searchParams: { q?: string; categoryId?: string; storeId?: string; brandId?: string };
+}
+
+export default async function ProductsPage({ searchParams }: Props) {
   const user = await requireUser();
-  const rows = await withTenant(db, user.businessId, (tx) =>
-    tx
+  const { q, categoryId, storeId, brandId } = searchParams;
+
+  const data = await withTenant(db, user.businessId, async (tx) => {
+    // Load all categories (for filter bar + descendant expansion)
+    const allCats = await tx
+      .select({ id: categories.id, name: categories.name, parentId: categories.parentId })
+      .from(categories)
+      .orderBy(asc(categories.name));
+
+    const allStores = await tx
+      .select({ id: stores.id, name: stores.name })
+      .from(stores)
+      .orderBy(asc(stores.name));
+
+    const allBrands = await tx
+      .select({ id: brands.id, name: brands.name })
+      .from(brands)
+      .orderBy(asc(brands.name));
+
+    // Build WHERE conditions
+    const conditions = [eq(products.businessId, user.businessId)];
+
+    if (q?.trim()) {
+      conditions.push(ilike(products.name, `%${q.trim()}%`));
+    }
+
+    if (categoryId) {
+      const descendantIds = collectDescendants(allCats, categoryId);
+      conditions.push(inArray(products.categoryId, descendantIds));
+    }
+
+    if (storeId) {
+      conditions.push(eq(products.storeId, storeId));
+    }
+
+    if (brandId) {
+      conditions.push(eq(products.brandId, brandId));
+    }
+
+    const rows = await tx
       .select({
         id: products.id,
         name: products.name,
@@ -31,11 +94,16 @@ export default async function ProductsPage() {
       .leftJoin(stores, eq(stores.id, products.storeId))
       .leftJoin(categories, eq(categories.id, products.categoryId))
       .leftJoin(brands, eq(brands.id, products.brandId))
-      .orderBy(desc(products.active), desc(products.updatedAt)),
-  );
+      .where(and(...conditions))
+      .orderBy(desc(products.active), desc(products.updatedAt));
+
+    return { rows, allCats, allStores, allBrands };
+  });
+
+  const isFiltered = !!(q || categoryId || storeId || brandId);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Products</h1>
         <Button asChild>
@@ -43,24 +111,40 @@ export default async function ProductsPage() {
         </Button>
       </div>
 
-      {rows.length === 0 ? (
+      {/* Filter bar */}
+      <Suspense>
+        <ProductFilters
+          categories={data.allCats}
+          stores={data.allStores}
+          brands={data.allBrands}
+        />
+      </Suspense>
+
+      {data.rows.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>No products yet</CardTitle>
+            <CardTitle>{isFiltered ? 'No products match' : 'No products yet'}</CardTitle>
             <CardDescription>
-              Add your first product. Inventory is tracked per store, so make sure a store exists
-              first.
+              {isFiltered
+                ? 'Try adjusting the search or filters.'
+                : 'Add your first product. Inventory is tracked per store, so make sure a store exists first.'}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/products/new">Create product</Link>
-            </Button>
-          </CardContent>
+          {!isFiltered && (
+            <CardContent>
+              <Button asChild>
+                <Link href="/products/new">Create product</Link>
+              </Button>
+            </CardContent>
+          )}
         </Card>
       ) : (
         <Card>
           <CardContent className="p-0">
+            <div className="px-4 py-2 border-b text-xs text-muted-foreground">
+              {data.rows.length} product{data.rows.length !== 1 ? 's' : ''}
+              {isFiltered ? ' (filtered)' : ''}
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -75,7 +159,7 @@ export default async function ProductsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((p) => (
+                {data.rows.map((p) => (
                   <TableRow key={p.id} className={p.active ? '' : 'opacity-50'}>
                     <TableCell>
                       {p.imageKey ? (

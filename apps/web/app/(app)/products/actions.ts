@@ -53,6 +53,17 @@ const ProductBase = z.object({
   inventory: numericText(12, 3),
   hsnCode: optionalText(20),
   gstRate: z.union([z.literal(''), numericText(5, 2)]).transform((v) => (v === '' ? null : v)),
+  specs: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v) return {};
+      try {
+        const parsed = JSON.parse(v);
+        if (typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, string>;
+        return {};
+      } catch { return {}; }
+    }),
 });
 
 interface UnitPair {
@@ -111,6 +122,7 @@ export const createProductAction = safeAction(ProductInput, async (input, { user
       inventory: input.inventory,
       hsnCode: input.hsnCode,
       gstRate: input.gstRate,
+      specs: input.specs,
     })
     .returning({ id: products.id, name: products.name });
   if (!row) throw new Error('insert failed');
@@ -170,6 +182,7 @@ export const updateProductAction = safeAction(UpdateProductInput, async (input, 
       inventory: input.inventory,
       hsnCode: input.hsnCode,
       gstRate: input.gstRate,
+      specs: input.specs,
       updatedAt: new Date(),
     })
     .where(and(eq(products.id, input.id), eq(products.businessId, user.businessId)))

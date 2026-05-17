@@ -18,6 +18,7 @@ export default async function EditCategoryPage({ params }: { params: { id: strin
         parentId: categories.parentId,
         storeId: categories.storeId,
         sortOrder: categories.sortOrder,
+        attributes: categories.attributes,
       })
       .from(categories)
       .where(and(eq(categories.id, params.id), eq(categories.businessId, user.businessId)));
@@ -40,7 +41,7 @@ export default async function EditCategoryPage({ params }: { params: { id: strin
         mode="edit"
         parentOptions={data.parentOptions}
         storeOptions={data.storeOptions}
-        initial={data.row}
+        initial={{ ...data.row, attributes: data.row.attributes ?? [] }}
       />
     </div>
   );

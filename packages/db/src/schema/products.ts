@@ -1,4 +1,4 @@
-import { boolean, index, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, jsonb, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { brands } from './brands';
 import { businesses } from './businesses';
 import { categories } from './categories';
@@ -40,6 +40,8 @@ export const products = pgTable(
     hsnCode: text('hsn_code'),
     gstRate: numeric('gst_rate', { precision: 5, scale: 2 }),
     imageKey: text('image_key'),
+    // Values for category-defined attributes, e.g. {"Capacity":"1.5","Star Rating":"5"}
+    specs: jsonb('specs').$type<Record<string, string>>().default({}),
     departmentId: uuid('department_id').references(() => departments.id, { onDelete: 'set null' }),
     active: boolean('active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

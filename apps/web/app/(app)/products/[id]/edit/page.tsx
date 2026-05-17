@@ -36,6 +36,7 @@ export default async function EditProductPage({ params }: { params: { id: string
         hsnCode: products.hsnCode,
         gstRate: products.gstRate,
         imageKey: products.imageKey,
+        specs: products.specs,
       })
       .from(products)
       .where(and(eq(products.id, params.id), eq(products.businessId, user.businessId)));
@@ -50,7 +51,12 @@ export default async function EditProductPage({ params }: { params: { id: string
       .from(stores)
       .orderBy(asc(stores.name));
     const cats = await tx
-      .select({ id: categories.id, name: categories.name })
+      .select({
+        id: categories.id,
+        name: categories.name,
+        parentId: categories.parentId,
+        attributes: categories.attributes,
+      })
       .from(categories)
       .orderBy(asc(categories.name));
     const brs = await tx
