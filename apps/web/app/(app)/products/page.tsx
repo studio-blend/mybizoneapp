@@ -41,21 +41,12 @@ export default async function ProductsPage({ searchParams }: Props) {
   const { q, categoryId, storeId, brandId } = searchParams;
 
   const data = await withTenant(db, user.businessId, async (tx) => {
-    // Load all categories (for filter bar + descendant expansion)
-    const allCats = await tx
-      .select({ id: categories.id, name: categories.name, parentId: categories.parentId })
-      .from(categories)
-      .orderBy(asc(categories.name));
-
-    const allStores = await tx
-      .select({ id: stores.id, name: stores.name })
-      .from(stores)
-      .orderBy(asc(stores.name));
-
-    const allBrands = await tx
-      .select({ id: brands.id, name: brands.name })
-      .from(brands)
-      .orderBy(asc(brands.name));
+    // Load filter options in parallel — rows query depends on allCats so runs after
+    const [allCats, allStores, allBrands] = await Promise.all([
+      tx.select({ id: categories.id, name: categories.name, parentId: categories.parentId }).from(categories).orderBy(asc(categories.name)),
+      tx.select({ id: stores.id, name: stores.name }).from(stores).orderBy(asc(stores.name)),
+      tx.select({ id: brands.id, name: brands.name }).from(brands).orderBy(asc(brands.name)),
+    ]);
 
     // Build WHERE conditions
     const conditions = [eq(products.businessId, user.businessId)];

@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 import { auth } from './auth';
 
 export interface AppUser {
@@ -15,8 +16,9 @@ export interface AppUser {
 
 /**
  * Server-side session lookup. Returns null when unauthenticated.
+ * Wrapped in React cache() so layout + page share one DB round-trip per request.
  */
-export async function getSessionUser(): Promise<AppUser | null> {
+export const getSessionUser = cache(async (): Promise<AppUser | null> => {
   const session = await auth.api.getSession({ headers: headers() });
   if (!session?.user) return null;
   const u = session.user as unknown as {
@@ -39,7 +41,7 @@ export async function getSessionUser(): Promise<AppUser | null> {
     empId: u.empId ?? null,
     mustChangePassword: u.mustChangePassword ?? false,
   };
-}
+});
 
 /**
  * Require an authenticated user with a tenant. Redirects when missing.

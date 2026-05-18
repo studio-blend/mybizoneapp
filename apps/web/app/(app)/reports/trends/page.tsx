@@ -19,45 +19,25 @@ export default async function TrendsPage() {
   const user = await requireUser();
 
   const { monthly, topProducts } = await withTenant(db, user.businessId, async (tx) => {
-    // Monthly sales for last 12 months
-    const monthly = await tx
-      .select({
+    const [monthly, topProducts] = await Promise.all([
+      // Monthly sales for last 12 months
+      tx.select({
         month: sql<string>`DATE_TRUNC('month', ${sales.createdAt})`.as('month'),
         billCount: sql<number>`COUNT(*)::int`.as('bill_count'),
         revenue: sum(sales.total).as('revenue'),
-      })
-      .from(sales)
-      .where(
-        and(
-          eq(sales.businessId, user.businessId),
-          eq(sales.status, 'completed'),
-          sql`${sales.createdAt} >= DATE_TRUNC('month', NOW()) - INTERVAL '11 months'`,
-        ),
-      )
-      .groupBy(sql`DATE_TRUNC('month', ${sales.createdAt})`)
-      .orderBy(sql`DATE_TRUNC('month', ${sales.createdAt})`);
-
-    // Top 10 products this calendar month
-    const topProducts = await tx
-      .select({
+      }).from(sales).where(
+        and(eq(sales.businessId, user.businessId), eq(sales.status, 'completed'), sql`${sales.createdAt} >= DATE_TRUNC('month', NOW()) - INTERVAL '11 months'`),
+      ).groupBy(sql`DATE_TRUNC('month', ${sales.createdAt})`).orderBy(sql`DATE_TRUNC('month', ${sales.createdAt})`),
+      // Top 10 products this calendar month
+      tx.select({
         productId: saleItems.productId,
         productName: saleItems.productName,
         totalQty: sum(saleItems.qty).as('total_qty'),
         totalRevenue: sum(saleItems.lineTotal).as('total_revenue'),
-      })
-      .from(saleItems)
-      .innerJoin(sales, eq(sales.id, saleItems.saleId))
-      .where(
-        and(
-          eq(saleItems.businessId, user.businessId),
-          eq(sales.status, 'completed'),
-          sql`${sales.createdAt} >= DATE_TRUNC('month', NOW())`,
-        ),
-      )
-      .groupBy(saleItems.productId, saleItems.productName)
-      .orderBy(desc(sum(saleItems.lineTotal)))
-      .limit(10);
-
+      }).from(saleItems).innerJoin(sales, eq(sales.id, saleItems.saleId)).where(
+        and(eq(saleItems.businessId, user.businessId), eq(sales.status, 'completed'), sql`${sales.createdAt} >= DATE_TRUNC('month', NOW())`),
+      ).groupBy(saleItems.productId, saleItems.productName).orderBy(desc(sum(saleItems.lineTotal))).limit(10),
+    ]);
     return { monthly, topProducts };
   });
 

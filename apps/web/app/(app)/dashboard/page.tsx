@@ -62,212 +62,80 @@ export default async function DashboardPage() {
   const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   const data = await withTenant(db, user.businessId, async (tx) => {
-    // ── Revenue this month + last month ──────────────────────────────────────
-    const [revThis] = await tx
-      .select({ total: sum(sales.total) })
-      .from(sales)
-      .where(
-        and(
-          eq(sales.businessId, user.businessId),
-          ne(sales.billType, 'estimate'),
-          eq(sales.status, 'completed'),
-          gte(sales.createdAt, thisMonthStart),
-          lt(sales.createdAt, nextMonthStart),
-        ),
-      );
-    const [revPrev] = await tx
-      .select({ total: sum(sales.total) })
-      .from(sales)
-      .where(
-        and(
-          eq(sales.businessId, user.businessId),
-          ne(sales.billType, 'estimate'),
-          eq(sales.status, 'completed'),
-          gte(sales.createdAt, prevMthStart),
-          lt(sales.createdAt, thisMonthStart),
-        ),
-      );
-
-    // ── Units sold this month ────────────────────────────────────────────────
-    const [unitsSold] = await tx
-      .select({ qty: sql<string>`COALESCE(SUM(${saleItems.qty}::numeric),0)` })
-      .from(saleItems)
-      .innerJoin(sales, eq(sales.id, saleItems.saleId))
-      .where(
-        and(
-          eq(saleItems.businessId, user.businessId),
-          ne(sales.billType, 'estimate'),
-          eq(sales.status, 'completed'),
-          gte(sales.createdAt, thisMonthStart),
-          lt(sales.createdAt, nextMonthStart),
-        ),
-      );
-
-    // ── Expenses this month + last month ─────────────────────────────────────
-    const [expThis] = await tx
-      .select({ total: sum(expenseEntries.amount) })
-      .from(expenseEntries)
-      .where(
-        and(
-          eq(expenseEntries.businessId, user.businessId),
-          eq(expenseEntries.type, 'expense'),
-          gte(expenseEntries.entryDate, thisMonthStart),
-          lt(expenseEntries.entryDate, nextMonthStart),
-        ),
-      );
-    const [expPrev] = await tx
-      .select({ total: sum(expenseEntries.amount) })
-      .from(expenseEntries)
-      .where(
-        and(
-          eq(expenseEntries.businessId, user.businessId),
-          eq(expenseEntries.type, 'expense'),
-          gte(expenseEntries.entryDate, prevMthStart),
-          lt(expenseEntries.entryDate, thisMonthStart),
-        ),
-      );
-
-    // ── COGS this month (for gross profit) ───────────────────────────────────
-    const [cogsThis] = await tx
-      .select({
-        cogs: sql<string>`COALESCE(SUM(${saleItems.qty}::numeric * ${saleItems.costPriceAtSale}::numeric),0)`,
-      })
-      .from(saleItems)
-      .innerJoin(sales, eq(sales.id, saleItems.saleId))
-      .where(
-        and(
-          eq(saleItems.businessId, user.businessId),
-          ne(sales.billType, 'estimate'),
-          eq(sales.status, 'completed'),
-          eq(saleItems.isFreeItem, false),
-          gte(sales.createdAt, thisMonthStart),
-          lt(sales.createdAt, nextMonthStart),
-        ),
-      );
-
-    // ── Customer counts ───────────────────────────────────────────────────────
-    const [custTotal] = await tx
-      .select({ cnt: count(customers.id) })
-      .from(customers)
-      .where(eq(customers.businessId, user.businessId));
-    const [custNew] = await tx
-      .select({ cnt: count(customers.id) })
-      .from(customers)
-      .where(
-        and(
-          eq(customers.businessId, user.businessId),
-          gte(customers.createdAt, thisMonthStart),
-          lt(customers.createdAt, nextMonthStart),
-        ),
-      );
-
-    // ── Pending receivables ───────────────────────────────────────────────────
-    const [recv] = await tx
-      .select({ total: sql<string>`COALESCE(SUM(${customers.outstandingBalance}::numeric),0)` })
-      .from(customers)
-      .where(
-        and(
-          eq(customers.businessId, user.businessId),
-          sql`${customers.outstandingBalance}::numeric > 0`,
-        ),
-      );
-
-    // ── Payables ─────────────────────────────────────────────────────────────
-    const [payable] = await tx
-      .select({ total: sql<string>`COALESCE(SUM(${suppliers.outstandingBalance}::numeric),0)` })
-      .from(suppliers)
-      .where(
-        and(
-          eq(suppliers.businessId, user.businessId),
-          sql`${suppliers.outstandingBalance}::numeric > 0`,
-        ),
-      );
-
-    // ── 12-month revenue trend ────────────────────────────────────────────────
-    const monthlyRevRaw = await tx
-      .select({
-        month: sql<string>`TO_CHAR(DATE_TRUNC('month', ${sales.createdAt}), 'YYYY-MM-DD')`,
-        revenue: sum(sales.total),
-      })
-      .from(sales)
-      .where(
-        and(
-          eq(sales.businessId, user.businessId),
-          ne(sales.billType, 'estimate'),
-          eq(sales.status, 'completed'),
-          sql`${sales.createdAt} >= DATE_TRUNC('month', NOW()) - INTERVAL '11 months'`,
-        ),
-      )
-      .groupBy(sql`DATE_TRUNC('month', ${sales.createdAt})`)
-      .orderBy(sql`DATE_TRUNC('month', ${sales.createdAt})`);
-
-    // ── Top 5 products this month by revenue ─────────────────────────────────
-    const top5Raw = await tx
-      .select({
-        name: saleItems.productName,
-        revenue: sum(saleItems.lineTotal),
-      })
-      .from(saleItems)
-      .innerJoin(sales, eq(sales.id, saleItems.saleId))
-      .where(
-        and(
-          eq(saleItems.businessId, user.businessId),
-          ne(sales.billType, 'estimate'),
-          eq(sales.status, 'completed'),
-          gte(sales.createdAt, thisMonthStart),
-          lt(sales.createdAt, nextMonthStart),
-        ),
-      )
-      .groupBy(saleItems.productName)
-      .orderBy(desc(sum(saleItems.lineTotal)))
-      .limit(5);
-
-    // ── Sales by category this month ──────────────────────────────────────────
-    const catRaw = await tx
-      .select({
-        category: categories.name,
-        revenue: sum(saleItems.lineTotal),
-      })
-      .from(saleItems)
-      .innerJoin(sales, eq(sales.id, saleItems.saleId))
-      .innerJoin(products, eq(products.id, saleItems.productId))
-      .innerJoin(categories, eq(categories.id, products.categoryId))
-      .where(
-        and(
-          eq(saleItems.businessId, user.businessId),
-          ne(sales.billType, 'estimate'),
-          eq(sales.status, 'completed'),
-          gte(sales.createdAt, thisMonthStart),
-          lt(sales.createdAt, nextMonthStart),
-        ),
-      )
-      .groupBy(categories.name)
-      .orderBy(desc(sum(saleItems.lineTotal)));
-
-    // ── Payment method split this month ──────────────────────────────────────
-    const pmtRaw = await tx
-      .select({
-        method: sales.paymentMethod,
-        total: sum(sales.total),
-      })
-      .from(sales)
-      .where(
-        and(
-          eq(sales.businessId, user.businessId),
-          ne(sales.billType, 'estimate'),
-          eq(sales.status, 'completed'),
-          gte(sales.createdAt, thisMonthStart),
-          lt(sales.createdAt, nextMonthStart),
-        ),
-      )
-      .groupBy(sales.paymentMethod)
-      .orderBy(desc(sum(sales.total)));
-
-    // ── Tour data ─────────────────────────────────────────────────────────────
-    const [productAgg] = await tx
-      .select({ total: count(products.id) })
-      .from(products)
-      .where(and(eq(products.businessId, user.businessId), eq(products.active, true)));
+    const [
+      [revThis],
+      [revPrev],
+      [unitsSold],
+      [expThis],
+      [expPrev],
+      [cogsThis],
+      [custTotal],
+      [custNew],
+      [recv],
+      [payable],
+      monthlyRevRaw,
+      top5Raw,
+      catRaw,
+      pmtRaw,
+      [productAgg],
+    ] = await Promise.all([
+      // Revenue this month
+      tx.select({ total: sum(sales.total) }).from(sales).where(
+        and(eq(sales.businessId, user.businessId), ne(sales.billType, 'estimate'), eq(sales.status, 'completed'), gte(sales.createdAt, thisMonthStart), lt(sales.createdAt, nextMonthStart)),
+      ),
+      // Revenue last month
+      tx.select({ total: sum(sales.total) }).from(sales).where(
+        and(eq(sales.businessId, user.businessId), ne(sales.billType, 'estimate'), eq(sales.status, 'completed'), gte(sales.createdAt, prevMthStart), lt(sales.createdAt, thisMonthStart)),
+      ),
+      // Units sold this month
+      tx.select({ qty: sql<string>`COALESCE(SUM(${saleItems.qty}::numeric),0)` }).from(saleItems).innerJoin(sales, eq(sales.id, saleItems.saleId)).where(
+        and(eq(saleItems.businessId, user.businessId), ne(sales.billType, 'estimate'), eq(sales.status, 'completed'), gte(sales.createdAt, thisMonthStart), lt(sales.createdAt, nextMonthStart)),
+      ),
+      // Expenses this month
+      tx.select({ total: sum(expenseEntries.amount) }).from(expenseEntries).where(
+        and(eq(expenseEntries.businessId, user.businessId), eq(expenseEntries.type, 'expense'), gte(expenseEntries.entryDate, thisMonthStart), lt(expenseEntries.entryDate, nextMonthStart)),
+      ),
+      // Expenses last month
+      tx.select({ total: sum(expenseEntries.amount) }).from(expenseEntries).where(
+        and(eq(expenseEntries.businessId, user.businessId), eq(expenseEntries.type, 'expense'), gte(expenseEntries.entryDate, prevMthStart), lt(expenseEntries.entryDate, thisMonthStart)),
+      ),
+      // COGS this month
+      tx.select({ cogs: sql<string>`COALESCE(SUM(${saleItems.qty}::numeric * ${saleItems.costPriceAtSale}::numeric),0)` }).from(saleItems).innerJoin(sales, eq(sales.id, saleItems.saleId)).where(
+        and(eq(saleItems.businessId, user.businessId), ne(sales.billType, 'estimate'), eq(sales.status, 'completed'), eq(saleItems.isFreeItem, false), gte(sales.createdAt, thisMonthStart), lt(sales.createdAt, nextMonthStart)),
+      ),
+      // Total customers
+      tx.select({ cnt: count(customers.id) }).from(customers).where(eq(customers.businessId, user.businessId)),
+      // New customers this month
+      tx.select({ cnt: count(customers.id) }).from(customers).where(
+        and(eq(customers.businessId, user.businessId), gte(customers.createdAt, thisMonthStart), lt(customers.createdAt, nextMonthStart)),
+      ),
+      // Receivables
+      tx.select({ total: sql<string>`COALESCE(SUM(${customers.outstandingBalance}::numeric),0)` }).from(customers).where(
+        and(eq(customers.businessId, user.businessId), sql`${customers.outstandingBalance}::numeric > 0`),
+      ),
+      // Payables
+      tx.select({ total: sql<string>`COALESCE(SUM(${suppliers.outstandingBalance}::numeric),0)` }).from(suppliers).where(
+        and(eq(suppliers.businessId, user.businessId), sql`${suppliers.outstandingBalance}::numeric > 0`),
+      ),
+      // 12-month revenue trend
+      tx.select({ month: sql<string>`TO_CHAR(DATE_TRUNC('month', ${sales.createdAt}), 'YYYY-MM-DD')`, revenue: sum(sales.total) }).from(sales).where(
+        and(eq(sales.businessId, user.businessId), ne(sales.billType, 'estimate'), eq(sales.status, 'completed'), sql`${sales.createdAt} >= DATE_TRUNC('month', NOW()) - INTERVAL '11 months'`),
+      ).groupBy(sql`DATE_TRUNC('month', ${sales.createdAt})`).orderBy(sql`DATE_TRUNC('month', ${sales.createdAt})`),
+      // Top 5 products this month
+      tx.select({ name: saleItems.productName, revenue: sum(saleItems.lineTotal) }).from(saleItems).innerJoin(sales, eq(sales.id, saleItems.saleId)).where(
+        and(eq(saleItems.businessId, user.businessId), ne(sales.billType, 'estimate'), eq(sales.status, 'completed'), gte(sales.createdAt, thisMonthStart), lt(sales.createdAt, nextMonthStart)),
+      ).groupBy(saleItems.productName).orderBy(desc(sum(saleItems.lineTotal))).limit(5),
+      // Sales by category this month
+      tx.select({ category: categories.name, revenue: sum(saleItems.lineTotal) }).from(saleItems).innerJoin(sales, eq(sales.id, saleItems.saleId)).innerJoin(products, eq(products.id, saleItems.productId)).innerJoin(categories, eq(categories.id, products.categoryId)).where(
+        and(eq(saleItems.businessId, user.businessId), ne(sales.billType, 'estimate'), eq(sales.status, 'completed'), gte(sales.createdAt, thisMonthStart), lt(sales.createdAt, nextMonthStart)),
+      ).groupBy(categories.name).orderBy(desc(sum(saleItems.lineTotal))),
+      // Payment method split this month
+      tx.select({ method: sales.paymentMethod, total: sum(sales.total) }).from(sales).where(
+        and(eq(sales.businessId, user.businessId), ne(sales.billType, 'estimate'), eq(sales.status, 'completed'), gte(sales.createdAt, thisMonthStart), lt(sales.createdAt, nextMonthStart)),
+      ).groupBy(sales.paymentMethod).orderBy(desc(sum(sales.total))),
+      // Product count (tour)
+      tx.select({ total: count(products.id) }).from(products).where(and(eq(products.businessId, user.businessId), eq(products.active, true))),
+    ]);
 
     return {
       revThis: Number(revThis?.total ?? 0),

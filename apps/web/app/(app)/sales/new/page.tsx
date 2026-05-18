@@ -12,56 +12,29 @@ export const dynamic = 'force-dynamic';
 export default async function NewSalePage() {
   const user = await requireUser();
   const data = await withTenant(db, user.businessId, async (tx) => {
-    const sts = await tx
-      .select({ id: stores.id, name: stores.name })
-      .from(stores)
-      .orderBy(asc(stores.name));
-    const ps = await tx
-      .select({
-        id: products.id,
-        storeId: products.storeId,
-        name: products.name,
-        sku: products.sku,
-        barcode: products.barcode,
-        unitType: products.unitType,
-        unitSymbol: products.unitSymbol,
-        price: products.price,
-        gstRate: products.gstRate,
-        inventory: products.inventory,
-      })
-      .from(products)
-      .where(and(eq(products.businessId, user.businessId), eq(products.active, true)))
-      .orderBy(asc(products.name));
-    const [biz] = await tx
-      .select({ gstEnabled: businesses.gstEnabled })
-      .from(businesses)
-      .where(eq(businesses.id, user.businessId));
-    // Recent products: last 50 sale_items by this user, deduplicated to 5 distinct product_ids.
-    const recent = await tx
-      .select({ productId: saleItems.productId })
-      .from(saleItems)
-      .innerJoin(sales, eq(sales.id, saleItems.saleId))
-      .where(and(eq(saleItems.businessId, user.businessId), eq(sales.employeeId, user.id)))
-      .orderBy(desc(sales.createdAt))
-      .limit(50);
+    const [sts, ps, [biz], recentRaw, cs] = await Promise.all([
+      tx.select({ id: stores.id, name: stores.name }).from(stores).orderBy(asc(stores.name)),
+      tx.select({
+        id: products.id, storeId: products.storeId, name: products.name, sku: products.sku,
+        barcode: products.barcode, unitType: products.unitType, unitSymbol: products.unitSymbol,
+        price: products.price, gstRate: products.gstRate, inventory: products.inventory,
+      }).from(products).where(and(eq(products.businessId, user.businessId), eq(products.active, true))).orderBy(asc(products.name)),
+      tx.select({ gstEnabled: businesses.gstEnabled }).from(businesses).where(eq(businesses.id, user.businessId)),
+      // Recent products: last 50 sale_items by this user, deduplicated to 5 distinct product_ids
+      tx.select({ productId: saleItems.productId }).from(saleItems).innerJoin(sales, eq(sales.id, saleItems.saleId)).where(
+        and(eq(saleItems.businessId, user.businessId), eq(sales.employeeId, user.id)),
+      ).orderBy(desc(sales.createdAt)).limit(50),
+      tx.select({ id: customers.id, name: customers.name, outstandingBalance: customers.outstandingBalance }).from(customers).where(eq(customers.businessId, user.businessId)).orderBy(asc(customers.name)),
+    ]);
+
     const seen = new Set<string>();
     const recentProductIds: string[] = [];
-    for (const { productId } of recent) {
+    for (const { productId } of recentRaw) {
       if (productId && !seen.has(productId) && recentProductIds.length < 5) {
         seen.add(productId);
         recentProductIds.push(productId);
       }
     }
-
-    const cs = await tx
-      .select({
-        id: customers.id,
-        name: customers.name,
-        outstandingBalance: customers.outstandingBalance,
-      })
-      .from(customers)
-      .where(eq(customers.businessId, user.businessId))
-      .orderBy(asc(customers.name));
 
     return { stores: sts, products: ps, gstEnabled: biz?.gstEnabled ?? false, recentProductIds, customers: cs };
   });

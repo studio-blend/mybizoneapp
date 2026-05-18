@@ -12,8 +12,6 @@ export const metadata: Metadata = {
 // Force dynamic rendering across the app: every page either reads cookies
 // (auth) or DB (tenant data). Static prerender would crash on any of those.
 // Re-enable static for marketing pages later.
-export const dynamic = 'force-dynamic';
-
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
