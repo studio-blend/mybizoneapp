@@ -9,9 +9,9 @@ describe('PLAN_LIMITS', () => {
   });
 
   it('pro tier is unlimited', () => {
-    expect(PLAN_LIMITS.pro.stores).toBe(Infinity);
-    expect(PLAN_LIMITS.pro.products).toBe(Infinity);
-    expect(PLAN_LIMITS.pro.users).toBe(Infinity);
+    expect(PLAN_LIMITS.pro.stores).toBe(Number.POSITIVE_INFINITY);
+    expect(PLAN_LIMITS.pro.products).toBe(Number.POSITIVE_INFINITY);
+    expect(PLAN_LIMITS.pro.users).toBe(Number.POSITIVE_INFINITY);
   });
 });
 

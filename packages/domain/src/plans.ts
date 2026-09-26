@@ -3,7 +3,11 @@ export type LimitResource = 'stores' | 'products' | 'users';
 
 export const PLAN_LIMITS: Record<Plan, Record<LimitResource, number>> = {
   free: { stores: 1, products: 500, users: 1 },
-  pro: { stores: Infinity, products: Infinity, users: Infinity },
+  pro: {
+    stores: Number.POSITIVE_INFINITY,
+    products: Number.POSITIVE_INFINITY,
+    users: Number.POSITIVE_INFINITY,
+  },
 };
 
 export interface LimitCheck {
@@ -12,11 +16,7 @@ export interface LimitCheck {
   limit: number;
 }
 
-export function checkLimit(
-  plan: Plan,
-  resource: LimitResource,
-  current: number,
-): LimitCheck {
+export function checkLimit(plan: Plan, resource: LimitResource, current: number): LimitCheck {
   const limit = PLAN_LIMITS[plan][resource];
   return { allowed: current < limit, current, limit };
 }

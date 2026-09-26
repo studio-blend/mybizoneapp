@@ -1,81 +1,93 @@
-import { createHmac } from 'node:crypto';
 import { db } from '@/lib/db';
 import { env } from '@/lib/env';
+import {
+  SubscriptionEvent,
+  shouldApplySubscriptionEvent,
+  subscriptionChange,
+  validWebhookSignature,
+} from '@/lib/subscription-events';
 import { businesses, webhookEvents } from '@mybizone/db';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-type RazorpaySubscriptionEvent = {
-  entity: 'event';
-  event: string;
-  payload: {
-    subscription: {
-      entity: {
-        id: string;
-        status: string;
-        notes?: Record<string, string>;
-      };
-    };
-  };
-};
-
 export async function POST(req: Request) {
-  const body = await req.text();
-  const signature = req.headers.get('x-razorpay-signature') ?? '';
-
   if (!env.RAZORPAY_WEBHOOK_SECRET) {
-    console.error('[webhook/razorpay] RAZORPAY_WEBHOOK_SECRET not set');
-    return NextResponse.json({ error: 'not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'not configured' }, { status: 503 });
   }
-
-  const expected = createHmac('sha256', env.RAZORPAY_WEBHOOK_SECRET)
-    .update(body)
-    .digest('hex');
-
-  if (expected !== signature) {
+  const body = await req.text();
+  if (
+    !validWebhookSignature(
+      body,
+      req.headers.get('x-razorpay-signature') ?? '',
+      env.RAZORPAY_WEBHOOK_SECRET,
+    )
+  ) {
     return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
   }
-
-  let event: RazorpaySubscriptionEvent;
+  const eventId = req.headers.get('x-razorpay-event-id');
+  if (!eventId || eventId.length > 200) {
+    return NextResponse.json({ error: 'missing or invalid event ID' }, { status: 400 });
+  }
+  let raw: unknown;
   try {
-    event = JSON.parse(body) as RazorpaySubscriptionEvent;
+    raw = JSON.parse(body);
   } catch {
     return NextResponse.json({ error: 'bad json' }, { status: 400 });
   }
-
-  // Idempotency: skip if already processed
-  const eventId = `${event.event}:${event.payload?.subscription?.entity?.id ?? ''}`;
+  const eventName = typeof raw === 'object' && raw !== null && 'event' in raw ? raw.event : null;
+  const change = typeof eventName === 'string' ? subscriptionChange(eventName) : null;
+  if (!change) return NextResponse.json({ ok: true, ignored: true });
+  const parsed = SubscriptionEvent.safeParse(raw);
+  if (!parsed.success) return NextResponse.json({ error: 'invalid event' }, { status: 400 });
+  const event = parsed.data;
+  const sub = event.payload.subscription.entity;
   try {
-    await db.insert(webhookEvents).values({
-      provider: 'razorpay',
-      eventId,
-      eventType: event.event,
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.business_id', ${sub.notes.business_id}, true)`);
+      // The deduplication record and entitlement change must commit together.
+      const inserted = await tx
+        .insert(webhookEvents)
+        .values({
+          provider: 'razorpay',
+          eventId,
+          eventType: event.event,
+        })
+        .onConflictDoNothing()
+        .returning({ id: webhookEvents.id });
+      if (!inserted.length) return { duplicate: true };
+      const [biz] = await tx
+        .select()
+        .from(businesses)
+        .where(eq(businesses.id, sub.notes.business_id))
+        .for('update');
+      if (!biz || biz.subscriptionId !== sub.id) return { ignored: true };
+      const at = new Date(event.created_at * 1000);
+      if (
+        !shouldApplySubscriptionEvent(
+          biz.subscriptionEventAt,
+          biz.subscriptionStatus,
+          at,
+          change.status,
+        )
+      ) {
+        return { stale: true };
+      }
+      await tx
+        .update(businesses)
+        .set({
+          plan: change.plan,
+          subscriptionStatus: change.status,
+          subscriptionEventAt: at,
+          updatedAt: new Date(),
+        })
+        .where(eq(businesses.id, biz.id));
+      return {};
     });
-  } catch {
-    // UNIQUE constraint violation — duplicate delivery, return 200 immediately
-    return NextResponse.json({ ok: true, duplicate: true });
-  }
-
-  const sub = event.payload?.subscription?.entity;
-  const businessId = sub?.notes?.business_id;
-
-  if (!businessId) {
-    console.warn('[webhook/razorpay] no business_id in notes for event', event.event);
-    return NextResponse.json({ ok: true });
-  }
-
-  try {
-    if (event.event === 'subscription.activated' || event.event === 'subscription.charged') {
-      await db.update(businesses).set({ plan: 'pro', updatedAt: new Date() }).where(eq(businesses.id, businessId));
-    } else if (event.event === 'subscription.cancelled' || event.event === 'subscription.completed') {
-      await db.update(businesses).set({ plan: 'free', updatedAt: new Date() }).where(eq(businesses.id, businessId));
-    }
+    return NextResponse.json({ ok: true, ...result });
   } catch (err) {
-    console.error('[webhook/razorpay] db update failed', err);
-    return NextResponse.json({ error: 'db error' }, { status: 500 });
+    console.error('[webhook/razorpay] processing failed', err);
+    return NextResponse.json({ error: 'processing failed; retry delivery' }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true });
 }

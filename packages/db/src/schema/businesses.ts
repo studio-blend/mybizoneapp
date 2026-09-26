@@ -9,6 +9,9 @@ export const businesses = pgTable('businesses', {
   currency: text('currency').notNull().default('INR'),
   timezone: text('timezone').notNull().default('Asia/Kolkata'),
   plan: text('plan').notNull().default('free'),
+  subscriptionId: text('subscription_id'),
+  subscriptionStatus: text('subscription_status'),
+  subscriptionEventAt: timestamp('subscription_event_at', { withTimezone: true }),
   status: text('status').notNull().default('active'), // active | suspended | deleted
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

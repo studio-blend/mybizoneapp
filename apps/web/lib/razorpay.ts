@@ -14,5 +14,14 @@ export function getRazorpay(): Razorpay {
 }
 
 export function isBillingEnabled(): boolean {
-  return Boolean(env.RAZORPAY_KEY_ID) && !env.LAN_MODE;
+  return (
+    !env.LAN_MODE &&
+    Boolean(
+      env.RAZORPAY_KEY_ID &&
+        env.RAZORPAY_KEY_SECRET &&
+        env.RAZORPAY_WEBHOOK_SECRET &&
+        env.NEXT_PUBLIC_RAZORPAY_KEY_ID === env.RAZORPAY_KEY_ID &&
+        (env.RAZORPAY_PLAN_ID_MONTHLY || env.RAZORPAY_PLAN_ID_ANNUAL),
+    )
+  );
 }

@@ -3,11 +3,27 @@ import { type NextRequest, NextResponse } from 'next/server';
 const SESSION_COOKIE = 'mybizone.session_token';
 const SESSION_COOKIE_SECURE = '__Secure-mybizone.session_token';
 const PROTECTED_PREFIXES = [
-  '/dashboard', '/stores', '/onboarding',
-  '/products', '/categories', '/brands', '/catalogues',
-  '/sales', '/returns', '/quotations', '/purchases', '/purchase-returns',
-  '/expenses', '/customers', '/suppliers', '/employees', '/team',
-  '/reports', '/settings', '/departments', '/help',
+  '/dashboard',
+  '/stores',
+  '/onboarding',
+  '/products',
+  '/categories',
+  '/brands',
+  '/catalogues',
+  '/sales',
+  '/returns',
+  '/quotations',
+  '/purchases',
+  '/purchase-returns',
+  '/expenses',
+  '/customers',
+  '/suppliers',
+  '/employees',
+  '/team',
+  '/reports',
+  '/settings',
+  '/departments',
+  '/help',
 ];
 
 function buildCsp(): string {
@@ -16,11 +32,12 @@ function buildCsp(): string {
   // native GET. Switch to nonce-based CSP post-launch for stricter enforcement.
   return [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.sentry.io https://*.posthog.com",
+    "connect-src 'self' https://*.sentry.io https://*.posthog.com https://*.razorpay.com",
+    "frame-src 'self' https://*.razorpay.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -35,10 +52,7 @@ function applySecurityHeaders(res: NextResponse): NextResponse {
   res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.headers.set('Content-Security-Policy', buildCsp());
   if (!isLAN) {
-    res.headers.set(
-      'Strict-Transport-Security',
-      'max-age=63072000; includeSubDomains; preload',
-    );
+    res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   }
   return res;
 }
