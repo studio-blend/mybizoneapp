@@ -1,18 +1,19 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
-import { auditLogs, categories } from '@mybizone/db';
+import { auditLogs, categories, stores } from '@mybizone/db';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const blank = z.literal('');
 const optionalUuid = z.union([uuid, blank]).transform((v) => (v === '' ? null : v));
 
-const AttributeSchema = z.array(
-  z.object({ name: z.string().max(60), unit: z.string().max(20).optional().default('') }),
-).default([]);
+const AttributeSchema = z
+  .array(z.object({ name: z.string().max(60), unit: z.string().max(20).optional().default('') }))
+  .default([]);
 
 const CategoryInput = z.object({
   name: z.string().min(1, 'name required').max(120),
@@ -24,11 +25,32 @@ const CategoryInput = z.object({
     .optional()
     .transform((v) => {
       if (!v) return [];
-      try { return AttributeSchema.parse(JSON.parse(v)); } catch { return []; }
+      try {
+        return AttributeSchema.parse(JSON.parse(v));
+      } catch {
+        return [];
+      }
     }),
 });
 
 export const createCategoryAction = safeAction(CategoryInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_products');
+  if (input.parentId) {
+    const [parent] = await tx
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.id, input.parentId), eq(categories.businessId, user.businessId)));
+    if (!parent) throw new Error('parent category not found');
+  }
+
+  if (input.storeId) {
+    const [store] = await tx
+      .select({ id: stores.id })
+      .from(stores)
+      .where(and(eq(stores.id, input.storeId), eq(stores.businessId, user.businessId)));
+    if (!store) throw new Error('store not found');
+  }
+
   const [row] = await tx
     .insert(categories)
     .values({
@@ -66,11 +88,32 @@ const UpdateCategoryInput = z.object({
     .optional()
     .transform((v) => {
       if (!v) return [];
-      try { return AttributeSchema.parse(JSON.parse(v)); } catch { return []; }
+      try {
+        return AttributeSchema.parse(JSON.parse(v));
+      } catch {
+        return [];
+      }
     }),
 });
 
 export const updateCategoryAction = safeAction(UpdateCategoryInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_products');
+  if (input.parentId) {
+    const [parent] = await tx
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.id, input.parentId), eq(categories.businessId, user.businessId)));
+    if (!parent) throw new Error('parent category not found');
+  }
+
+  if (input.storeId) {
+    const [store] = await tx
+      .select({ id: stores.id })
+      .from(stores)
+      .where(and(eq(stores.id, input.storeId), eq(stores.businessId, user.businessId)));
+    if (!store) throw new Error('store not found');
+  }
+
   if (input.parentId === input.id) {
     throw new Error('parent cannot be self');
   }
@@ -112,6 +155,7 @@ export const updateCategoryAction = safeAction(UpdateCategoryInput, async (input
 const DeleteCategoryInput = z.object({ id: uuid });
 
 export const deleteCategoryAction = safeAction(DeleteCategoryInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_products');
   const [before] = await tx
     .select({ name: categories.name })
     .from(categories)

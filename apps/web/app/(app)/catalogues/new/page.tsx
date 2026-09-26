@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { brands, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function NewCataloguePage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_products');
   const { brandList, storeList } = await withTenant(db, user.businessId, async (tx) => {
     const brandList = await tx
       .select({ id: brands.id, name: brands.name })

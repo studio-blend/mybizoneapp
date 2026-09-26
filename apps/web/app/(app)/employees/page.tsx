@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { invitations, stores, user as userTable } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function EmployeesPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_rbac');
   const data = await withTenant(db, user.businessId, async (tx) => {
     const employees = await tx
       .select({
@@ -52,7 +54,7 @@ export default async function EmployeesPage() {
   });
 
   const storeNames = new Map(data.stores.map((s) => [s.id, s.name]));
-  const isOwnerOrAdmin = ['owner', 'admin'].includes(user.role);
+  const isOwnerOrAdmin = true; // The current manage_rbac gate above authorizes these controls.
 
   return (
     <div className="space-y-6">
@@ -94,7 +96,7 @@ export default async function EmployeesPage() {
               {data.employees.map((e) => {
                 const locked = !!e.lockedAt;
                 const isMe = e.id === user.id;
-                const isOwner = e.role === 'owner';
+                const isOwner = ['owner', 'super_admin'].includes(e.role);
                 return (
                   <TableRow key={e.id} className={!e.active ? 'opacity-50' : ''}>
                     <TableCell className="font-medium">{e.name}</TableCell>
@@ -107,8 +109,12 @@ export default async function EmployeesPage() {
                       {e.storeId ? (storeNames.get(e.storeId) ?? '—') : '—'}
                     </TableCell>
                     <TableCell className="text-xs">
-                      {!e.active && <span className="text-destructive font-medium">deactivated</span>}
-                      {e.active && locked && <span className="text-orange-600 font-medium">locked</span>}
+                      {!e.active && (
+                        <span className="text-destructive font-medium">deactivated</span>
+                      )}
+                      {e.active && locked && (
+                        <span className="text-orange-600 font-medium">locked</span>
+                      )}
                       {e.active && !locked && e.mustChangePassword && (
                         <span className="text-yellow-600">pwd reset pending</span>
                       )}

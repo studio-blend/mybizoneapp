@@ -23,7 +23,7 @@ let categoryA = '';
 let brandA = '';
 let productA = '';
 let saleA = '';
-let catalogueA = '';
+let _catalogueA = '';
 
 beforeAll(async () => {
   // Seed two tenants (as superuser — RLS bypassed for setup convenience).
@@ -75,7 +75,7 @@ beforeAll(async () => {
       INSERT INTO catalogues (business_id, name, file_key)
       VALUES (${bizA}, 'Cat-A-PDF', ${catFileKeyA}) RETURNING id`;
     if (!cat) throw new Error('catalogue A seed failed');
-    catalogueA = cat.id;
+    _catalogueA = cat.id;
   });
 
   // Seed under tenant B

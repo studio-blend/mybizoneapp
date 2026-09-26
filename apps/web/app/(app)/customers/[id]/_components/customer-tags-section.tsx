@@ -5,7 +5,15 @@ import { Input } from '@mybizone/ui/input';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { addCustomerTagAction, removeCustomerTagAction } from '../actions';
 
-const PRESET_TAGS = ['VIP', 'Wholesale', 'Inactive', 'Regular', 'Bulk Buyer', 'Credit Risk', 'New Customer'];
+const PRESET_TAGS = [
+  'VIP',
+  'Wholesale',
+  'Inactive',
+  'Regular',
+  'Bulk Buyer',
+  'Credit Risk',
+  'New Customer',
+];
 
 const TAG_COLORS: Record<string, string> = {
   VIP: 'bg-purple-100 text-purple-800 border-purple-200',
@@ -82,6 +90,7 @@ export function CustomerTagsSection({
           >
             {t.tag}
             <button
+              type="button"
               onClick={() => removeTag(t.id)}
               disabled={isPending}
               className="ml-0.5 leading-none hover:text-destructive disabled:opacity-50"
@@ -107,6 +116,7 @@ export function CustomerTagsSection({
               <div className="flex flex-wrap gap-1">
                 {PRESET_TAGS.filter((pt) => !existingTagNames.has(pt)).map((pt) => (
                   <button
+                    type="button"
                     key={pt}
                     onClick={() => addTag(pt)}
                     disabled={isPending}

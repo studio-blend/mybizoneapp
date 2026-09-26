@@ -1,20 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { triggerBackupAction, restoreBackupAction } from './actions';
+import { useCallback, useEffect, useState } from 'react';
+import { triggerBackupAction } from './actions';
 
 type BackupStatus = { lastBackup: string | null; count: number };
 type BackupResult = { success?: boolean; filename?: string; error?: string } | null;
-type RestoreResult = { success?: boolean; error?: string } | null;
 
 export function BackupSection() {
   const [status, setStatus] = useState<BackupStatus | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [backupPending, setBackupPending] = useState(false);
   const [backupResult, setBackupResult] = useState<BackupResult>(null);
-  const [restorePending, setRestorePending] = useState(false);
-  const [restoreResult, setRestoreResult] = useState<RestoreResult>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleBackup(e: React.FormEvent) {
     e.preventDefault();
@@ -26,21 +22,7 @@ export function BackupSection() {
     if (result?.success) fetchStatus();
   }
 
-  async function handleRestore(e: React.FormEvent) {
-    e.preventDefault();
-    const file = fileRef.current?.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
-    setRestorePending(true);
-    setRestoreResult(null);
-    const result = await restoreBackupAction(null, formData);
-    setRestoreResult(result);
-    setRestorePending(false);
-  }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  async function fetchStatus() {
+  const fetchStatus = useCallback(async () => {
     setLoadingStatus(true);
     try {
       const res = await fetch('/api/backup/status');
@@ -51,12 +33,11 @@ export function BackupSection() {
     } finally {
       setLoadingStatus(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     fetchStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchStatus]);
 
   const lastBackupLabel = loadingStatus
     ? 'Loading...'
@@ -107,41 +88,15 @@ export function BackupSection() {
           Backup created: {backupResult.filename}
         </p>
       )}
-      {backupResult?.error && (
-        <p className="text-xs text-destructive">{backupResult.error}</p>
-      )}
+      {backupResult?.error && <p className="text-xs text-destructive">{backupResult.error}</p>}
 
-      {/* Restore from file */}
       <div className="border-t pt-4 space-y-2">
         <p className="text-sm font-medium">Restore from backup</p>
         <p className="text-xs text-muted-foreground">
-          Upload a <code>.sql.gz</code> backup file. This will overwrite the current database.
+          Restore backups on the shop PC using the recovery guide. Close other sessions first and
+          ask your server administrator to stop the application before restoring. Store downloaded
+          backups securely.
         </p>
-        <form onSubmit={handleRestore} className="flex items-center gap-3">
-          <input
-            ref={fileRef}
-            type="file"
-            name="file"
-            accept=".gz,.sql.gz"
-            className="text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-xs file:font-medium"
-            required
-          />
-          <button
-            type="submit"
-            disabled={restorePending}
-            className="inline-flex items-center rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground shadow hover:bg-destructive/90 disabled:opacity-50 disabled:pointer-events-none"
-          >
-            {restorePending ? 'Restoring...' : 'Restore'}
-          </button>
-        </form>
-        {restoreResult?.success && (
-          <p className="text-xs text-green-600 dark:text-green-400">
-            Database restored successfully. Please restart the server.
-          </p>
-        )}
-        {restoreResult?.error && (
-          <p className="text-xs text-destructive">{restoreResult.error}</p>
-        )}
       </div>
     </div>
   );

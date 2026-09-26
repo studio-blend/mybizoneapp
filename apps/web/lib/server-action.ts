@@ -1,5 +1,5 @@
 import { withTenant } from '@mybizone/db/tenant';
-import type { z } from 'zod';
+import type { z } from 'zod/v3';
 import { db } from './db';
 import { type AppUser, requireUser } from './session';
 

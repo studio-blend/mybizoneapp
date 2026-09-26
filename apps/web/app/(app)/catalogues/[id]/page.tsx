@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { catalogues } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -9,8 +10,10 @@ import { notFound } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CatalogueViewPage({ params }: { params: { id: string } }) {
+export default async function CatalogueViewPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
+  await requirePermission(user, 'manage_products');
   const [row] = await withTenant(db, user.businessId, (tx) =>
     tx
       .select({ name: catalogues.name, fileKey: catalogues.fileKey })
@@ -39,11 +42,7 @@ export default async function CatalogueViewPage({ params }: { params: { id: stri
       </div>
 
       {isPdf ? (
-        <iframe
-          src={fileUrl}
-          className="h-[80vh] w-full rounded-md border"
-          title={row.name}
-        />
+        <iframe src={fileUrl} className="h-[80vh] w-full rounded-md border" title={row.name} />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img

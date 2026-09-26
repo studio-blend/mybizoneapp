@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { categories, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -13,6 +14,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function CategoriesPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_products');
   const { rows, storeNames } = await withTenant(db, user.businessId, async (tx) => {
     const cats = await tx
       .select({
@@ -36,7 +38,7 @@ export default async function CategoriesPage() {
   });
 
   // Build tree: top-level first, then each child under its parent
-  const byId = new Map(rows.map((r) => [r.id, r]));
+  const _byId = new Map(rows.map((r) => [r.id, r]));
   const topLevel = rows.filter((r) => !r.parentId);
   const childrenOf = new Map<string, typeof rows>();
   for (const r of rows) {
@@ -113,6 +115,7 @@ export default async function CategoriesPage() {
                         >
                           {depth > 0 && (
                             <svg
+                              aria-hidden="true"
                               className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                               fill="none"
                               stroke="currentColor"

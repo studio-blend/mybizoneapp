@@ -1,11 +1,11 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
-import { departments } from '@mybizone/db';
+import { departments, stores } from '@mybizone/db';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
-import { requireUser } from '@/lib/session';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const optionalUuid = z.union([uuid, z.literal('')]).transform((v) => (v === '' ? null : v));
@@ -19,6 +19,15 @@ const CreateDepartmentInput = z.object({
 export const createDepartmentAction = safeAction(
   CreateDepartmentInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_departments');
+    if (input.storeId) {
+      const [store] = await tx
+        .select({ id: stores.id })
+        .from(stores)
+        .where(and(eq(stores.id, input.storeId), eq(stores.businessId, user.businessId)));
+      if (!store) throw new Error('store not found');
+    }
+
     if (!['super_admin', 'admin', 'owner'].includes(user.role)) {
       throw new Error('Permission denied — requires admin or higher');
     }
@@ -45,6 +54,7 @@ const DeleteDepartmentInput = z.object({ id: uuid });
 export const deleteDepartmentAction = safeAction(
   DeleteDepartmentInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_departments');
     if (!['super_admin', 'admin', 'owner'].includes(user.role)) {
       throw new Error('Permission denied — requires admin or higher');
     }

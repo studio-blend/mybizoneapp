@@ -1,10 +1,14 @@
+import { requirePermission } from '@/lib/require-permission';
+import { requireUser } from '@/lib/session';
 import { Button } from '@mybizone/ui/button';
 import Link from 'next/link';
 import { SegmentBuilder } from './_components/segment-builder';
 
 export const dynamic = 'force-dynamic';
 
-export default function CmsPage() {
+export default async function CmsPage() {
+  const user = await requireUser();
+  await requirePermission(user, 'manage_campaigns');
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

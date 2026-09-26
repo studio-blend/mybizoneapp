@@ -5,7 +5,9 @@ import { stores } from './stores';
 
 export const userRoles = pgTable('user_roles', {
   id: uuid('id').primaryKey().defaultRandom(),
-  businessId: uuid('business_id').notNull().references(() => businesses.id, { onDelete: 'cascade' }),
+  businessId: uuid('business_id')
+    .notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
   // user.id is text in Better Auth
   userId: text('user_id').notNull(),
   role: text('role').notNull(),
@@ -17,7 +19,9 @@ export const userRoles = pgTable('user_roles', {
 
 export const ownershipTransfers = pgTable('ownership_transfers', {
   id: uuid('id').primaryKey().defaultRandom(),
-  businessId: uuid('business_id').notNull().references(() => businesses.id, { onDelete: 'cascade' }),
+  businessId: uuid('business_id')
+    .notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
   fromUserId: text('from_user_id').notNull(),
   toUserId: text('to_user_id').notNull(),
   token: text('token').notNull().unique(),

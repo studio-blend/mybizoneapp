@@ -1,4 +1,8 @@
-import { invitationEmailTemplate, resetPasswordTemplate, verifyEmailTemplate } from '@mybizone/auth-config/email';
+import {
+  invitationEmailTemplate,
+  resetPasswordTemplate,
+  verifyEmailTemplate,
+} from '@mybizone/auth-config/email';
 import { describe, expect, it } from 'vitest';
 
 describe('invitationEmailTemplate', () => {

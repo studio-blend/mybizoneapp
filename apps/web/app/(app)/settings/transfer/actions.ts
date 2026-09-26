@@ -2,11 +2,11 @@
 
 import { getUserRoles } from '@/lib/get-user-roles';
 import { safeAction } from '@/lib/server-action';
-import { ownershipTransfers, user as userTable, userRoles } from '@mybizone/db';
+import { ownershipTransfers, user as userTable } from '@mybizone/db';
 import { hasPermission } from '@mybizone/domain';
 import { and, eq, isNull } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 
@@ -30,16 +30,11 @@ export const initiateOwnershipTransferAction = safeAction(
       .where(and(eq(userTable.id, input.toUserId), eq(userTable.businessId, user.businessId)));
 
     if (!targetUser) throw new Error('Target user not found in this business');
+    if (input.toUserId === user.id) throw new Error('Cannot transfer ownership to yourself');
 
     // Use the existing tx from safeAction — already in withTenant context
-    const targetRoles = await tx
-      .select({ role: userRoles.role })
-      .from(userRoles)
-      .where(and(eq(userRoles.userId, input.toUserId), eq(userRoles.businessId, user.businessId)));
-
-    const hasAdminRole = targetRoles.some((r) =>
-      ['admin', 'shop_manager', 'branch_manager'].includes(r.role),
-    );
+    const targetRoles = await getUserRoles({ id: input.toUserId, businessId: user.businessId });
+    const hasAdminRole = hasPermission(targetRoles, 'manage_rbac');
 
     if (!hasAdminRole) {
       throw new Error('Target user must have at least an admin role to receive ownership');
@@ -71,9 +66,6 @@ export const initiateOwnershipTransferAction = safeAction(
       .returning({ id: ownershipTransfers.id, token: ownershipTransfers.token });
 
     if (!row) throw new Error('Failed to create ownership transfer');
-
-    // Log token to server console — email integration can be added later
-    console.info(`[ownership-transfer] token=${row.token} to=${targetUser.email} expires=${expiresAt.toISOString()}`);
 
     revalidatePath('/settings/transfer');
     return { token: row.token, expiresAt: expiresAt.toISOString(), toEmail: targetUser.email };

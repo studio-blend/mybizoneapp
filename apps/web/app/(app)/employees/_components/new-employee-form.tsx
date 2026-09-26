@@ -40,7 +40,10 @@ export function NewEmployeeForm({ stores }: { stores: Store[] }) {
     setServerError(null);
     const fd = new FormData(e.currentTarget);
     const errs = validate(fd);
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
     setErrors({});
     setPending(true);
     const result = await createEmployeeAction({
@@ -64,16 +67,20 @@ export function NewEmployeeForm({ stores }: { stores: Store[] }) {
           <div className="rounded-md bg-muted p-4 space-y-2">
             <p className="text-sm font-medium">Employee created successfully!</p>
             <p className="text-sm text-muted-foreground">
-              Employee ID: <span className="font-mono font-semibold text-foreground">{created}</span>
+              Employee ID:{' '}
+              <span className="font-mono font-semibold text-foreground">{created}</span>
             </p>
             <p className="text-sm text-muted-foreground">
-              A welcome email with login instructions has been sent. The initial password is the Employee ID.
+              A welcome email with login instructions has been sent. The email contains a randomly
+              generated temporary password.
             </p>
           </div>
         </CardContent>
         <CardFooter className="gap-2">
           <Button onClick={() => setCreated(null)}>Add another</Button>
-          <Button variant="outline" onClick={() => router.push('/employees')}>Back to team</Button>
+          <Button variant="outline" onClick={() => router.push('/employees')}>
+            Back to team
+          </Button>
         </CardFooter>
       </Card>
     );
@@ -92,7 +99,9 @@ export function NewEmployeeForm({ stores }: { stores: Store[] }) {
             <Label htmlFor="emp-email">Email</Label>
             <Input id="emp-email" name="email" type="email" required />
             <FieldError msg={errors.email} />
-            <p className="text-xs text-muted-foreground">Used for password reset and notifications.</p>
+            <p className="text-xs text-muted-foreground">
+              Used for password reset and notifications.
+            </p>
           </div>
           <div className="space-y-1">
             <Label htmlFor="emp-role">Role</Label>
@@ -107,15 +116,23 @@ export function NewEmployeeForm({ stores }: { stores: Store[] }) {
               <Select id="emp-store" name="storeId" className="h-9 text-sm">
                 <option value="">All stores</option>
                 {stores.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
                 ))}
               </Select>
             </div>
           )}
           {serverError && <p className="text-sm text-destructive">{serverError}</p>}
           <div className="rounded-md bg-muted/50 border p-3 text-xs text-muted-foreground space-y-1">
-            <p>An Employee ID will be auto-generated (e.g. <span className="font-mono">EMPAB12CD</span>).</p>
-            <p>The initial password is set to the Employee ID. The employee will be prompted to change it on first login.</p>
+            <p>
+              An Employee ID will be auto-generated (e.g.{' '}
+              <span className="font-mono">EMPAB12CD</span>).
+            </p>
+            <p>
+              A random temporary password will be emailed to the employee. The employee will be
+              prompted to change it on first login.
+            </p>
           </div>
         </CardContent>
         <CardFooter className="gap-2">

@@ -49,8 +49,8 @@ export function DemoSaleForm({ storeId, productId, productName }: Props) {
       <CardHeader>
         <CardTitle>Record your first sale</CardTitle>
         <CardDescription>
-          This creates a real bill so you can see how the system works. You can delete it later
-          from the Sales page.
+          This creates a real bill so you can see how the system works. You can delete it later from
+          the Sales page.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { categories, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -8,8 +9,10 @@ import { CategoryForm } from '../../_components/category-form';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditCategoryPage({ params }: { params: { id: string } }) {
+export default async function EditCategoryPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
+  await requirePermission(user, 'manage_products');
   const data = await withTenant(db, user.businessId, async (tx) => {
     const [row] = await tx
       .select({

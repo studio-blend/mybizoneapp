@@ -1,12 +1,28 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
-import { campaignRecipients, customerTags, customers, marketingCampaigns, sales } from '@mybizone/db';
-import { and, desc, eq, gte, gt, inArray, isNotNull, lte, sql, sum } from 'drizzle-orm';
+import {
+  campaignRecipients,
+  customerTags,
+  customers,
+  marketingCampaigns,
+  sales,
+} from '@mybizone/db';
+import { and, desc, eq, gt, inArray, isNotNull, sql, sum } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
-const RATE_CATEGORIES = ['retail', 'wholesale', 'mrp', 'dealer', 'rate1', 'rate2', 'rate3', 'rate4'] as const;
+const RATE_CATEGORIES = [
+  'retail',
+  'wholesale',
+  'mrp',
+  'dealer',
+  'rate1',
+  'rate2',
+  'rate3',
+  'rate4',
+] as const;
 
 const SegmentFiltersSchema = z.object({
   tags: z.array(z.string()).optional(),
@@ -29,122 +45,112 @@ export type SegmentCustomer = {
   lifetimeValue: string;
 };
 
-export const getSegmentAction = safeAction(
-  SegmentFiltersSchema,
-  async (filters, { user, tx }) => {
-    // Build customer IDs matching tag filter
-    let tagFilteredIds: string[] | null = null;
-    if (filters.tags && filters.tags.length > 0) {
-      const rows = await tx
-        .select({ customerId: customerTags.customerId })
-        .from(customerTags)
-        .where(
-          and(
-            eq(customerTags.businessId, user.businessId),
-            inArray(customerTags.tag, filters.tags),
-          ),
-        );
-      tagFilteredIds = [...new Set(rows.map((r) => r.customerId))];
-      if (tagFilteredIds.length === 0) return [] as SegmentCustomer[];
-    }
-
-    // Build lifetime value subquery
-    const ltv = tx
-      .select({
-        customerId: sales.customerId,
-        total: sum(sales.total).as('ltv'),
-      })
-      .from(sales)
-      .where(eq(sales.businessId, user.businessId))
-      .groupBy(sales.customerId)
-      .as('ltv');
-
-    // Build WHERE conditions for customers
-    const conditions = [eq(customers.businessId, user.businessId)];
-
-    if (tagFilteredIds !== null) {
-      conditions.push(inArray(customers.id, tagFilteredIds));
-    }
-
-    if (filters.hasPhone === 'yes') {
-      conditions.push(isNotNull(customers.phone));
-    } else if (filters.hasPhone === 'no') {
-      conditions.push(sql`${customers.phone} IS NULL`);
-    }
-
-    if (filters.outstandingMin && Number(filters.outstandingMin) > 0) {
-      conditions.push(gt(customers.outstandingBalance, filters.outstandingMin));
-    }
-
-    if (filters.rateCategory) {
-      conditions.push(eq(customers.rateCategory, filters.rateCategory));
-    }
-
+export const getSegmentAction = safeAction(SegmentFiltersSchema, async (filters, { user, tx }) => {
+  await requirePermission(user, 'manage_campaigns');
+  // Build customer IDs matching tag filter
+  let tagFilteredIds: string[] | null = null;
+  if (filters.tags && filters.tags.length > 0) {
     const rows = await tx
-      .select({
-        id: customers.id,
-        name: customers.name,
-        phone: customers.phone,
-        outstandingBalance: customers.outstandingBalance,
-        rateCategory: customers.rateCategory,
-        createdAt: customers.createdAt,
-        ltv: ltv.total,
-        lastPurchaseAt: sql<Date | null>`(
+      .select({ customerId: customerTags.customerId })
+      .from(customerTags)
+      .where(
+        and(eq(customerTags.businessId, user.businessId), inArray(customerTags.tag, filters.tags)),
+      );
+    tagFilteredIds = [...new Set(rows.map((r) => r.customerId))];
+    if (tagFilteredIds.length === 0) return [] as SegmentCustomer[];
+  }
+
+  // Build lifetime value subquery
+  const ltv = tx
+    .select({
+      customerId: sales.customerId,
+      total: sum(sales.total).as('ltv'),
+    })
+    .from(sales)
+    .where(eq(sales.businessId, user.businessId))
+    .groupBy(sales.customerId)
+    .as('ltv');
+
+  // Build WHERE conditions for customers
+  const conditions = [eq(customers.businessId, user.businessId)];
+
+  if (tagFilteredIds !== null) {
+    conditions.push(inArray(customers.id, tagFilteredIds));
+  }
+
+  if (filters.hasPhone === 'yes') {
+    conditions.push(isNotNull(customers.phone));
+  } else if (filters.hasPhone === 'no') {
+    conditions.push(sql`${customers.phone} IS NULL`);
+  }
+
+  if (filters.outstandingMin && Number(filters.outstandingMin) > 0) {
+    conditions.push(gt(customers.outstandingBalance, filters.outstandingMin));
+  }
+
+  if (filters.rateCategory) {
+    conditions.push(eq(customers.rateCategory, filters.rateCategory));
+  }
+
+  const rows = await tx
+    .select({
+      id: customers.id,
+      name: customers.name,
+      phone: customers.phone,
+      outstandingBalance: customers.outstandingBalance,
+      rateCategory: customers.rateCategory,
+      createdAt: customers.createdAt,
+      ltv: ltv.total,
+      lastPurchaseAt: sql<Date | null>`(
           SELECT MAX(s.created_at) FROM sales s
           WHERE s.customer_id = ${customers.id}
             AND s.business_id = ${customers.businessId}
         )`.as('last_purchase_at'),
-      })
-      .from(customers)
-      .leftJoin(ltv, eq(ltv.customerId, customers.id))
-      .where(and(...conditions))
-      .orderBy(desc(customers.outstandingBalance))
-      .limit(200);
+    })
+    .from(customers)
+    .leftJoin(ltv, eq(ltv.customerId, customers.id))
+    .where(and(...conditions))
+    .orderBy(desc(customers.outstandingBalance))
+    .limit(200);
 
-    // Apply post-filters that need computed values
-    let filtered = rows;
+  // Apply post-filters that need computed values
+  let filtered = rows;
 
-    if (filters.lastPurchaseDays) {
-      if (filters.lastPurchaseDays === 'never') {
-        filtered = filtered.filter((r) => !r.lastPurchaseAt);
-      } else {
-        const days = Number(filters.lastPurchaseDays);
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - days);
-        filtered = filtered.filter(
-          (r) => r.lastPurchaseAt && new Date(r.lastPurchaseAt) >= cutoff,
-        );
-      }
+  if (filters.lastPurchaseDays) {
+    if (filters.lastPurchaseDays === 'never') {
+      filtered = filtered.filter((r) => !r.lastPurchaseAt);
+    } else {
+      const days = Number(filters.lastPurchaseDays);
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      filtered = filtered.filter((r) => r.lastPurchaseAt && new Date(r.lastPurchaseAt) >= cutoff);
     }
+  }
 
-    if (filters.lifetimeValueMin && Number(filters.lifetimeValueMin) > 0) {
-      filtered = filtered.filter(
-        (r) => Number(r.ltv ?? 0) >= Number(filters.lifetimeValueMin),
-      );
-    }
+  if (filters.lifetimeValueMin && Number(filters.lifetimeValueMin) > 0) {
+    filtered = filtered.filter((r) => Number(r.ltv ?? 0) >= Number(filters.lifetimeValueMin));
+  }
 
-    // Fetch tags for result set
-    const ids = filtered.map((r) => r.id);
-    if (ids.length === 0) return [] as SegmentCustomer[];
+  // Fetch tags for result set
+  const ids = filtered.map((r) => r.id);
+  if (ids.length === 0) return [] as SegmentCustomer[];
 
-    const tagRows = await tx
-      .select({ customerId: customerTags.customerId, tag: customerTags.tag })
-      .from(customerTags)
-      .where(
-        and(
-          eq(customerTags.businessId, user.businessId),
-          inArray(customerTags.customerId, ids),
-        ),
-      );
+  const tagRows = await tx
+    .select({ customerId: customerTags.customerId, tag: customerTags.tag })
+    .from(customerTags)
+    .where(
+      and(eq(customerTags.businessId, user.businessId), inArray(customerTags.customerId, ids)),
+    );
 
-    const tagMap = new Map<string, string[]>();
-    for (const t of tagRows) {
-      const arr = tagMap.get(t.customerId) ?? [];
-      arr.push(t.tag);
-      tagMap.set(t.customerId, arr);
-    }
+  const tagMap = new Map<string, string[]>();
+  for (const t of tagRows) {
+    const arr = tagMap.get(t.customerId) ?? [];
+    arr.push(t.tag);
+    tagMap.set(t.customerId, arr);
+  }
 
-    return filtered.map((r): SegmentCustomer => ({
+  return filtered.map(
+    (r): SegmentCustomer => ({
       id: r.id,
       name: r.name,
       phone: r.phone,
@@ -152,9 +158,9 @@ export const getSegmentAction = safeAction(
       lastPurchaseAt: r.lastPurchaseAt ? new Date(r.lastPurchaseAt) : null,
       outstandingBalance: r.outstandingBalance,
       lifetimeValue: r.ltv ?? '0',
-    }));
-  },
-);
+    }),
+  );
+});
 
 // ── Campaign actions ──────────────────────────────────────────────────────────
 
@@ -167,7 +173,12 @@ const LaunchCampaignSchema = z.object({
 
 function replaceCampaignVars(
   template: string,
-  customer: { name: string; lastPurchaseAt: Date | null; outstandingBalance: string; storeName: string },
+  customer: {
+    name: string;
+    lastPurchaseAt: Date | null;
+    outstandingBalance: string;
+    storeName: string;
+  },
 ) {
   return template
     .replace(/{name}/g, customer.name)
@@ -181,16 +192,14 @@ function replaceCampaignVars(
           })
         : 'N/A',
     )
-    .replace(
-      /{balance}/g,
-      `₹${Number(customer.outstandingBalance).toLocaleString('en-IN')}`,
-    )
+    .replace(/{balance}/g, `₹${Number(customer.outstandingBalance).toLocaleString('en-IN')}`)
     .replace(/{store_name}/g, customer.storeName);
 }
 
 export const launchCampaignAction = safeAction(
   LaunchCampaignSchema,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_campaigns');
     // Create campaign
     const [campaign] = await tx
       .insert(marketingCampaigns)
@@ -219,10 +228,7 @@ export const launchCampaignAction = safeAction(
       })
       .from(customers)
       .where(
-        and(
-          eq(customers.businessId, user.businessId),
-          inArray(customers.id, input.customerIds),
-        ),
+        and(eq(customers.businessId, user.businessId), inArray(customers.id, input.customerIds)),
       );
 
     // Build recipient rows
@@ -257,23 +263,21 @@ const MarkSentSchema = z.object({
   count: z.number().int().min(0),
 });
 
-export const markCampaignSentAction = safeAction(
-  MarkSentSchema,
-  async (input, { user, tx }) => {
-    await tx
-      .update(marketingCampaigns)
-      .set({
-        status: 'sent',
-        sentAt: new Date(),
-        recipientCount: input.count,
-      })
-      .where(
-        and(
-          eq(marketingCampaigns.id, input.campaignId),
-          eq(marketingCampaigns.businessId, user.businessId),
-        ),
-      );
-    revalidatePath('/cms/campaigns');
-    return { ok: true };
-  },
-);
+export const markCampaignSentAction = safeAction(MarkSentSchema, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_campaigns');
+  await tx
+    .update(marketingCampaigns)
+    .set({
+      status: 'sent',
+      sentAt: new Date(),
+      recipientCount: input.count,
+    })
+    .where(
+      and(
+        eq(marketingCampaigns.id, input.campaignId),
+        eq(marketingCampaigns.businessId, user.businessId),
+      ),
+    );
+  revalidatePath('/cms/campaigns');
+  return { ok: true };
+});

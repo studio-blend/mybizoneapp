@@ -71,8 +71,8 @@ export function DcForm({ products, customers }: Props) {
   }
 
   const runningTotal = lines.reduce((acc, l) => {
-    const qty = parseFloat(l.qty);
-    const price = parseFloat(l.unitPrice);
+    const qty = Number.parseFloat(l.qty);
+    const price = Number.parseFloat(l.unitPrice);
     if (!Number.isNaN(qty) && !Number.isNaN(price)) return acc + qty * price;
     return acc;
   }, 0);
@@ -163,7 +163,7 @@ export function DcForm({ products, customers }: Props) {
             {lines.map((line) => {
               const lineTotal =
                 line.qty && line.unitPrice
-                  ? (parseFloat(line.qty) * parseFloat(line.unitPrice)).toFixed(2)
+                  ? (Number.parseFloat(line.qty) * Number.parseFloat(line.unitPrice)).toFixed(2)
                   : '—';
               return (
                 <div key={line.id} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto_auto]">
@@ -228,7 +228,12 @@ export function DcForm({ products, customers }: Props) {
           {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (optional)</Label>
-            <Textarea id="notes" name="notes" maxLength={500} placeholder="Dispatch instructions…" />
+            <Textarea
+              id="notes"
+              name="notes"
+              maxLength={500}
+              placeholder="Dispatch instructions…"
+            />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

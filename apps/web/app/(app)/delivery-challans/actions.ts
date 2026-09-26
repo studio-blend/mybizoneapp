@@ -1,11 +1,19 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
-import { auditLogs, billSeries, dcItems, deliveryChallans, products } from '@mybizone/db';
+import {
+  auditLogs,
+  billSeries,
+  customers,
+  dcItems,
+  deliveryChallans,
+  products,
+} from '@mybizone/db';
 import { financialYear, formatBillNo } from '@mybizone/domain/bill-series';
 import { and, eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const optionalUuid = z.union([uuid, z.literal('')]).transform((v) => (v === '' ? null : v));
@@ -35,6 +43,14 @@ const CreateDcInput = z.object({
 });
 
 export const createDcAction = safeAction(CreateDcInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'create_sale');
+  if (input.customerId) {
+    const [customer] = await tx
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(eq(customers.id, input.customerId), eq(customers.businessId, user.businessId)));
+    if (!customer) throw new Error('customer not found');
+  }
   // Generate dcNo via bill_series (docType='dc', prefix='DC')
   const now = new Date();
   const fy = financialYear(now);
@@ -134,43 +150,36 @@ const UpdateDcStatusInput = z.object({
   status: z.enum(DC_STATUSES),
 });
 
-export const updateDcStatusAction = safeAction(
-  UpdateDcStatusInput,
-  async (input, { user, tx }) => {
-    const now = new Date();
-    const extraFields: {
-      dispatchedAt?: Date;
-      deliveredAt?: Date;
-    } = {};
+export const updateDcStatusAction = safeAction(UpdateDcStatusInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'create_sale');
+  const now = new Date();
+  const extraFields: {
+    dispatchedAt?: Date;
+    deliveredAt?: Date;
+  } = {};
 
-    if (input.status === 'dispatched') {
-      extraFields.dispatchedAt = now;
-    } else if (input.status === 'delivered') {
-      extraFields.deliveredAt = now;
-    }
+  if (input.status === 'dispatched') {
+    extraFields.dispatchedAt = now;
+  } else if (input.status === 'delivered') {
+    extraFields.deliveredAt = now;
+  }
 
-    const [row] = await tx
-      .update(deliveryChallans)
-      .set({ status: input.status, updatedAt: now, ...extraFields })
-      .where(
-        and(
-          eq(deliveryChallans.id, input.id),
-          eq(deliveryChallans.businessId, user.businessId),
-        ),
-      )
-      .returning({ id: deliveryChallans.id });
-    if (!row) throw new Error('delivery challan not found');
+  const [row] = await tx
+    .update(deliveryChallans)
+    .set({ status: input.status, updatedAt: now, ...extraFields })
+    .where(and(eq(deliveryChallans.id, input.id), eq(deliveryChallans.businessId, user.businessId)))
+    .returning({ id: deliveryChallans.id });
+  if (!row) throw new Error('delivery challan not found');
 
-    await tx.insert(auditLogs).values({
-      businessId: user.businessId,
-      actorId: user.id,
-      action: 'dc.status_update',
-      entity: 'delivery_challan',
-      entityId: input.id,
-      after: { status: input.status, ...extraFields },
-    });
+  await tx.insert(auditLogs).values({
+    businessId: user.businessId,
+    actorId: user.id,
+    action: 'dc.status_update',
+    entity: 'delivery_challan',
+    entityId: input.id,
+    after: { status: input.status, ...extraFields },
+  });
 
-    revalidatePath('/delivery-challans');
-    return { ok: true };
-  },
-);
+  revalidatePath('/delivery-challans');
+  return { ok: true };
+});

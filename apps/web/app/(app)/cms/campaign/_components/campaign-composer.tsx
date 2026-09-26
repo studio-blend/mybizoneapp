@@ -16,11 +16,7 @@ interface CustomerPreview {
   lastPurchaseAt: string | null;
 }
 
-function renderPreview(
-  template: string,
-  customer: CustomerPreview,
-  storeName: string,
-): string {
+function renderPreview(template: string, customer: CustomerPreview, storeName: string): string {
   const lastPurchase = customer.lastPurchaseAt
     ? new Date(customer.lastPurchaseAt).toLocaleDateString('en-IN', {
         day: 'numeric',
@@ -31,10 +27,7 @@ function renderPreview(
   return template
     .replace(/{name}/g, customer.name)
     .replace(/{last_purchase}/g, lastPurchase)
-    .replace(
-      /{balance}/g,
-      `₹${Number(customer.outstandingBalance).toLocaleString('en-IN')}`,
-    )
+    .replace(/{balance}/g, `₹${Number(customer.outstandingBalance).toLocaleString('en-IN')}`)
     .replace(/{store_name}/g, storeName);
 }
 
@@ -47,12 +40,12 @@ export function CampaignComposer({
 }) {
   const [campaignName, setCampaignName] = useState('');
   const [template, setTemplate] = useState(
-    `Hi {name},\n\nThank you for shopping at {store_name}.\n\nYour outstanding balance is {balance}.\n\nLast purchase: {last_purchase}\n\nWe look forward to seeing you again!`,
+    'Hi {name},\n\nThank you for shopping at {store_name}.\n\nYour outstanding balance is {balance}.\n\nLast purchase: {last_purchase}\n\nWe look forward to seeing you again!',
   );
   const [status, setStatus] = useState<'idle' | 'launching' | 'opening' | 'done'>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isPending, _startTransition] = useTransition();
 
   const preview3 = customers.slice(0, 3);
 
@@ -102,8 +95,8 @@ export function CampaignComposer({
         <CardHeader>
           <CardTitle>Compose campaign</CardTitle>
           <CardDescription>
-            Recipients: {customers.length} customers ({customers.filter((c) => c.phone).length}{' '}
-            with phone). Variables: <code className="text-xs">{'{name}'}</code>,{' '}
+            Recipients: {customers.length} customers ({customers.filter((c) => c.phone).length} with
+            phone). Variables: <code className="text-xs">{'{name}'}</code>,{' '}
             <code className="text-xs">{'{last_purchase}'}</code>,{' '}
             <code className="text-xs">{'{balance}'}</code>,{' '}
             <code className="text-xs">{'{store_name}'}</code>
@@ -134,7 +127,8 @@ export function CampaignComposer({
           {error && <p className="text-sm text-destructive">{error}</p>}
           {status === 'idle' && (
             <Button onClick={handleLaunch} disabled={isPending}>
-              Launch campaign — open WhatsApp for {customers.filter((c) => c.phone).length} customers
+              Launch campaign — open WhatsApp for {customers.filter((c) => c.phone).length}{' '}
+              customers
             </Button>
           )}
           {status === 'launching' && (
@@ -142,9 +136,7 @@ export function CampaignComposer({
           )}
           {status === 'opening' && (
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">
-                Opening WhatsApp... {progress}%
-              </p>
+              <p className="text-sm text-muted-foreground">Opening WhatsApp... {progress}%</p>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full bg-primary transition-all"
@@ -166,7 +158,9 @@ export function CampaignComposer({
         <Card>
           <CardHeader>
             <CardTitle>Message preview</CardTitle>
-            <CardDescription>First {preview3.length} customers with variables filled in.</CardDescription>
+            <CardDescription>
+              First {preview3.length} customers with variables filled in.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {preview3.map((c) => (

@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { deliveryChallans } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -40,6 +41,7 @@ function formatDate(d: Date | string): string {
 
 export default async function DeliveryChallansPage() {
   const user = await requireUser();
+  await requirePermission(user, 'create_sale');
   const rows = await withTenant(db, user.businessId, (tx) =>
     tx
       .select({

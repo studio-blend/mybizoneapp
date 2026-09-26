@@ -1,28 +1,25 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { customerNotes, customerTags, customers, openingBalances, sales } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { financialYear } from '@mybizone/domain/bill-series';
 import { Button } from '@mybizone/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@mybizone/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
 import { and, desc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { OpeningBalanceForm } from './_components/opening-balance-form';
 import { CustomerNotesSection } from './_components/customer-notes-section';
 import { CustomerTagsSection } from './_components/customer-tags-section';
+import { OpeningBalanceForm } from './_components/opening-balance-form';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CustomerDetailPage({ params }: { params: { id: string } }) {
+export default async function CustomerDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
+  await requirePermission(user, 'manage_customers');
   const data = await withTenant(db, user.businessId, async (tx) => {
     const [customer] = await tx
       .select()
@@ -61,10 +58,7 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
       .select({ id: customerTags.id, tag: customerTags.tag })
       .from(customerTags)
       .where(
-        and(
-          eq(customerTags.customerId, customer.id),
-          eq(customerTags.businessId, user.businessId),
-        ),
+        and(eq(customerTags.customerId, customer.id), eq(customerTags.businessId, user.businessId)),
       );
 
     const notes = await tx
@@ -141,13 +135,12 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
       <Card>
         <CardHeader className="pb-3">
           <CardTitle>Tags</CardTitle>
-          <CardDescription>Categorise this customer for segmentation and campaigns.</CardDescription>
+          <CardDescription>
+            Categorise this customer for segmentation and campaigns.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <CustomerTagsSection
-            customerId={customer.id}
-            initialTags={tags}
-          />
+          <CustomerTagsSection customerId={customer.id} initialTags={tags} />
         </CardContent>
       </Card>
 
@@ -155,7 +148,9 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
       <Card>
         <CardHeader className="pb-3">
           <CardTitle>Notes</CardTitle>
-          <CardDescription>Internal notes about this customer (not visible to them).</CardDescription>
+          <CardDescription>
+            Internal notes about this customer (not visible to them).
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <CustomerNotesSection

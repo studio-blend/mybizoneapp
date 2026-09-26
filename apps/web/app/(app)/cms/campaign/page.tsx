@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { businesses, customers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -9,12 +10,12 @@ import { CampaignComposer } from './_components/campaign-composer';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CampaignPage({
-  searchParams,
-}: {
-  searchParams: { ids?: string };
+export default async function CampaignPage(props: {
+  searchParams: Promise<{ ids?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
+  await requirePermission(user, 'manage_campaigns');
 
   const rawIds = searchParams.ids ?? '';
   const customerIds = rawIds
@@ -51,12 +52,7 @@ export default async function CampaignPage({
         )`.as('last_purchase_at'),
       })
       .from(customers)
-      .where(
-        and(
-          eq(customers.businessId, user.businessId),
-          inArray(customers.id, customerIds),
-        ),
-      );
+      .where(and(eq(customers.businessId, user.businessId), inArray(customers.id, customerIds)));
 
     const [biz] = await tx
       .select({ name: businesses.name })

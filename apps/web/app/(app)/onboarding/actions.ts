@@ -1,11 +1,12 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { auditLogs, businesses } from '@mybizone/db';
 import { isValidGstin } from '@mybizone/domain/gst';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const Schema = z
   .object({
@@ -23,6 +24,7 @@ const Schema = z
 
 /** Persist business GST settings as the first onboarding step. */
 export const updateBusinessSetupAction = safeAction(Schema, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_settings');
   const [before] = await tx
     .select({ gstEnabled: businesses.gstEnabled, gstin: businesses.gstin })
     .from(businesses)

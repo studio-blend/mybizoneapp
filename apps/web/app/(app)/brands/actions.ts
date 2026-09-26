@@ -1,10 +1,11 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { auditLogs, brands } from '@mybizone/db';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const optionalText = z
@@ -19,6 +20,7 @@ const BrandInput = z.object({
 });
 
 export const createBrandAction = safeAction(BrandInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_products');
   const [row] = await tx
     .insert(brands)
     .values({
@@ -45,6 +47,7 @@ export const createBrandAction = safeAction(BrandInput, async (input, { user, tx
 const UpdateBrandInput = BrandInput.extend({ id: uuid });
 
 export const updateBrandAction = safeAction(UpdateBrandInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_products');
   const [before] = await tx
     .select({ name: brands.name, description: brands.description })
     .from(brands)
@@ -79,6 +82,7 @@ export const updateBrandAction = safeAction(UpdateBrandInput, async (input, { us
 const DeleteBrandInput = z.object({ id: uuid });
 
 export const deleteBrandAction = safeAction(DeleteBrandInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_products');
   const [before] = await tx
     .select({ name: brands.name })
     .from(brands)

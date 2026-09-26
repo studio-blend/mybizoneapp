@@ -1,11 +1,12 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { auditLogs, openingBalances, suppliers } from '@mybizone/db';
 import { financialYear } from '@mybizone/domain/bill-series';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 
@@ -29,6 +30,7 @@ const SupplierInput = z.object({
 });
 
 export const createSupplierAction = safeAction(SupplierInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_suppliers');
   const [row] = await tx
     .insert(suppliers)
     .values({
@@ -58,6 +60,7 @@ export const createSupplierAction = safeAction(SupplierInput, async (input, { us
 const UpdateSupplierInput = SupplierInput.extend({ id: uuid });
 
 export const updateSupplierAction = safeAction(UpdateSupplierInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_suppliers');
   const [before] = await tx
     .select({
       name: suppliers.name,
@@ -106,12 +109,17 @@ const SetSupplierOpeningBalanceInput = z.object({
     .regex(/^\d{4}-\d{2}$/, 'expected FY like 2025-26')
     .optional(),
   amount: z.string().regex(/^\d{1,10}(?:\.\d{1,2})?$/, 'expected money up to 2dp'),
-  notes: z.string().max(500).optional().transform((v) => v?.trim() || null),
+  notes: z
+    .string()
+    .max(500)
+    .optional()
+    .transform((v) => v?.trim() || null),
 });
 
 export const setSupplierOpeningBalanceAction = safeAction(
   SetSupplierOpeningBalanceInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_suppliers');
     const fy = input.financialYear ?? financialYear(new Date());
 
     const [supplier] = await tx
@@ -158,6 +166,7 @@ export const setSupplierOpeningBalanceAction = safeAction(
 const DeleteSupplierInput = z.object({ id: uuid });
 
 export const deleteSupplierAction = safeAction(DeleteSupplierInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_suppliers');
   const [before] = await tx
     .select({ name: suppliers.name, outstandingBalance: suppliers.outstandingBalance })
     .from(suppliers)
@@ -166,9 +175,7 @@ export const deleteSupplierAction = safeAction(DeleteSupplierInput, async (input
 
   const balance = Number(before.outstandingBalance ?? 0);
   if (balance > 0) {
-    throw new Error(
-      `cannot delete supplier with outstanding balance of ₹${balance.toFixed(2)}`,
-    );
+    throw new Error(`cannot delete supplier with outstanding balance of ₹${balance.toFixed(2)}`);
   }
 
   await tx

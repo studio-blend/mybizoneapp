@@ -1,7 +1,8 @@
 import { db } from '@/lib/db';
 import { getUserRoles } from '@/lib/get-user-roles';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
-import { departments, stores, user as userTable, userRoles } from '@mybizone/db';
+import { departments, stores, userRoles, user as userTable } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { hasPermission } from '@mybizone/domain';
 import { Button } from '@mybizone/ui/button';
@@ -29,12 +30,15 @@ const ROLE_COLORS: Record<string, string> = {
 
 export default async function TeamPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_rbac');
   const myRoles = await getUserRoles(user);
 
   if (!hasPermission(myRoles, 'manage_employees')) {
     return (
       <div className="p-8 text-center">
-        <p className="text-muted-foreground">You don&apos;t have permission to manage team members.</p>
+        <p className="text-muted-foreground">
+          You don&apos;t have permission to manage team members.
+        </p>
       </div>
     );
   }
@@ -138,10 +142,14 @@ export default async function TeamPage() {
                           >
                             {r.role}
                             {r.storeId && (
-                              <span className="opacity-70">@ {storeNames.get(r.storeId) ?? r.storeId}</span>
+                              <span className="opacity-70">
+                                @ {storeNames.get(r.storeId) ?? r.storeId}
+                              </span>
                             )}
                             {r.departmentId && (
-                              <span className="opacity-70">/ {deptNames.get(r.departmentId) ?? r.departmentId}</span>
+                              <span className="opacity-70">
+                                / {deptNames.get(r.departmentId) ?? r.departmentId}
+                              </span>
                             )}
                             {/* Cannot revoke own super_admin or revoke if not admin+ */}
                             {!(m.id === user.id && r.role === 'super_admin') && (

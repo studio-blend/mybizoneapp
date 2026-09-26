@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { quotations } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -13,10 +14,7 @@ export const dynamic = 'force-dynamic';
 
 type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted';
 
-const STATUS_BADGE: Record<
-  QuotationStatus,
-  { label: string; className: string }
-> = {
+const STATUS_BADGE: Record<QuotationStatus, { label: string; className: string }> = {
   draft: { label: 'Draft', className: 'bg-gray-100 text-gray-700' },
   sent: { label: 'Sent', className: 'bg-blue-100 text-blue-700' },
   accepted: { label: 'Accepted', className: 'bg-green-100 text-green-700' },
@@ -44,6 +42,7 @@ function formatDate(d: Date | string): string {
 
 export default async function QuotationsPage() {
   const user = await requireUser();
+  await requirePermission(user, 'create_sale');
   const rows = await withTenant(db, user.businessId, (tx) =>
     tx
       .select({

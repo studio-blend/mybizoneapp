@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { stores, user as userTable } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -8,8 +9,10 @@ import { EditEmployeeForm } from './form';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditEmployeePage({ params }: { params: { id: string } }) {
+export default async function EditEmployeePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
+  await requirePermission(user, 'manage_rbac');
   if (params.id === user.id) notFound();
 
   const data = await withTenant(db, user.businessId, async (tx) => {

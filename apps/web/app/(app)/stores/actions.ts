@@ -1,11 +1,12 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { auditLogs, bumpUsage, businesses, stores } from '@mybizone/db';
 import { type Plan, checkLimit, isValidPlan } from '@mybizone/domain/plans';
 import { count, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const CreateStoreSchema = z.object({
   name: z.string().min(1, 'name required').max(120),
@@ -14,6 +15,7 @@ const CreateStoreSchema = z.object({
 });
 
 export const createStoreAction = safeAction(CreateStoreSchema, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_stores');
   const [bizRows, countRows] = await Promise.all([
     tx.select({ plan: businesses.plan }).from(businesses).where(eq(businesses.id, user.businessId)),
     tx.select({ n: count() }).from(stores).where(eq(stores.businessId, user.businessId)),

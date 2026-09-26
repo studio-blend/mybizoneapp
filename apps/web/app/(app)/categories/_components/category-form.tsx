@@ -1,5 +1,6 @@
 'use client';
 
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 import { Button } from '@mybizone/ui/button';
 import {
   Card,
@@ -13,8 +14,7 @@ import { Input } from '@mybizone/ui/input';
 import { Label } from '@mybizone/ui/label';
 import { Select } from '@mybizone/ui/select';
 import { useToast } from '@mybizone/ui/use-toast';
-import { useState, useCallback } from 'react';
-import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
+import { useCallback, useRef, useState } from 'react';
 import { createCategoryAction, updateCategoryAction } from '../actions';
 
 interface Option {
@@ -75,12 +75,16 @@ export function CategoryForm({ mode, parentOptions, storeOptions, initial }: Pro
   const [isDirty, setIsDirty] = useState(false);
   const { safeNavigate } = useUnsavedChanges(isDirty && !pending);
 
-  const [attributes, setAttributes] = useState<Attribute[]>(initial?.attributes ?? []);
+  const nextRowKey = useRef(initial?.attributes.length ?? 0);
+  const [attributes, setAttributes] = useState<(Attribute & { rowKey: number })[]>(() =>
+    (initial?.attributes ?? []).map((attribute, rowKey) => ({ ...attribute, rowKey })),
+  );
 
   const markDirty = useCallback(() => setIsDirty(true), []);
 
   function addAttribute() {
-    setAttributes((prev) => [...prev, { name: '', unit: undefined }]);
+    const rowKey = nextRowKey.current++;
+    setAttributes((prev) => [...prev, { name: '', unit: undefined, rowKey }]);
     markDirty();
   }
 
@@ -90,9 +94,7 @@ export function CategoryForm({ mode, parentOptions, storeOptions, initial }: Pro
   }
 
   function updateAttribute(index: number, field: keyof Attribute, value: string) {
-    setAttributes((prev) =>
-      prev.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
-    );
+    setAttributes((prev) => prev.map((a, i) => (i === index ? { ...a, [field]: value } : a)));
     markDirty();
   }
 
@@ -117,7 +119,9 @@ export function CategoryForm({ mode, parentOptions, storeOptions, initial }: Pro
       parentId: fd.get('parentId') ?? '',
       storeId: fd.get('storeId') ?? '',
       sortOrder: fd.get('sortOrder') ?? '0',
-      attributes: JSON.stringify(attributes.filter((a) => a.name.trim())),
+      attributes: JSON.stringify(
+        attributes.filter((a) => a.name.trim()).map(({ name, unit }) => ({ name, unit })),
+      ),
     };
     const result =
       mode === 'create'
@@ -170,7 +174,9 @@ export function CategoryForm({ mode, parentOptions, storeOptions, initial }: Pro
               {parentOptions
                 .filter((o) => o.id !== initial?.id)
                 .map((o) => (
-                  <option key={o.id} value={o.id}>{o.name}</option>
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
                 ))}
             </Select>
           </div>
@@ -179,7 +185,9 @@ export function CategoryForm({ mode, parentOptions, storeOptions, initial }: Pro
             <Select id="storeId" name="storeId" defaultValue={initial?.storeId ?? ''}>
               <option value="">All stores</option>
               {storeOptions.map((o) => (
-                <option key={o.id} value={o.id}>{o.name}</option>
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
               ))}
             </Select>
           </div>
@@ -216,7 +224,7 @@ export function CategoryForm({ mode, parentOptions, storeOptions, initial }: Pro
                   <span />
                 </div>
                 {attributes.map((attr, i) => (
-                  <div key={i} className="space-y-0.5">
+                  <div key={attr.rowKey} className="space-y-0.5">
                     <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start">
                       <div>
                         <Input
@@ -246,8 +254,19 @@ export function CategoryForm({ mode, parentOptions, storeOptions, initial }: Pro
                         className="mt-2 text-muted-foreground hover:text-destructive transition-colors p-1"
                         aria-label="Remove attribute"
                       >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                          aria-hidden="true"
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
                         </svg>
                       </button>
                     </div>

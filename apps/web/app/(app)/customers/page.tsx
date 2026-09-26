@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { customerTags, customers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -13,12 +14,12 @@ import { TagFilter } from './_components/tag-filter';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CustomersPage({
-  searchParams,
-}: {
-  searchParams: { tag?: string };
+export default async function CustomersPage(props: {
+  searchParams: Promise<{ tag?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
+  await requirePermission(user, 'manage_customers');
   const activeTag = searchParams.tag ?? null;
 
   const [rows, totals] = await withTenant(db, user.businessId, async (tx) => {
@@ -92,7 +93,9 @@ export default async function CustomersPage({
       {rows.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>{activeTag ? `No customers tagged "${activeTag}"` : 'No customers yet'}</CardTitle>
+            <CardTitle>
+              {activeTag ? `No customers tagged "${activeTag}"` : 'No customers yet'}
+            </CardTitle>
             <CardDescription>
               {activeTag
                 ? 'Try a different tag filter or clear the filter to see all customers.'
@@ -130,8 +133,12 @@ export default async function CustomersPage({
                       </Link>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{c.phone ?? '—'}</TableCell>
-                    <TableCell className="capitalize text-muted-foreground">{c.rateCategory}</TableCell>
-                    <TableCell className="text-right">₹{Number(c.creditLimit).toFixed(2)}</TableCell>
+                    <TableCell className="capitalize text-muted-foreground">
+                      {c.rateCategory}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      ₹{Number(c.creditLimit).toFixed(2)}
+                    </TableCell>
                     <TableCell className="text-right">
                       <span
                         className={

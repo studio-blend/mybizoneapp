@@ -1,16 +1,11 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { openingBalances, purchases, suppliers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { financialYear } from '@mybizone/domain/bill-series';
 import { Button } from '@mybizone/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@mybizone/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
 import { and, desc, eq } from 'drizzle-orm';
 import Link from 'next/link';
@@ -19,8 +14,10 @@ import { SupplierOpeningBalanceForm } from '../_components/opening-balance-form'
 
 export const dynamic = 'force-dynamic';
 
-export default async function SupplierDetailPage({ params }: { params: { id: string } }) {
+export default async function SupplierDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
+  await requirePermission(user, 'manage_suppliers');
   const data = await withTenant(db, user.businessId, async (tx) => {
     const [supplier] = await tx
       .select()
@@ -145,9 +142,7 @@ export default async function SupplierDetailPage({ params }: { params: { id: str
                 recentPurchases.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-mono text-xs">{p.billNo}</TableCell>
-                    <TableCell>
-                      {new Date(p.purchaseDate).toLocaleDateString('en-IN')}
-                    </TableCell>
+                    <TableCell>{new Date(p.purchaseDate).toLocaleDateString('en-IN')}</TableCell>
                     <TableCell className="text-right">₹{Number(p.total).toFixed(2)}</TableCell>
                     <TableCell className="text-muted-foreground">{p.paymentMethod}</TableCell>
                     <TableCell className="text-right">

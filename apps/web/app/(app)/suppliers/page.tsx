@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { suppliers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -13,6 +14,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function SuppliersPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_suppliers');
 
   const { rows, totalOutstanding } = await withTenant(db, user.businessId, async (tx) => {
     const rows = await tx
@@ -26,9 +28,7 @@ export default async function SuppliersPage() {
       .from(suppliers)
       .orderBy(asc(suppliers.name));
 
-    const [agg] = await tx
-      .select({ total: sum(suppliers.outstandingBalance) })
-      .from(suppliers);
+    const [agg] = await tx.select({ total: sum(suppliers.outstandingBalance) }).from(suppliers);
 
     return { rows, totalOutstanding: agg?.total ?? '0' };
   });

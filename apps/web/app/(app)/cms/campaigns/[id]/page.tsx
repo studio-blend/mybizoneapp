@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { campaignRecipients, customers, marketingCampaigns } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -11,8 +12,10 @@ import { notFound } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CampaignDetailPage({ params }: { params: { id: string } }) {
+export default async function CampaignDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
+  await requirePermission(user, 'manage_campaigns');
 
   const data = await withTenant(db, user.businessId, async (tx) => {
     const [campaign] = await tx
@@ -84,9 +87,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
           <CardTitle>Message template</CardTitle>
           <CardDescription>
             {campaign.recipientCount ?? 0} recipients sent
-            {campaign.sentAt
-              ? ` on ${new Date(campaign.sentAt).toLocaleDateString('en-IN')}`
-              : ''}
+            {campaign.sentAt ? ` on ${new Date(campaign.sentAt).toLocaleDateString('en-IN')}` : ''}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -121,9 +122,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
                       {r.phone ?? '—'}
                     </TableCell>
                     <TableCell className="max-w-sm text-sm text-muted-foreground">
-                      <span className="line-clamp-2">
-                        {r.personalizedMessage ?? '—'}
-                      </span>
+                      <span className="line-clamp-2">{r.personalizedMessage ?? '—'}</span>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -53,11 +53,7 @@ export function DepartmentForm({ stores }: { stores: Store[] }) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="dept-store">Store (optional)</Label>
-        <Select
-          id="dept-store"
-          value={storeId}
-          onChange={(e) => setStoreId(e.target.value)}
-        >
+        <Select id="dept-store" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
           <option value="">All stores</option>
           {stores.map((s) => (
             <option key={s.id} value={s.id}>

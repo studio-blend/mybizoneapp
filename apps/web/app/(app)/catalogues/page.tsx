@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { brands, catalogues, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -13,6 +14,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function CataloguesPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_products');
   const rows = await withTenant(db, user.businessId, (tx) =>
     tx
       .select({
@@ -69,7 +71,9 @@ export default async function CataloguesPage() {
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.name}</TableCell>
                     <TableCell className="text-muted-foreground">{c.brandName ?? '—'}</TableCell>
-                    <TableCell className="text-muted-foreground">{c.storeName ?? 'All stores'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {c.storeName ?? 'All stores'}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm" asChild>

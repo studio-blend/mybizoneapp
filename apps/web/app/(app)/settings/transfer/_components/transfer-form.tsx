@@ -6,10 +6,7 @@ import { Select } from '@mybizone/ui/select';
 import { useToast } from '@mybizone/ui/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import {
-  cancelOwnershipTransferAction,
-  initiateOwnershipTransferAction,
-} from '../actions';
+import { cancelOwnershipTransferAction, initiateOwnershipTransferAction } from '../actions';
 
 interface Admin {
   id: string;
@@ -31,11 +28,7 @@ export function TransferForm({ admins, pendingTransferId }: Props) {
   async function onInitiate(e: React.FormEvent) {
     e.preventDefault();
     if (!toUserId) return;
-    if (
-      !confirm(
-        'Are you sure? You will permanently give up super_admin status and become admin.',
-      )
-    )
+    if (!confirm('Are you sure? You will permanently give up super_admin status and become admin.'))
       return;
     setPending(true);
     const result = await initiateOwnershipTransferAction({ toUserId });

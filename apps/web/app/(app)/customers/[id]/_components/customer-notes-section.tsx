@@ -71,11 +71,7 @@ export function CustomerNotesSection({
           maxLength={2000}
           className="resize-none text-sm"
         />
-        <Button
-          size="sm"
-          onClick={saveNote}
-          disabled={!text.trim() || isPending}
-        >
+        <Button size="sm" onClick={saveNote} disabled={!text.trim() || isPending}>
           {isPending ? 'Saving...' : 'Save note'}
         </Button>
       </div>

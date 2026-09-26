@@ -130,9 +130,7 @@ export function SupplierForm({ mode, initial }: Props) {
           {mode === 'edit' && initial && (
             <p className="text-sm text-muted-foreground">
               Outstanding balance:{' '}
-              <span className="font-medium">
-                ₹{Number(initial.outstandingBalance).toFixed(2)}
-              </span>
+              <span className="font-medium">₹{Number(initial.outstandingBalance).toFixed(2)}</span>
             </p>
           )}
 

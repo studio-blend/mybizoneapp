@@ -25,10 +25,7 @@ export async function GET() {
     return NextResponse.json({ valid: false, reason: result.reason }, { status: 403 });
   }
 
-  return NextResponse.json({
-    valid: true,
-    plan: result.payload.plan,
-    expiresAt: new Date(result.payload.exp * 1000).toISOString(),
-    businessId: result.payload.sub,
-  });
+  // Startup probes need only validity; tenant/license details belong on the
+  // authorized instance-owner settings page.
+  return NextResponse.json({ valid: true });
 }

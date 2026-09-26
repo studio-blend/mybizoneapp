@@ -1,11 +1,12 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { auditLogs, customers, openingBalances } from '@mybizone/db';
 import { financialYear } from '@mybizone/domain/bill-series';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 
@@ -37,6 +38,7 @@ const CustomerInput = z.object({
 });
 
 export const createCustomerAction = safeAction(CustomerInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_customers');
   const [row] = await tx
     .insert(customers)
     .values({
@@ -67,53 +69,51 @@ export const createCustomerAction = safeAction(CustomerInput, async (input, { us
 
 const UpdateCustomerInput = CustomerInput.extend({ id: uuid });
 
-export const updateCustomerAction = safeAction(
-  UpdateCustomerInput,
-  async (input, { user, tx }) => {
-    const [before] = await tx
-      .select({
-        name: customers.name,
-        phone: customers.phone,
-        email: customers.email,
-        gstin: customers.gstin,
-        address: customers.address,
-        rateCategory: customers.rateCategory,
-        creditLimit: customers.creditLimit,
-      })
-      .from(customers)
-      .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)));
-    if (!before) throw new Error('not found');
+export const updateCustomerAction = safeAction(UpdateCustomerInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_customers');
+  const [before] = await tx
+    .select({
+      name: customers.name,
+      phone: customers.phone,
+      email: customers.email,
+      gstin: customers.gstin,
+      address: customers.address,
+      rateCategory: customers.rateCategory,
+      creditLimit: customers.creditLimit,
+    })
+    .from(customers)
+    .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)));
+  if (!before) throw new Error('not found');
 
-    const [row] = await tx
-      .update(customers)
-      .set({
-        name: input.name,
-        phone: input.phone ?? null,
-        email: input.email ?? null,
-        gstin: input.gstin ?? null,
-        address: input.address ?? null,
-        rateCategory: input.rateCategory,
-        creditLimit: input.creditLimit,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)))
-      .returning({ id: customers.id, name: customers.name });
-    if (!row) throw new Error('update failed');
+  const [row] = await tx
+    .update(customers)
+    .set({
+      name: input.name,
+      phone: input.phone ?? null,
+      email: input.email ?? null,
+      gstin: input.gstin ?? null,
+      address: input.address ?? null,
+      rateCategory: input.rateCategory,
+      creditLimit: input.creditLimit,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)))
+    .returning({ id: customers.id, name: customers.name });
+  if (!row) throw new Error('update failed');
 
-    await tx.insert(auditLogs).values({
-      businessId: user.businessId,
-      actorId: user.id,
-      action: 'customer.update',
-      entity: 'customer',
-      entityId: row.id,
-      before,
-      after: { name: row.name },
-    });
+  await tx.insert(auditLogs).values({
+    businessId: user.businessId,
+    actorId: user.id,
+    action: 'customer.update',
+    entity: 'customer',
+    entityId: row.id,
+    before,
+    after: { name: row.name },
+  });
 
-    revalidatePath('/customers');
-    return { id: row.id, name: row.name };
-  },
-);
+  revalidatePath('/customers');
+  return { id: row.id, name: row.name };
+});
 
 // M8: opening balance per (customer, FY). UPSERT keyed on the unique tuple.
 const SetOpeningBalanceInput = z.object({
@@ -123,12 +123,17 @@ const SetOpeningBalanceInput = z.object({
     .regex(/^\d{4}-\d{2}$/, 'expected FY like 2025-26')
     .optional(),
   amount: z.string().regex(/^\d{1,10}(?:\.\d{1,2})?$/, 'expected money up to 2dp'),
-  notes: z.string().max(500).optional().transform((v) => v?.trim() || null),
+  notes: z
+    .string()
+    .max(500)
+    .optional()
+    .transform((v) => v?.trim() || null),
 });
 
 export const setCustomerOpeningBalanceAction = safeAction(
   SetOpeningBalanceInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_customers');
     const fy = input.financialYear ?? financialYear(new Date());
 
     // Ensure the customer belongs to this tenant.
@@ -175,35 +180,33 @@ export const setCustomerOpeningBalanceAction = safeAction(
 
 const DeleteCustomerInput = z.object({ id: uuid });
 
-export const deleteCustomerAction = safeAction(
-  DeleteCustomerInput,
-  async (input, { user, tx }) => {
-    const [before] = await tx
-      .select({ name: customers.name, outstandingBalance: customers.outstandingBalance })
-      .from(customers)
-      .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)));
-    if (!before) throw new Error('not found');
+export const deleteCustomerAction = safeAction(DeleteCustomerInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_customers');
+  const [before] = await tx
+    .select({ name: customers.name, outstandingBalance: customers.outstandingBalance })
+    .from(customers)
+    .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)));
+  if (!before) throw new Error('not found');
 
-    if (parseFloat(before.outstandingBalance) !== 0) {
-      throw new Error(
-        `cannot delete customer with outstanding balance of ₹${before.outstandingBalance}`,
-      );
-    }
+  if (Number.parseFloat(before.outstandingBalance) !== 0) {
+    throw new Error(
+      `cannot delete customer with outstanding balance of ₹${before.outstandingBalance}`,
+    );
+  }
 
-    await tx
-      .delete(customers)
-      .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)));
+  await tx
+    .delete(customers)
+    .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)));
 
-    await tx.insert(auditLogs).values({
-      businessId: user.businessId,
-      actorId: user.id,
-      action: 'customer.delete',
-      entity: 'customer',
-      entityId: input.id,
-      before: { name: before.name },
-    });
+  await tx.insert(auditLogs).values({
+    businessId: user.businessId,
+    actorId: user.id,
+    action: 'customer.delete',
+    entity: 'customer',
+    entityId: input.id,
+    before: { name: before.name },
+  });
 
-    revalidatePath('/customers');
-    return { ok: true };
-  },
-);
+  revalidatePath('/customers');
+  return { ok: true };
+});

@@ -8,10 +8,11 @@ import { AcceptTransferForm } from './_components/accept-form';
 export const dynamic = 'force-dynamic';
 
 interface Props {
-  searchParams: { token?: string };
+  searchParams: Promise<{ token?: string }>;
 }
 
-export default async function AcceptOwnershipPage({ searchParams }: Props) {
+export default async function AcceptOwnershipPage(props: Props) {
+  const searchParams = await props.searchParams;
   const token = searchParams.token ?? '';
 
   if (!token) {
@@ -103,8 +104,12 @@ export default async function AcceptOwnershipPage({ searchParams }: Props) {
       <div className="rounded-lg border p-4 text-sm text-muted-foreground">
         <p>By accepting:</p>
         <ul className="mt-2 list-disc pl-4 space-y-1">
-          <li>You will become the new <strong>super_admin</strong> (business owner)</li>
-          <li>The current owner will become an <strong>admin</strong></li>
+          <li>
+            You will become the new <strong>super_admin</strong> (business owner)
+          </li>
+          <li>
+            The current owner will become an <strong>admin</strong>
+          </li>
           <li>This action cannot be undone without another transfer</li>
         </ul>
       </div>

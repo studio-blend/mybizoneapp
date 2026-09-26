@@ -21,9 +21,7 @@ if (!businessId || !/^[0-9a-f-]{36}$/i.test(businessId)) {
 }
 
 const durationYears =
-  durationArg === '2y' ? 2
-  : durationArg === '1y' || durationArg === 'annual' ? 1
-  : 1;
+  durationArg === '2y' ? 2 : durationArg === '1y' || durationArg === 'annual' ? 1 : 1;
 
 const privateKeyPath = join(import.meta.dirname, '.license-private-key.pem');
 let privateKey: string;
@@ -31,7 +29,9 @@ try {
   privateKey = readFileSync(privateKeyPath, 'utf8');
 } catch {
   console.error(`Private key not found at ${privateKeyPath}`);
-  console.error('Generate a key pair with: node -e "const {generateKeyPairSync} = require(\'crypto\'); const k = generateKeyPairSync(\'rsa\',{modulusLength:2048,publicKeyEncoding:{type:\'spki\',format:\'pem\'},privateKeyEncoding:{type:\'pkcs8\',format:\'pem\'}}); require(\'fs\').writeFileSync(\'scripts/.license-private-key.pem\',k.privateKey);"');
+  console.error(
+    "Generate a key pair with: node -e \"const {generateKeyPairSync} = require('crypto'); const k = generateKeyPairSync('rsa',{modulusLength:2048,publicKeyEncoding:{type:'spki',format:'pem'},privateKeyEncoding:{type:'pkcs8',format:'pem'}}); require('fs').writeFileSync('scripts/.license-private-key.pem',k.privateKey);\"",
+  );
   process.exit(1);
 }
 
@@ -65,7 +65,7 @@ console.log('License key:');
 console.log(token);
 console.log('');
 console.log(`Business ID: ${businessId}`);
-console.log(`Plan: pro`);
+console.log('Plan: pro');
 console.log(`Expires: ${new Date(exp * 1000).toLocaleDateString('en-IN')} (${durationYears}yr)`);
 console.log('');
 console.log('Set in .env or docker-compose:');

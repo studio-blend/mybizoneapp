@@ -1,63 +1,46 @@
 'use server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import path from 'path';
-import fs from 'fs';
+import { execFile } from 'node:child_process';
+import { mkdir, rename, rm } from 'node:fs/promises';
+import path from 'node:path';
+import { promisify } from 'node:util';
+import { canManageInstanceBackups } from '@/lib/backup-access';
 
-const execAsync = promisify(exec);
-
-function getBackupDir(): string {
-  return (
-    process.env.BACKUP_DIR || path.join(process.cwd(), '..', '..', 'backups')
-  );
-}
+const execFileAsync = promisify(execFile);
 
 export async function triggerBackupAction(): Promise<{
   success?: boolean;
   filename?: string;
   error?: string;
 }> {
-  if (process.env.LAN_MODE !== 'true') {
-    return { error: 'Not available' };
-  }
-  const backupDir = getBackupDir();
-  const filename =
-    new Date().toISOString().replace(/[:.]/g, '-') + '.sql.gz';
+  if (!(await canManageInstanceBackups())) return { error: 'Permission denied' };
+  const backupDir = process.env.BACKUP_DIR || path.join(process.cwd(), '..', '..', 'backups');
+  const filename = `${new Date().toISOString().replace(/[:.]/g, '-')}.dump`;
   const outPath = path.join(backupDir, filename);
-  fs.mkdirSync(backupDir, { recursive: true });
-  const dbUrl = process.env.DATABASE_URL!;
+  const partialPath = `${outPath}.partial`;
   try {
-    await execAsync(`pg_dump "${dbUrl}" | gzip > "${outPath}"`);
+    if (!process.env.DATABASE_URL) return { error: 'Database not configured' };
+    await mkdir(backupDir, { recursive: true });
+    // argv avoids a shell; PGDATABASE keeps connection secrets out of process arguments.
+    await execFileAsync('pg_dump', ['--format=custom', '--no-owner', '--file', partialPath], {
+      env: { ...process.env, PGDATABASE: process.env.DATABASE_URL },
+      windowsHide: true,
+      timeout: 5 * 60 * 1000,
+    });
+    await rename(partialPath, outPath);
     return { success: true, filename };
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { error: msg };
+  } catch {
+    await rm(partialPath, { force: true }).catch(() => undefined);
+    return { error: 'Backup failed. Check PostgreSQL backup tools and server logs.' };
   }
 }
 
+/** SQL restore is an offline operator operation, never an uploaded web action. */
 export async function restoreBackupAction(
   _prevState: unknown,
-  formData: FormData,
-): Promise<{ success?: boolean; error?: string }> {
-  if (process.env.LAN_MODE !== 'true') {
-    return { error: 'Not available' };
-  }
-  const file = formData.get('file') as File | null;
-  if (!file) {
-    return { error: 'No file provided' };
-  }
-  const backupDir = getBackupDir();
-  fs.mkdirSync(backupDir, { recursive: true });
-  const destPath = path.join(backupDir, `restore-${Date.now()}.sql.gz`);
-  const arrayBuffer = await file.arrayBuffer();
-  fs.writeFileSync(destPath, Buffer.from(arrayBuffer));
-  const dbUrl = process.env.DATABASE_URL!;
-  try {
-    await execAsync(`gunzip -c "${destPath}" | psql "${dbUrl}"`);
-    fs.unlinkSync(destPath);
-    return { success: true };
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { error: msg };
-  }
+  _formData: FormData,
+): Promise<{ error: string }> {
+  return {
+    error:
+      'Restore requires the server administrator to stop the application and follow the recovery guide.',
+  };
 }

@@ -1,11 +1,19 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
-import { auditLogs, billSeries, products, quotationItems, quotations } from '@mybizone/db';
+import {
+  auditLogs,
+  billSeries,
+  customers,
+  products,
+  quotationItems,
+  quotations,
+} from '@mybizone/db';
 import { financialYear, formatBillNo } from '@mybizone/domain/bill-series';
 import { and, eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const optionalUuid = z.union([uuid, z.literal('')]).transform((v) => (v === '' ? null : v));
@@ -41,6 +49,14 @@ const CreateQuotationInput = z.object({
 export const createQuotationAction = safeAction(
   CreateQuotationInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'create_sale');
+    if (input.customerId) {
+      const [customer] = await tx
+        .select({ id: customers.id })
+        .from(customers)
+        .where(and(eq(customers.id, input.customerId), eq(customers.businessId, user.businessId)));
+      if (!customer) throw new Error('customer not found');
+    }
     // 1. Generate quoteNo via bill_series (docType='quotation', prefix='QT')
     const now = new Date();
     const fy = financialYear(now);
@@ -153,6 +169,7 @@ const UpdateQuotationStatusInput = z.object({
 export const updateQuotationStatusAction = safeAction(
   UpdateQuotationStatusInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'create_sale');
     const [row] = await tx
       .update(quotations)
       .set({ status: input.status, updatedAt: new Date() })

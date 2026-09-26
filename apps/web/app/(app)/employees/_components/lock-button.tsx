@@ -31,7 +31,11 @@ export function LockButton({ id, name, locked }: { id: string; name: string; loc
       size="sm"
       onClick={onClick}
       disabled={pending}
-      className={locked ? 'text-green-600 hover:text-green-700' : 'text-destructive hover:text-destructive/80'}
+      className={
+        locked
+          ? 'text-green-600 hover:text-green-700'
+          : 'text-destructive hover:text-destructive/80'
+      }
     >
       {pending ? '…' : locked ? 'Unlock' : 'Lock'}
     </Button>

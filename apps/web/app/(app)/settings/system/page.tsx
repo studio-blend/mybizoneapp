@@ -1,7 +1,8 @@
+import { canManageInstanceBackups } from '@/lib/backup-access';
 import { env } from '@/lib/env';
 import { BackupSection } from './backup-section';
 
-export default function SystemSettingsPage() {
+export default async function SystemSettingsPage() {
   if (!env.LAN_MODE) {
     return (
       <div className="mx-auto max-w-2xl">
@@ -15,8 +16,13 @@ export default function SystemSettingsPage() {
     );
   }
 
+  if (!(await canManageInstanceBackups()))
+    return (
+      <p>System administration is available to the owner of a single-business LAN installation.</p>
+    );
+
   const maskedKey = env.LICENSE_KEY
-    ? env.LICENSE_KEY.slice(0, 8) + '...' + env.LICENSE_KEY.slice(-4)
+    ? `${env.LICENSE_KEY.slice(0, 8)}...${env.LICENSE_KEY.slice(-4)}`
     : '(none — trial mode)';
 
   const nodeVersion = process.version;
@@ -27,7 +33,9 @@ export default function SystemSettingsPage() {
     <div className="mx-auto max-w-2xl space-y-8">
       <div>
         <h1 className="text-2xl font-bold">System Settings</h1>
-        <p className="text-sm text-muted-foreground">Server information for this self-hosted deployment</p>
+        <p className="text-sm text-muted-foreground">
+          Server information for this self-hosted deployment
+        </p>
       </div>
 
       {/* Server Info */}

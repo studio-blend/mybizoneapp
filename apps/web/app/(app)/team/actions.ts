@@ -1,10 +1,10 @@
 'use server';
-
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
-import { departments, stores, userRoles } from '@mybizone/db';
+import { departments, stores, userRoles, user as userTable } from '@mybizone/db';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const optionalUuid = z.union([uuid, z.literal('')]).transform((v) => (v === '' ? null : v));
@@ -30,14 +30,50 @@ const GrantRoleInput = z.object({
 });
 
 export const grantRoleAction = safeAction(GrantRoleInput, async (input, { user, tx }) => {
-  if (!['super_admin', 'admin', 'owner'].includes(user.role)) {
-    throw new Error('Permission denied — requires admin or higher');
-  }
+  await requirePermission(user, 'manage_rbac');
 
   // Only super_admin can grant super_admin
-  if (input.role === 'super_admin' && user.role !== 'super_admin') {
-    throw new Error('Only super_admin can grant super_admin role');
+  if (input.role === 'super_admin') await requirePermission(user, 'transfer_ownership');
+
+  const [target] = await tx
+    .select({ id: userTable.id, role: userTable.role })
+    .from(userTable)
+    .where(
+      and(
+        eq(userTable.id, input.userId),
+        eq(userTable.businessId, user.businessId),
+        eq(userTable.active, true),
+      ),
+    )
+    .for('update');
+  if (!target) throw new Error('Team member not found');
+  if (['owner', 'super_admin'].includes(target.role))
+    throw new Error('Use ownership transfer to change an owner account');
+  if (input.storeId) {
+    const [store] = await tx
+      .select({ id: stores.id })
+      .from(stores)
+      .where(and(eq(stores.id, input.storeId), eq(stores.businessId, user.businessId)));
+    if (!store) throw new Error('Store not found');
   }
+  if (input.departmentId) {
+    const [department] = await tx
+      .select({ id: departments.id, storeId: departments.storeId })
+      .from(departments)
+      .where(
+        and(eq(departments.id, input.departmentId), eq(departments.businessId, user.businessId)),
+      );
+    if (!department || (input.storeId && department.storeId !== input.storeId))
+      throw new Error('Department not found in store');
+  }
+  if (input.role === 'super_admin' && (input.storeId || input.departmentId))
+    throw new Error('Owner role cannot be scoped');
+
+  // Explicit grants replace the legacy fallback, including after the last revocation.
+  await tx
+    .update(userTable)
+    .set({ role: 'custom', updatedAt: new Date() })
+    .where(and(eq(userTable.id, input.userId), eq(userTable.businessId, user.businessId)));
 
   await tx
     .insert(userRoles)
@@ -58,21 +94,32 @@ export const grantRoleAction = safeAction(GrantRoleInput, async (input, { user, 
 const RevokeRoleInput = z.object({ userRoleId: uuid });
 
 export const revokeRoleAction = safeAction(RevokeRoleInput, async (input, { user, tx }) => {
-  if (!['super_admin', 'admin', 'owner'].includes(user.role)) {
-    throw new Error('Permission denied — requires admin or higher');
-  }
+  await requirePermission(user, 'manage_rbac');
 
   const [existing] = await tx
-    .select({ id: userRoles.id, role: userRoles.role })
+    .select({ id: userRoles.id, role: userRoles.role, userId: userRoles.userId })
     .from(userRoles)
     .where(and(eq(userRoles.id, input.userRoleId), eq(userRoles.businessId, user.businessId)));
 
   if (!existing) throw new Error('Role not found');
 
   // Prevent revoking super_admin unless the caller is super_admin
-  if (existing.role === 'super_admin' && user.role !== 'super_admin') {
-    throw new Error('Only super_admin can revoke super_admin role');
-  }
+  if (existing.role === 'super_admin') await requirePermission(user, 'transfer_ownership');
+  const [target] = await tx
+    .select({ role: userTable.role })
+    .from(userTable)
+    .where(and(eq(userTable.id, existing.userId), eq(userTable.businessId, user.businessId)))
+    .for('update');
+  if (!target) throw new Error('Team member not found');
+  if (
+    ['owner', 'super_admin'].includes(target.role) ||
+    (existing.role === 'super_admin' && existing.userId === user.id)
+  )
+    throw new Error('Use ownership transfer to change an owner account');
+  await tx
+    .update(userTable)
+    .set({ role: 'custom', updatedAt: new Date() })
+    .where(and(eq(userTable.id, existing.userId), eq(userTable.businessId, user.businessId)));
 
   await tx
     .delete(userRoles)

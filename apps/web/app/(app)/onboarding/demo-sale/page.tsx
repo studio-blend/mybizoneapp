@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { products, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -14,12 +15,10 @@ const DEMO_PRODUCT_PRICE = '100.00';
 
 export default async function OnboardingDemoSalePage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_settings');
 
   const data = await withTenant(db, user.businessId, async (tx) => {
-    const [store] = await tx
-      .select({ id: stores.id })
-      .from(stores)
-      .limit(1);
+    const [store] = await tx.select({ id: stores.id }).from(stores).limit(1);
     if (!store) return null;
 
     let [product] = await tx

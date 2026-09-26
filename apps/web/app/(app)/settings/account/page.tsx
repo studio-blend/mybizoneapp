@@ -50,7 +50,10 @@ export default async function MyAccountPage() {
           <p className="text-sm text-muted-foreground">
             To change your password, use the forgot password flow from the login page.
           </p>
-          <Link href="/settings/transfer" className="text-sm underline underline-offset-4 hover:text-primary">
+          <Link
+            href="/settings/transfer"
+            className="text-sm underline underline-offset-4 hover:text-primary"
+          >
             Transfer business ownership
           </Link>
         </CardContent>

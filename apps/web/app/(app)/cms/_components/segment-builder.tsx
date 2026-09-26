@@ -8,9 +8,17 @@ import { Select } from '@mybizone/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
-import { getSegmentAction, type SegmentCustomer, type SegmentFilters } from '../actions';
+import { type SegmentCustomer, type SegmentFilters, getSegmentAction } from '../actions';
 
-const ALL_TAGS = ['VIP', 'Wholesale', 'Inactive', 'Regular', 'Bulk Buyer', 'Credit Risk', 'New Customer'];
+const ALL_TAGS = [
+  'VIP',
+  'Wholesale',
+  'Inactive',
+  'Regular',
+  'Bulk Buyer',
+  'Credit Risk',
+  'New Customer',
+];
 
 export function SegmentBuilder() {
   const [lastPurchaseDays, setLastPurchaseDays] = useState('');
@@ -65,7 +73,8 @@ export function SegmentBuilder() {
         <CardHeader>
           <CardTitle>Segment Builder</CardTitle>
           <CardDescription>
-            Filter customers by tags, purchase history, balance, and more. All filters are AND logic.
+            Filter customers by tags, purchase history, balance, and more. All filters are AND
+            logic.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -151,11 +160,7 @@ export function SegmentBuilder() {
 
             <div className="space-y-1">
               <Label htmlFor="has-phone">Has phone number</Label>
-              <Select
-                id="has-phone"
-                value={hasPhone}
-                onChange={(e) => setHasPhone(e.target.value)}
-              >
+              <Select id="has-phone" value={hasPhone} onChange={(e) => setHasPhone(e.target.value)}>
                 <option value="">Any</option>
                 <option value="yes">Yes</option>
                 <option value="no">No</option>
@@ -185,9 +190,7 @@ export function SegmentBuilder() {
           </CardHeader>
           <CardContent className="p-0">
             {results.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">
-                No customers match these filters.
-              </p>
+              <p className="p-4 text-sm text-muted-foreground">No customers match these filters.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -212,10 +215,7 @@ export function SegmentBuilder() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {c.tags.map((t) => (
-                            <span
-                              key={t}
-                              className="rounded-full bg-muted px-2 py-0.5 text-xs"
-                            >
+                            <span key={t} className="rounded-full bg-muted px-2 py-0.5 text-xs">
                               {t}
                             </span>
                           ))}

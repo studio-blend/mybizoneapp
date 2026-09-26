@@ -2,7 +2,15 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 
-const FILTER_TAGS = ['VIP', 'Wholesale', 'Inactive', 'Regular', 'Bulk Buyer', 'Credit Risk', 'New Customer'];
+const FILTER_TAGS = [
+  'VIP',
+  'Wholesale',
+  'Inactive',
+  'Regular',
+  'Bulk Buyer',
+  'Credit Risk',
+  'New Customer',
+];
 
 export function TagFilter({ current }: { current: string | null }) {
   const router = useRouter();
@@ -19,6 +27,7 @@ export function TagFilter({ current }: { current: string | null }) {
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-sm text-muted-foreground">Filter by tag:</span>
       <button
+        type="button"
         onClick={() => select(null)}
         className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
           !current
@@ -30,6 +39,7 @@ export function TagFilter({ current }: { current: string | null }) {
       </button>
       {FILTER_TAGS.map((t) => (
         <button
+          type="button"
           key={t}
           onClick={() => select(t)}
           className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${

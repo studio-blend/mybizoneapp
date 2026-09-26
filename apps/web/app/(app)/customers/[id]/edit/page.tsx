@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { customers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -8,8 +9,10 @@ import { CustomerForm } from '../../_components/customer-form';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditCustomerPage({ params }: { params: { id: string } }) {
+export default async function EditCustomerPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
+  await requirePermission(user, 'manage_customers');
   const [row] = await withTenant(db, user.businessId, (tx) =>
     tx
       .select()

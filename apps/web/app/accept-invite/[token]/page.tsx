@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { getSessionUser } from '@/lib/session';
-import { auditLogs, invitations, user as userTable } from '@mybizone/db';
+import { invitations } from '@mybizone/db';
 import { Button } from '@mybizone/ui/button';
 import {
   Card,
@@ -12,15 +12,16 @@ import {
 } from '@mybizone/ui/card';
 import { eq } from 'drizzle-orm';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { acceptInvitation } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
 interface Props {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }
 
-export default async function AcceptInvitePage({ params }: Props) {
+export default async function AcceptInvitePage(props: Props) {
+  const params = await props.params;
   const { token } = params;
 
   // Direct DB — no RLS — token acts as capability key.
@@ -96,29 +97,29 @@ export default async function AcceptInvitePage({ params }: Props) {
     );
   }
 
-  // Process acceptance — direct DB, no RLS (user has no businessId yet).
-  await db.transaction(async (tx) => {
-    await tx
-      .update(userTable)
-      .set({ businessId: inv.businessId, role: inv.role, storeId: inv.storeId, updatedAt: new Date() })
-      .where(eq(userTable.id, sessionUser.id));
+  if (sessionUser.businessId) {
+    return (
+      <Centered>
+        <ErrorCard message="This account already belongs to a business. Use a separate email address for the invitation." />
+      </Centered>
+    );
+  }
 
-    await tx
-      .update(invitations)
-      .set({ acceptedAt: new Date() })
-      .where(eq(invitations.id, inv.id));
-
-    await tx.insert(auditLogs).values({
-      businessId: inv.businessId,
-      actorId: sessionUser.id,
-      action: 'invitation.accept',
-      entity: 'invitation',
-      entityId: inv.id,
-      after: { email: sessionUser.email, role: inv.role },
-    });
-  });
-
-  redirect('/dashboard');
+  return (
+    <Centered>
+      <Card>
+        <CardHeader>
+          <CardTitle>Join this business</CardTitle>
+          <CardDescription>Accept the invitation for {sessionUser.email}.</CardDescription>
+        </CardHeader>
+        <CardFooter>
+          <form action={acceptInvitation.bind(null, token)}>
+            <Button type="submit">Accept invitation</Button>
+          </form>
+        </CardFooter>
+      </Card>
+    </Centered>
+  );
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

@@ -1,17 +1,18 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { type ActionResult, safeAction } from '@/lib/server-action';
 import { requireUser } from '@/lib/session';
 import { uploadFile } from '@/lib/storage';
-import { auditLogs, catalogues } from '@mybizone/db';
+import { auditLogs, brands, catalogues, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
-const optionalUuid = z.union([uuid, z.literal('')]).transform((v) => (v === '' ? null : v));
+const _optionalUuid = z.union([uuid, z.literal('')]).transform((v) => (v === '' ? null : v));
 
 /**
  * Upload a catalogue file + insert the row in one shot.
@@ -38,6 +39,28 @@ export async function createCatalogueAction(
 
   const brandId = brandIdRaw && /^[0-9a-f-]{36}$/i.test(brandIdRaw) ? brandIdRaw : null;
   const storeId = storeIdRaw && /^[0-9a-f-]{36}$/i.test(storeIdRaw) ? storeIdRaw : null;
+
+  await requirePermission(user, 'manage_products', storeId ? { storeId } : undefined);
+  try {
+    await withTenant(db, user.businessId, async (tx) => {
+      if (storeId) {
+        const [store] = await tx
+          .select({ id: stores.id })
+          .from(stores)
+          .where(and(eq(stores.id, storeId), eq(stores.businessId, user.businessId)));
+        if (!store) throw new Error('store not found');
+      }
+      if (brandId) {
+        const [brand] = await tx
+          .select({ id: brands.id })
+          .from(brands)
+          .where(and(eq(brands.id, brandId), eq(brands.businessId, user.businessId)));
+        if (!brand) throw new Error('brand not found');
+      }
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'invalid catalogue scope' };
+  }
 
   const buf = Buffer.from(await fileValue.arrayBuffer());
   let fileKey: string;
@@ -90,6 +113,7 @@ export async function createCatalogueAction(
 const DeleteInput = z.object({ id: uuid });
 
 export const deleteCatalogueAction = safeAction(DeleteInput, async (input, { user, tx }) => {
+  await requirePermission(user, 'manage_products');
   const [before] = await tx
     .select({ name: catalogues.name })
     .from(catalogues)

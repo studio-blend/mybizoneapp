@@ -2,7 +2,7 @@ import { createVerify } from 'node:crypto';
 import { LICENSE_PUBLIC_KEY } from './license-public-key';
 
 export interface LicensePayload {
-  sub: string;   // businessId
+  sub: string; // businessId
   plan: 'pro';
   iss: 'mybizone-license';
   iat: number;
@@ -14,7 +14,10 @@ export type LicenseResult =
   | { valid: false; reason: string };
 
 function base64UrlDecode(s: string): Buffer {
-  const padded = s.replace(/-/g, '+').replace(/_/g, '/').padEnd(s.length + (4 - (s.length % 4)) % 4, '=');
+  const padded = s
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(s.length + ((4 - (s.length % 4)) % 4), '=');
   return Buffer.from(padded, 'base64');
 }
 
@@ -42,7 +45,10 @@ export function verifyLicenseKey(token: string): LicenseResult {
 
   const now = Math.floor(Date.now() / 1000);
   if (payload.exp < now) {
-    return { valid: false, reason: `expired ${new Date(payload.exp * 1000).toLocaleDateString('en-IN')}` };
+    return {
+      valid: false,
+      reason: `expired ${new Date(payload.exp * 1000).toLocaleDateString('en-IN')}`,
+    };
   }
   if (payload.iss !== 'mybizone-license') {
     return { valid: false, reason: 'invalid issuer' };

@@ -1,11 +1,11 @@
 import { db } from '@/lib/db';
 import { getUserRoles } from '@/lib/get-user-roles';
 import { requireUser } from '@/lib/session';
-import { ownershipTransfers, user as userTable, userRoles } from '@mybizone/db';
+import { ownershipTransfers, user as userTable } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { hasPermission } from '@mybizone/domain';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, ne } from 'drizzle-orm';
 import { TransferForm } from './_components/transfer-form';
 
 export const dynamic = 'force-dynamic';
@@ -23,35 +23,21 @@ export default async function TransferOwnershipPage() {
   }
 
   const data = await withTenant(db, user.businessId, async (tx) => {
-    // Find all admins (users with admin or higher role)
-    const adminRoleRows = await tx
-      .select({ userId: userRoles.userId, role: userRoles.role })
-      .from(userRoles)
-      .where(
-        and(
-          eq(userRoles.businessId, user.businessId),
-          // Admins who are not the current user
+    const members = await tx
+      .select({ id: userTable.id, name: userTable.name, email: userTable.email })
+      .from(userTable)
+      .where(and(eq(userTable.businessId, user.businessId), ne(userTable.id, user.id)));
+    // Use the same current, unscoped permission check as the transfer action,
+    // including legacy admins and excluding inactive/scoped/revoked accounts.
+    const eligibility = await Promise.all(
+      members.map(async (member) =>
+        hasPermission(
+          await getUserRoles({ id: member.id, businessId: user.businessId }),
+          'manage_rbac',
         ),
-      );
-
-    // Get users who have admin-level roles (excluding current user)
-    const adminUserIds = [
-      ...new Set(
-        adminRoleRows
-          .filter((r) => ['admin', 'shop_manager', 'branch_manager'].includes(r.role) && r.userId !== user.id)
-          .map((r) => r.userId),
       ),
-    ];
-
-    const admins =
-      adminUserIds.length > 0
-        ? await tx
-            .select({ id: userTable.id, name: userTable.name, email: userTable.email })
-            .from(userTable)
-            .where(eq(userTable.businessId, user.businessId))
-        : [];
-
-    const eligibleAdmins = admins.filter((u) => adminUserIds.includes(u.id));
+    );
+    const eligibleAdmins = members.filter((_, index) => eligibility[index]);
 
     // Check pending transfer
     const now = new Date();
@@ -82,7 +68,8 @@ export default async function TransferOwnershipPage() {
       <div>
         <h1 className="text-2xl font-bold">Transfer Ownership</h1>
         <p className="text-sm text-muted-foreground">
-          Transfer business ownership to another admin. They will become super_admin and you will become admin.
+          Transfer business ownership to another admin. They will become super_admin and you will
+          become admin.
         </p>
       </div>
 
@@ -91,7 +78,8 @@ export default async function TransferOwnershipPage() {
           <CardHeader>
             <CardTitle className="text-yellow-800">Pending Transfer</CardTitle>
             <CardDescription className="text-yellow-700">
-              A transfer is pending. Share the token with the recipient or wait for them to accept via the link.
+              A transfer is pending. Share the token with the recipient or wait for them to accept
+              via the link.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">

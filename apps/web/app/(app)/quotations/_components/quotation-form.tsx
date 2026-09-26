@@ -72,8 +72,8 @@ export function QuotationForm({ products, customers }: Props) {
   }
 
   const runningTotal = lines.reduce((acc, l) => {
-    const qty = parseFloat(l.qty);
-    const price = parseFloat(l.unitPrice);
+    const qty = Number.parseFloat(l.qty);
+    const price = Number.parseFloat(l.unitPrice);
     if (!Number.isNaN(qty) && !Number.isNaN(price)) return acc + qty * price;
     return acc;
   }, 0);
@@ -169,7 +169,7 @@ export function QuotationForm({ products, customers }: Props) {
             {lines.map((line) => {
               const lineTotal =
                 line.qty && line.unitPrice
-                  ? (parseFloat(line.qty) * parseFloat(line.unitPrice)).toFixed(2)
+                  ? (Number.parseFloat(line.qty) * Number.parseFloat(line.unitPrice)).toFixed(2)
                   : '—';
               return (
                 <div key={line.id} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto_auto]">

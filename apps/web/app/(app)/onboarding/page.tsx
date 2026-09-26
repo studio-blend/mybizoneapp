@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { businesses, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -11,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function OnboardingPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_settings');
   const data = await withTenant(db, user.businessId, async (tx) => {
     const [biz] = await tx
       .select({ gstEnabled: businesses.gstEnabled, gstin: businesses.gstin })

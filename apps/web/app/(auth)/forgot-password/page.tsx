@@ -1,6 +1,6 @@
 'use client';
 
-import { forgetPassword } from '@/lib/auth-client';
+import { requestPasswordReset } from '@/lib/auth-client';
 import { Button } from '@mybizone/ui/button';
 import {
   Card,
@@ -25,7 +25,7 @@ export default function ForgotPasswordPage() {
     setPending(true);
     setError(null);
     const fd = new FormData(e.currentTarget);
-    const result = await forgetPassword({
+    const result = await requestPasswordReset({
       email: String(fd.get('email')),
       redirectTo: '/reset-password',
     });

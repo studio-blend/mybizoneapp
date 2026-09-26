@@ -52,9 +52,7 @@ export function InviteForm({ stores }: Props) {
     <Card>
       <CardHeader>
         <CardTitle>Invite teammate</CardTitle>
-        <CardDescription>
-          They'll receive an email with a link valid for 7 days.
-        </CardDescription>
+        <CardDescription>They'll receive an email with a link valid for 7 days.</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit}>
         <CardContent className="space-y-4">

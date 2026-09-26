@@ -54,7 +54,12 @@ export function AssignRoleForm({ userId, stores, departments, isSuperAdmin }: Pr
     e.preventDefault();
     if (!role) return;
     setPending(true);
-    const result = await grantRoleAction({ userId, role: role as typeof roles[number], storeId, departmentId });
+    const result = await grantRoleAction({
+      userId,
+      role: role as (typeof roles)[number],
+      storeId,
+      departmentId,
+    });
     setPending(false);
     if (!result.ok) {
       toast({ title: 'Failed', description: result.error, variant: 'destructive' });
@@ -89,7 +94,7 @@ export function AssignRoleForm({ userId, stores, departments, isSuperAdmin }: Pr
           ))}
         </Select>
       </div>
-      {(role === 'branch_manager') && stores.length > 0 && (
+      {role === 'branch_manager' && stores.length > 0 && (
         <div>
           <Label className="text-xs">Store scope (optional)</Label>
           <Select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
@@ -102,7 +107,7 @@ export function AssignRoleForm({ userId, stores, departments, isSuperAdmin }: Pr
           </Select>
         </div>
       )}
-      {(role === 'floor_manager') && departments.length > 0 && (
+      {role === 'floor_manager' && departments.length > 0 && (
         <div>
           <Label className="text-xs">Department scope (optional)</Label>
           <Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
@@ -123,7 +128,10 @@ export function AssignRoleForm({ userId, stores, departments, isSuperAdmin }: Pr
           type="button"
           size="sm"
           variant="ghost"
-          onClick={() => { setOpen(false); setRole(''); }}
+          onClick={() => {
+            setOpen(false);
+            setRole('');
+          }}
         >
           Cancel
         </Button>

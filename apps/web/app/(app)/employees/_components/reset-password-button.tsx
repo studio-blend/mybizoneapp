@@ -12,7 +12,12 @@ export function ResetPasswordButton({ id, name }: { id: string; name: string }) 
   const [pending, setPending] = useState(false);
 
   async function onClick() {
-    if (!confirm(`Reset password for ${name}? Their password will be reset to their Employee ID and they will be asked to change it on next login.`)) return;
+    if (
+      !confirm(
+        `Reset password for ${name}? A new random temporary password will be emailed to them and they will be asked to change it on next login.`,
+      )
+    )
+      return;
     setPending(true);
     const result = await resetEmployeePasswordAction({ id });
     setPending(false);
@@ -20,7 +25,10 @@ export function ResetPasswordButton({ id, name }: { id: string; name: string }) 
       toast({ title: 'Failed', description: result.error, variant: 'destructive' });
       return;
     }
-    toast({ title: 'Password reset', description: 'A welcome email with new credentials has been sent.' });
+    toast({
+      title: 'Password reset',
+      description: 'A welcome email with new credentials has been sent.',
+    });
     router.refresh();
   }
 

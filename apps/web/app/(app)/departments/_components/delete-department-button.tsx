@@ -25,7 +25,13 @@ export function DeleteDepartmentButton({ id, name }: { id: string; name: string 
   }
 
   return (
-    <Button variant="ghost" size="sm" onClick={onClick} disabled={pending} className="text-destructive hover:text-destructive">
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onClick}
+      disabled={pending}
+      className="text-destructive hover:text-destructive"
+    >
       {pending ? '…' : 'Delete'}
     </Button>
   );

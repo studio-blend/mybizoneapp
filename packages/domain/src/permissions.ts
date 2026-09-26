@@ -121,17 +121,17 @@ export function hasPermission(
   opts?: { storeId?: string; departmentId?: string },
 ): boolean {
   // super_admin always wins
-  if (userRoles.some((r) => r.role === 'super_admin')) return true;
+  if (userRoles.some((r) => r.role === 'super_admin' && !r.storeId && !r.departmentId)) return true;
 
   for (const ur of userRoles) {
     const grants = ROLE_PERMISSIONS[ur.role] ?? [];
     if (!grants.includes(gate)) continue;
 
     // If role is scoped to a store, check storeId matches
-    if (ur.storeId && opts?.storeId && ur.storeId !== opts.storeId) continue;
+    if (ur.storeId && ur.storeId !== opts?.storeId) continue;
 
     // If role is scoped to a dept, check deptId matches
-    if (ur.departmentId && opts?.departmentId && ur.departmentId !== opts.departmentId) continue;
+    if (ur.departmentId && ur.departmentId !== opts?.departmentId) continue;
 
     return true;
   }

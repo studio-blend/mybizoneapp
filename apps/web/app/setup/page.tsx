@@ -1,7 +1,7 @@
-import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { businesses } from '@mybizone/db';
 import { count } from 'drizzle-orm';
+import { redirect } from 'next/navigation';
 import { SetupWizard } from './_components/setup-wizard';
 
 export default async function SetupPage() {

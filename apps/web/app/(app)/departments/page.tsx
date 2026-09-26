@@ -1,17 +1,19 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { departments, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
 import { asc } from 'drizzle-orm';
-import { DepartmentForm } from './_components/department-form';
 import { DeleteDepartmentButton } from './_components/delete-department-button';
+import { DepartmentForm } from './_components/department-form';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DepartmentsPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_departments');
   const data = await withTenant(db, user.businessId, async (tx) => {
     const depts = await tx
       .select({

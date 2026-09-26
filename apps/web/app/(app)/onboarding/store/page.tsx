@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function OnboardingStorePage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_stores');
   const existing = await withTenant(db, user.businessId, (tx) =>
     tx.select({ id: stores.id }).from(stores).limit(1),
   );

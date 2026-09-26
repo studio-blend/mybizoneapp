@@ -61,7 +61,7 @@ describe('hasPermission', () => {
   it('branch_manager with store scope: allows when storeId matches', () => {
     const roles = [{ role: 'branch_manager' as AppRole, storeId: 'store-1', departmentId: null }];
     // No storeId restriction in gate call — passes
-    expect(hasPermission(roles, 'create_sale')).toBe(true);
+    expect(hasPermission(roles, 'create_sale')).toBe(false);
     // Matching storeId — passes
     expect(hasPermission(roles, 'create_sale', { storeId: 'store-1' })).toBe(true);
     // Non-matching storeId — blocked
@@ -70,9 +70,16 @@ describe('hasPermission', () => {
 
   it('floor_manager with department scope: allows when departmentId matches', () => {
     const roles = [{ role: 'floor_manager' as AppRole, storeId: null, departmentId: 'dept-1' }];
-    expect(hasPermission(roles, 'create_sale')).toBe(true);
+    expect(hasPermission(roles, 'create_sale')).toBe(false);
     expect(hasPermission(roles, 'create_sale', { departmentId: 'dept-1' })).toBe(true);
     expect(hasPermission(roles, 'create_sale', { departmentId: 'dept-2' })).toBe(false);
+  });
+
+  it('scoped super admins cannot bypass tenant-wide or mismatched scope checks', () => {
+    const roles = [{ role: 'super_admin' as AppRole, storeId: 'store-1' }];
+    expect(hasPermission(roles, 'manage_rbac')).toBe(false);
+    expect(hasPermission(roles, 'create_sale', { storeId: 'store-2' })).toBe(false);
+    expect(hasPermission(roles, 'create_sale', { storeId: 'store-1' })).toBe(true);
   });
 
   it('shop_manager has broad access but no ownership/rbac/settings', () => {

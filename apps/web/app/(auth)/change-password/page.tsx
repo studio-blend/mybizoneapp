@@ -1,7 +1,14 @@
 'use client';
 
 import { Button } from '@mybizone/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@mybizone/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@mybizone/ui/card';
 import { Input } from '@mybizone/ui/input';
 import { Label } from '@mybizone/ui/label';
 import { useRouter } from 'next/navigation';
@@ -43,7 +50,7 @@ export default function ChangePasswordPage() {
         setError(data.error ?? 'Failed to change password');
         return;
       }
-      router.push('/dashboard');
+      router.push('/login');
       router.refresh();
     } catch {
       setError('Network error. Please try again.');
@@ -56,9 +63,7 @@ export default function ChangePasswordPage() {
     <Card>
       <CardHeader>
         <CardTitle>Change your password</CardTitle>
-        <CardDescription>
-          You must set a new password before continuing.
-        </CardDescription>
+        <CardDescription>You must set a new password before continuing.</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit}>
         <CardContent className="space-y-4">
