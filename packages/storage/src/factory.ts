@@ -1,5 +1,4 @@
 import { LocalFsStorage } from './local-fs';
-import { R2Storage } from './r2';
 import type { Storage } from './types';
 
 export interface StorageEnv {
@@ -22,11 +21,9 @@ export function createStorage(env: StorageEnv): Storage {
     return new LocalFsStorage(dir);
   }
   if (backend === 'r2') {
-    const bucket = env.R2_BUCKET;
-    if (!bucket) {
-      throw new Error('STORAGE_BACKEND=r2 requires R2_BUCKET');
-    }
-    return new R2Storage(bucket);
+    throw new Error(
+      'R2 storage is not implemented. Use STORAGE_BACKEND=local with a persistent volume.',
+    );
   }
   throw new Error(`unknown STORAGE_BACKEND: ${backend}`);
 }

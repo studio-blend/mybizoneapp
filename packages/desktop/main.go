@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/getlantern/systray"
@@ -29,19 +32,23 @@ type Config struct {
 	LicenseKey string `json:"licenseKey"`
 	DataDir    string `json:"dataDir"`
 	AutoStart  bool   `json:"autoStart"`
+	AuthSecret string `json:"authSecret"`
 }
 
 var (
-	appDir     string // directory containing MyBizOne.exe
-	configPath string
-	cfg        Config
-	pgCmd      *exec.Cmd
-	nodeCmd    *exec.Cmd
+	appDir          string // directory containing MyBizOne.exe
+	configPath      string
+	cfg             Config
+	pgCmd           *exec.Cmd
+	nodeCmd         *exec.Cmd
+	maintenanceOnce sync.Once
+	minimized       bool
 )
 
 func main() {
 	// Parse flags
 	showVersion := flag.Bool("version", false, "Print version and exit")
+	flag.BoolVar(&minimized, "minimized", false, "Start in the system tray")
 	flag.Parse()
 
 	if *showVersion {
@@ -56,6 +63,14 @@ func main() {
 
 	// Load or create config
 	loadConfig()
+	if cfg.AuthSecret == "" {
+		secret := make([]byte, 32)
+		if _, err := rand.Read(secret); err != nil {
+			log.Fatal(err)
+		}
+		cfg.AuthSecret = hex.EncodeToString(secret)
+	}
+	saveConfig()
 
 	// Find a free port if default (3000) is taken
 	cfg.Port = findPort(cfg.Port)
@@ -100,47 +115,66 @@ func onExit() {
 func startBackend() {
 	systray.SetTooltip("MyBizOne — Starting Postgres...")
 
-	startPostgres()
-	waitForPostgres()
-	runMigrations()
+	if err := startPostgres(); err != nil {
+		showError(err.Error())
+		return
+	}
+	if err := waitForPostgres(); err != nil {
+		showError(err.Error())
+		return
+	}
+	if err := ensureDatabase(); err != nil {
+		showError(err.Error())
+		return
+	}
+	if err := runMigrations(); err != nil {
+		showError(err.Error())
+		return
+	}
 
 	systray.SetTooltip("MyBizOne — Starting server...")
-	startNode()
-	waitForApp()
+	if err := startNode(); err != nil {
+		showError(err.Error())
+		return
+	}
+	if err := waitForApp(); err != nil {
+		showError(err.Error())
+		return
+	}
 
 	systray.SetTooltip("MyBizOne — Running on :" + fmt.Sprint(cfg.Port))
 
 	// Open browser to setup if not done, else dashboard
-	if !cfg.SetupDone {
-		browser.OpenURL(fmt.Sprintf("http://localhost:%d/setup", cfg.Port))
-	} else {
-		browser.OpenURL(fmt.Sprintf("http://localhost:%d/dashboard", cfg.Port))
+	if !minimized {
+		openBrowser()
 	}
 
 	// Schedule daily backups (1-minute offset to let app stabilize)
-	backup.ScheduleDailyBackup(backup.Config{
-		BackupDir:     getDataDir() + "/backups",
-		PgDumpPath:    getPgDumpPath(),
-		DatabaseURL:   os.Getenv("DATABASE_URL"),
-		RetentionDays: 30,
-	})
+	maintenanceOnce.Do(func() {
+		backup.ScheduleDailyBackup(backup.Config{
+			BackupDir:     getDataDir() + "/backups",
+			PgDumpPath:    getPgDumpPath(),
+			DatabaseURL:   "postgresql://postgres@127.0.0.1:54321/mybizone",
+			RetentionDays: 30,
+		})
 
-	// Check for updates at startup and every 24h
-	go func() {
-		time.Sleep(30 * time.Second) // let app stabilize
-		latest, url, hasUpdate, err := updater.CheckForUpdate(Version)
-		if err == nil && hasUpdate {
-			log.Printf("Update available: %s — %s", latest, url)
-			openBrowserURL(url)
-		}
-		ticker := time.NewTicker(24 * time.Hour)
-		for range ticker.C {
-			latest, url, hasUpdate, err = updater.CheckForUpdate(Version)
+		// Check for updates at startup and every 24h
+		go func() {
+			time.Sleep(30 * time.Second) // let app stabilize
+			latest, url, hasUpdate, err := updater.CheckForUpdate(Version)
 			if err == nil && hasUpdate {
-				log.Printf("Update available: %s", latest)
+				log.Printf("Update available: %s — %s", latest, url)
+				openBrowserURL(url)
 			}
-		}
-	}()
+			ticker := time.NewTicker(24 * time.Hour)
+			for range ticker.C {
+				latest, url, hasUpdate, err = updater.CheckForUpdate(Version)
+				if err == nil && hasUpdate {
+					log.Printf("Update available: %s", latest)
+				}
+			}
+		}()
+	})
 }
 
 func getDataDir() string {
@@ -159,13 +193,12 @@ func dataDir() string {
 	return filepath.Join(appDir, "data")
 }
 
-func startPostgres() {
+func startPostgres() error {
 	pgBin := filepath.Join(appDir, "postgres", "bin")
 	dd := dataDir()
 
 	// Ensure sockets directory exists
 	socketsDir := filepath.Join(dd, "sockets")
-	os.MkdirAll(socketsDir, 0755)
 
 	// Init if first run
 	if _, err := os.Stat(filepath.Join(dd, "PG_VERSION")); os.IsNotExist(err) {
@@ -179,9 +212,11 @@ func startPostgres() {
 		initdb.Stdout = os.Stdout
 		initdb.Stderr = os.Stderr
 		if err := initdb.Run(); err != nil {
-			showError("Failed to initialise database: " + err.Error())
-			return
+			return fmt.Errorf("initialise database: %w", err)
 		}
+	}
+	if err := os.MkdirAll(socketsDir, 0700); err != nil {
+		return err
 	}
 
 	pgCtlPath := filepath.Join(pgBin, pgExe("pg_ctl"))
@@ -189,32 +224,43 @@ func startPostgres() {
 		pgCtlPath,
 		"start",
 		"-D", dd,
-		"-o", fmt.Sprintf(`-p 54321 -k "%s"`, socketsDir),
+		"-o", `-p 54321 -h 127.0.0.1`,
 		"-l", filepath.Join(dd, "postgres.log"),
 	)
-	pgCmd.Run() // pg_ctl start returns immediately
+	return pgCmd.Run()
 }
 
-func waitForPostgres() {
+func waitForPostgres() error {
 	pgBin := filepath.Join(appDir, "postgres", "bin")
 	for i := 0; i < 30; i++ {
 		check := exec.Command(filepath.Join(pgBin, pgExe("pg_isready")), "-p", "54321", "-h", "127.0.0.1")
 		if err := check.Run(); err == nil {
-			return
+			return nil
 		}
 		time.Sleep(1 * time.Second)
 	}
-	showError("Postgres did not start in 30 seconds. Check data/postgres.log.")
+	return fmt.Errorf("Postgres did not start in 30 seconds. Check data/postgres.log")
 }
 
-func runMigrations() {
+func ensureDatabase() error {
+	cmd := exec.Command(filepath.Join(appDir, "postgres", "bin", pgExe("psql")), "-h", "127.0.0.1", "-p", "54321", "-U", "postgres", "-d", "postgres", "-tAc", "SELECT 1 FROM pg_database WHERE datname='mybizone'")
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("check database: %w", err)
+	}
+	if len(out) > 1 {
+		return nil
+	}
+	return exec.Command(filepath.Join(appDir, "postgres", "bin", pgExe("createdb")), "-h", "127.0.0.1", "-p", "54321", "-U", "postgres", "mybizone").Run()
+}
+
+func runMigrations() error {
 	nodeExe := nodeExePath()
-	migrateScript := filepath.Join(appDir, "app", "scripts", "migrate.js")
+	migrateScript := filepath.Join(appDir, "app", "scripts", "migrate.mjs")
 
 	// Only run if the migrate script exists
 	if _, err := os.Stat(migrateScript); os.IsNotExist(err) {
-		fmt.Fprintln(os.Stderr, "WARN: migrate.js not found, skipping migrations")
-		return
+		return fmt.Errorf("required migration script missing: %s", migrateScript)
 	}
 
 	cmd := exec.Command(nodeExe, migrateScript)
@@ -225,26 +271,26 @@ func runMigrations() {
 	cmd.Dir = filepath.Join(appDir, "app")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		showError("Database migration failed: " + err.Error())
-	}
+	return cmd.Run()
 }
 
-func startNode() {
+func startNode() error {
 	nodeExe := nodeExePath()
-	serverJS := filepath.Join(appDir, "app", "server.js")
+	serverJS := filepath.Join(appDir, "app", "apps", "web", "server.js")
 	nodeCmd = exec.Command(nodeExe, serverJS)
 
-	secret := cfg.LicenseKey
-	if secret == "" {
-		secret = "desktop-mode-secret-placeholder-32ch"
-	}
+	secret := cfg.AuthSecret
 
 	nodeCmd.Env = append(os.Environ(),
 		"DATABASE_URL=postgresql://postgres@127.0.0.1:54321/mybizone",
 		fmt.Sprintf("PORT=%d", cfg.Port),
 		"NODE_ENV=production",
 		"LAN_MODE=true",
+		"HOSTNAME=127.0.0.1",
+		"STORAGE_BACKEND=local",
+		fmt.Sprintf("STORAGE_DIR=%s", filepath.Join(appDir, "uploads")),
+		fmt.Sprintf("BACKUP_DIR=%s", filepath.Join(dataDir(), "backups")),
+		fmt.Sprintf("PATH=%s%c%s", filepath.Join(appDir, "postgres", "bin"), os.PathListSeparator, os.Getenv("PATH")),
 		fmt.Sprintf("BETTER_AUTH_URL=http://localhost:%d", cfg.Port),
 		fmt.Sprintf("BETTER_AUTH_SECRET=%s", secret),
 		fmt.Sprintf("APP_DIR=%s", appDir),
@@ -256,26 +302,24 @@ func startNode() {
 	nodeCmd.Dir = filepath.Join(appDir, "app")
 	nodeCmd.Stdout = os.Stdout
 	nodeCmd.Stderr = os.Stderr
-	if err := nodeCmd.Start(); err != nil {
-		showError("Failed to start Node.js server: " + err.Error())
-	}
+	return nodeCmd.Start()
 }
 
-func waitForApp() {
+func waitForApp() error {
 	url := fmt.Sprintf("http://localhost:%d/api/health", cfg.Port)
+	client := &http.Client{Timeout: 2 * time.Second}
 	for i := 0; i < 60; i++ {
-		resp, err := http.Get(url)
+		resp, err := client.Get(url)
 		if err == nil && resp.StatusCode == 200 {
 			resp.Body.Close()
-			return
+			return nil
 		}
 		if resp != nil {
 			resp.Body.Close()
 		}
 		time.Sleep(2 * time.Second)
 	}
-	// App may still be starting — don't block browser open
-	fmt.Fprintln(os.Stderr, "WARN: /api/health did not return 200 within 120s; opening browser anyway")
+	return fmt.Errorf("application health check failed; inspect the server logs")
 }
 
 func stopBackend() {
@@ -330,12 +374,16 @@ func loadConfig() {
 	if err != nil {
 		return // first run, use defaults
 	}
-	json.Unmarshal(data, &cfg)
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		log.Fatal("Invalid config.json: ", err)
+	}
 }
 
 func saveConfig() {
 	data, _ := json.MarshalIndent(cfg, "", "  ")
-	os.WriteFile(configPath, data, 0644)
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
+		log.Fatal("Save config: ", err)
+	}
 }
 
 func findPort(preferred int) int {
@@ -350,6 +398,7 @@ func findPort(preferred int) int {
 }
 
 func showError(msg string) {
+	systray.SetTooltip("MyBizOne — Startup failed")
 	fmt.Fprintln(os.Stderr, "ERROR:", msg)
 }
 

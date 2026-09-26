@@ -1,101 +1,96 @@
-name: Release
+name: Release candidate
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  build-web:
+  cloud-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with: { version: 9 }
-      - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'pnpm' }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @mybizone/web build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: web-standalone
-          path: apps/web/.next/standalone/
+      - name: Validate cloud image build
+        run: docker build --tag mybizone:release-candidate .
 
-  build-launcher:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            binary: mybizonelaunch.exe
-          - os: ubuntu-latest
-            binary: mybizonelaunch-linux
-          - os: macos-latest
-            # macOS: .dmg creation requires macOS runner + create-dmg tool
-            # Apple notarization requires paid Apple Developer account ($99/yr)
-            # Current: ships raw binary; .dmg + notarization in a future release
-            binary: mybizonelaunch-macos
+  windows:
+    runs-on: windows-latest
+    env:
+      DATABASE_URL: postgres://build:build@localhost:5432/build
+      BETTER_AUTH_SECRET: release-build-placeholder-never-a-runtime-secret
+      BETTER_AUTH_URL: http://localhost:3000
+      NODE_ENV: production
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.12.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: pnpm }
       - uses: actions/setup-go@v5
         with: { go-version: '1.22' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - name: Test desktop
+        working-directory: packages/desktop
+        run: go test ./...
+      - name: Build Windows-native web application
+        run: pnpm --filter @mybizone/web build
+      - name: Stage complete application
+        run: node scripts/package-desktop.mjs
       - name: Build launcher
-        run: |
-          cd packages/desktop
-          go build -ldflags="-X main.Version=${{ github.ref_name }}" -o ${{ matrix.binary }} .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: launcher-${{ matrix.os }}
-          path: packages/desktop/${{ matrix.binary }}
-
-  build-installer:
-    needs: [build-web, build-launcher]
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download web standalone
-        uses: actions/download-artifact@v4
-        with: { name: web-standalone, path: apps/web/.next/standalone }
-      - name: Download Windows launcher
-        uses: actions/download-artifact@v4
-        with: { name: launcher-windows-latest, path: packages/desktop/installer }
+        working-directory: packages/desktop
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: go build -ldflags="-X main.Version=$env:RELEASE_VERSION" -o ../../dist/desktop/mybizonelaunch.exe .
+      - name: Bundle verified portable runtimes and seller license
+        env:
+          NODE_RUNTIME_URL: ${{ vars.NODE_RUNTIME_URL }}
+          NODE_RUNTIME_SHA256: ${{ vars.NODE_RUNTIME_SHA256 }}
+          POSTGRES_RUNTIME_URL: ${{ vars.POSTGRES_RUNTIME_URL }}
+          POSTGRES_RUNTIME_SHA256: ${{ vars.POSTGRES_RUNTIME_SHA256 }}
+          SELLER_LICENSE_TEXT: ${{ secrets.SELLER_LICENSE_TEXT }}
+        run: ./scripts/stage-desktop-runtimes.ps1
       - name: Install Inno Setup
-        run: choco install innosetup -y
+        run: choco install innosetup -y --no-progress
       - name: Compile installer
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
-          iscc /DAppVersion=$version packages/desktop/installer/setup.iss
+          $version = $env:RELEASE_VERSION.TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { $version = '0.0.0' }
+          & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' /DAppVersion=$version packages/desktop/installer/setup.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
+          name: windows-installer-candidate
           path: packages/desktop/installer/output/MyBizOne-Setup-*.exe
+          if-no-files-found: error
+      - name: Archive portable distribution
+        run: Compress-Archive -Path dist/desktop/* -DestinationPath dist/MyBizOne-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable-candidate
+          path: dist/MyBizOne-windows.zip
 
-  release:
-    needs: [build-web, build-launcher, build-installer]
+  draft-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [cloud-image, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with: { path: dist/ }
-      - name: Create Windows zip
-        run: |
-          mkdir -p release/windows
-          cp -r dist/web-standalone/* release/windows/
-          cp dist/launcher-windows-latest/mybizonelaunch.exe release/windows/
-          echo "# NOTE: Portable Postgres and Node.js must be bundled separately." > release/windows/README.txt
-          echo "# Download from: https://github.com/YOUR_ORG/mybizonelaunch/releases" >> release/windows/README.txt
-          cd release && zip -r ../MyBizOne-${{ github.ref_name }}-windows.zip windows/
-      - name: Create Release
+      - uses: actions/download-artifact@v4
+        with: { path: release-artifacts }
+      - name: Create draft for signing and acceptance checks
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create ${{ github.ref_name }} \
-            --title "MyBizOne ${{ github.ref_name }}" \
-            --generate-notes \
-            MyBizOne-${{ github.ref_name }}-windows.zip \
-            dist/launcher-ubuntu-latest/mybizonelaunch-linux \
-            dist/launcher-macos-latest/mybizonelaunch-macos \
-            dist/windows-installer/MyBizOne-Setup-*.exe
+          gh release create "$RELEASE_TAG" --draft --title "MyBizOne $RELEASE_TAG candidate" \
+            --notes-file docs/release/CANDIDATE_NOTES.md \
+            release-artifacts/windows-installer-candidate/*.exe \
+            release-artifacts/windows-portable-candidate/*.zip

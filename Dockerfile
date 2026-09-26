@@ -1,5 +1,5 @@
 # Build stage — install + build inside Linux container
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -24,19 +24,14 @@ ENV DATABASE_URL=postgres://build:build@localhost:5432/build \
 # NEXT_PUBLIC_* vars are baked into the JS bundle at build time — pass via build arg.
 ARG NEXT_PUBLIC_SUPPORT_WHATSAPP
 ENV NEXT_PUBLIC_SUPPORT_WHATSAPP=${NEXT_PUBLIC_SUPPORT_WHATSAPP}
+ARG NEXT_PUBLIC_RAZORPAY_KEY_ID
+ENV NEXT_PUBLIC_RAZORPAY_KEY_ID=${NEXT_PUBLIC_RAZORPAY_KEY_ID}
 
-# Build workspace packages first (web depends on them), then the web app
-RUN pnpm --filter @mybizone/domain build && \
-    pnpm --filter @mybizone/config build && \
-    pnpm --filter @mybizone/ui build && \
-    pnpm --filter @mybizone/db build && \
-    pnpm --filter @mybizone/storage build && \
-    pnpm --filter @mybizone/pdf build && \
-    pnpm --filter @mybizone/auth-config build && \
-    pnpm --filter @mybizone/web build
+# Workspace packages export TypeScript sources, compiled by Next.js.
+RUN pnpm --filter @mybizone/web build
 
 # Runtime stage — slim image with built artifacts
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 

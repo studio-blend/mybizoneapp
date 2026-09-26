@@ -7,8 +7,9 @@ pnpm --filter @mybizone/db migrate
 
 if [ "${LAN_MODE}" = "true" ]; then
   echo "[entrypoint] Validating license key..."
-  pnpm tsx scripts/validate-license.ts
+  pnpm --filter @mybizone/db exec tsx ../../scripts/validate-license.ts
 fi
 
 echo "[entrypoint] Starting app..."
+cd /app/apps/web
 exec "$@"

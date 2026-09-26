@@ -3,10 +3,13 @@ package backup
 import (
 	"compress/gzip"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -30,13 +33,21 @@ func RunBackup(cfg Config) (string, error) {
 	if err := os.MkdirAll(cfg.BackupDir, 0755); err != nil {
 		return "", fmt.Errorf("create backup dir: %w", err)
 	}
-	filename := time.Now().Format("2006-01-02_15-04") + ".sql.gz"
-	outPath := filepath.Join(cfg.BackupDir, filename)
-	f, err := os.Create(outPath)
+	if cfg.DatabaseURL == "" {
+		return "", fmt.Errorf("database URL is required")
+	}
+	if cfg.RetentionDays <= 0 {
+		cfg.RetentionDays = 30
+	}
+	f, err := os.CreateTemp(cfg.BackupDir, ".backup-*.partial")
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() {
+		f.Close()
+		os.Remove(f.Name())
+	}()
+	outPath := filepath.Join(cfg.BackupDir, time.Now().Format("2006-01-02_15-04-05.000000000")+".sql.gz")
 	gz := gzip.NewWriter(f)
 	defer gz.Close()
 	cmd := exec.Command(cfg.PgDumpPath, cfg.DatabaseURL)
@@ -45,7 +56,18 @@ func RunBackup(cfg Config) (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("pg_dump failed: %w", err)
 	}
-	gz.Close()
+	if err := gz.Close(); err != nil {
+		return "", err
+	}
+	if err := f.Sync(); err != nil {
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	if err := os.Rename(f.Name(), outPath); err != nil {
+		return "", err
+	}
 	// Cleanup old backups
 	cleanOldBackups(cfg.BackupDir, cfg.RetentionDays)
 	return outPath, nil
@@ -63,7 +85,21 @@ func RestoreBackup(cfg Config, backupPath string) error {
 		return err
 	}
 	defer gz.Close()
-	cmd := exec.Command("psql", cfg.DatabaseURL)
+	// Validate the complete compressed archive before changing the destination DB.
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		return fmt.Errorf("invalid backup: %w", err)
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	if err := gz.Reset(f); err != nil {
+		return err
+	}
+	psql := "psql"
+	if strings.HasSuffix(cfg.PgDumpPath, ".exe") {
+		psql += ".exe"
+	}
+	cmd := exec.Command(filepath.Join(filepath.Dir(cfg.PgDumpPath), psql), "--no-psqlrc", "--set=ON_ERROR_STOP=1", "--single-transaction", cfg.DatabaseURL)
 	cmd.Stdin = gz
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -75,24 +111,39 @@ func ScheduleDailyBackup(cfg Config) {
 	go func() {
 		// Run once at startup (offset 1min to let app start)
 		time.Sleep(1 * time.Minute)
-		RunBackup(cfg) //nolint:errcheck
+		if _, err := RunBackup(cfg); err != nil {
+			log.Printf("Backup failed: %v", err)
+		}
 		ticker := time.NewTicker(24 * time.Hour)
 		for range ticker.C {
-			RunBackup(cfg) //nolint:errcheck
+			if _, err := RunBackup(cfg); err != nil {
+				log.Printf("Backup failed: %v", err)
+			}
 		}
 	}()
 }
 
 // ListBackups returns list of backup files sorted newest first.
 func ListBackups(backupDir string) ([]BackupFile, error) {
-	entries, err := os.ReadDir(backupDir)
+	dirInfo, err := os.Stat(backupDir)
 	if err != nil {
-		return nil, nil // dir doesn't exist yet = no backups
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
 	}
+	if !dirInfo.IsDir() {
+		return nil, fmt.Errorf("backup path is not a directory: %s", backupDir)
+	}
+	entries, err := os.ReadDir(backupDir)
+	if err != nil { return nil, err }
 	var result []BackupFile
 	for _, e := range entries {
-		if !e.IsDir() && filepath.Ext(e.Name()) == ".gz" {
-			info, _ := e.Info()
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql.gz") {
+			info, err := e.Info()
+			if err != nil {
+				return nil, err
+			}
 			result = append(result, BackupFile{Name: e.Name(), Size: info.Size(), ModTime: info.ModTime()})
 		}
 	}
@@ -107,7 +158,7 @@ func cleanOldBackups(dir string, retentionDays int) {
 	}
 	var files []os.DirEntry
 	for _, e := range entries {
-		if !e.IsDir() && filepath.Ext(e.Name()) == ".gz" {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql.gz") {
 			files = append(files, e)
 		}
 	}
@@ -123,4 +174,3 @@ func cleanOldBackups(dir string, retentionDays int) {
 		}
 	}
 }
-

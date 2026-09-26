@@ -1,37 +1,39 @@
+#ifndef AppVersion
+  #error AppVersion is required
+#endif
+
 [Setup]
+AppId={{5FAD072F-50A7-4600-A46F-6A91CC586AC0}
 AppName=MyBizOne
 AppVersion={#AppVersion}
-AppPublisher=MyBizOne Technologies
-AppPublisherURL=https://mybizoneapp.com
-AppSupportURL=https://mybizoneapp.com/support
-DefaultDirName={autopf}\MyBizOne
+DefaultDirName={localappdata}\Programs\MyBizOne
 DefaultGroupName=MyBizOne
 AllowNoIcons=yes
-LicenseFile=..\..\LICENSE
+LicenseFile=..\..\..\dist\desktop\LICENSE.txt
 OutputDir=output
 OutputBaseFilename=MyBizOne-Setup-{#AppVersion}
-SetupIconFile=assets\icon.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+CloseApplications=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "startupicon"; Description: "Start MyBizOne automatically when Windows starts"; GroupDescription: "Startup:"
+Name: "startupicon"; Description: "Start MyBizOne when Windows starts"; GroupDescription: "Startup:"; Flags: unchecked
 
 [Files]
-; Next.js standalone app
-Source: "..\..\..\apps\web\.next\standalone\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Go launcher binary
-Source: "mybizonelaunch.exe"; DestDir: "{app}"; Flags: ignoreversion
-; Portable PostgreSQL (bundled separately — not in this repo)
-Source: "portable-pg\*"; DestDir: "{app}\pgsql"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: DirExists(ExpandConstant('{src}\portable-pg'))
-; Portable Node.js
-Source: "portable-node\*"; DestDir: "{app}\node"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: DirExists(ExpandConstant('{src}\portable-node'))
+; Required bundles: compilation fails if the complete application is absent.
+Source: "..\..\..\dist\desktop\app\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\..\dist\desktop\mybizonelaunch.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\..\dist\desktop\postgres\*"; DestDir: "{app}\postgres"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\..\dist\desktop\node\*"; DestDir: "{app}\node"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\..\dist\desktop\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\MyBizOne"; Filename: "{app}\mybizonelaunch.exe"
@@ -42,11 +44,4 @@ Name: "{userstartup}\MyBizOne"; Filename: "{app}\mybizonelaunch.exe"; Parameters
 [Run]
 Filename: "{app}\mybizonelaunch.exe"; Description: "{cm:LaunchProgram,MyBizOne}"; Flags: nowait postinstall skipifsilent
 
-[UninstallDelete]
-Type: filesandordirs; Name: "{app}\logs"
-
-[Code]
-function InitializeSetup(): Boolean;
-begin
-  Result := True;
-end;
+; Runtime-created config.json, data/, uploads/ and backups survive uninstall.
