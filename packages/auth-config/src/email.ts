@@ -25,7 +25,10 @@ export function createMailer(env: MailerEnv) {
       console.warn('[email:dev]', { to, subject, text });
       return;
     }
-    await resend.emails.send({ from, to, subject, html, text });
+    const { error } = await resend.emails.send({ from, to, subject, html, text });
+    // The SDK resolves API failures instead of rejecting the promise. Do not
+    // expose provider diagnostics (which may contain recipient details).
+    if (error) throw new Error('Email delivery failed. Please try again.');
   };
 }
 
@@ -51,17 +54,17 @@ export function invitationEmailTemplate(
 ) {
   const subject = `You've been invited to join ${businessName} on MyBizOne`;
   const text = [
-    `Hi,`,
-    ``,
+    'Hi,',
+    '',
     `${inviterName} has invited you to join ${businessName} as ${role === 'admin' ? 'an admin' : 'an employee'}.`,
-    ``,
-    `Click the link below to accept (valid for 7 days):`,
+    '',
+    'Click the link below to accept (valid for 7 days):',
     acceptUrl,
-    ``,
+    '',
     `If you weren't expecting this, you can safely ignore it.`,
   ].join('\n');
   const html = [
-    `<p>Hi,</p>`,
+    '<p>Hi,</p>',
     `<p>${escapeHtml(inviterName)} has invited you to join <strong>${escapeHtml(businessName)}</strong> as ${role === 'admin' ? 'an admin' : 'an employee'}.</p>`,
     `<p><a href="${acceptUrl}">Accept invitation</a> (valid for 7 days)</p>`,
     `<p>If you weren't expecting this, you can safely ignore it.</p>`,
@@ -78,25 +81,25 @@ export function employeeWelcomeTemplate(
   const subject = 'Your MyBizOne employee account is ready';
   const text = [
     `Hi ${name},`,
-    ``,
-    `Your employee account has been created. Here are your login details:`,
-    ``,
+    '',
+    'Your employee account has been created. Here are your login details:',
+    '',
     `Employee ID: ${empId}`,
     `Initial Password: ${initialPassword}`,
     `Login URL: ${loginUrl}`,
-    ``,
-    `You will be asked to change your password on first login.`,
-    `Keep these credentials secure.`,
+    '',
+    'You will be asked to change your password on first login.',
+    'Keep these credentials secure.',
   ].join('\n');
   const html = [
     `<p>Hi ${escapeHtml(name)},</p>`,
-    `<p>Your employee account has been created. Here are your login details:</p>`,
+    '<p>Your employee account has been created. Here are your login details:</p>',
     `<table style="border-collapse:collapse">`,
     `<tr><td style="padding:4px 12px 4px 0"><strong>Employee ID</strong></td><td style="font-family:monospace">${escapeHtml(empId)}</td></tr>`,
     `<tr><td style="padding:4px 12px 4px 0"><strong>Initial Password</strong></td><td style="font-family:monospace">${escapeHtml(initialPassword)}</td></tr>`,
-    `</table>`,
+    '</table>',
     `<p><a href="${loginUrl}">Log in to MyBizOne</a></p>`,
-    `<p>You will be asked to change your password on first login. Keep these credentials secure.</p>`,
+    '<p>You will be asked to change your password on first login. Keep these credentials secure.</p>',
   ].join('');
   return { subject, text, html };
 }
