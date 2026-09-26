@@ -31,7 +31,9 @@ export default function GlobalError({
             Ref: {error.digest}
           </p>
         )}
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '1rem' }}>
+        <div
+          style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '1rem' }}
+        >
           <button
             type="button"
             onClick={reset}
@@ -44,7 +46,13 @@ export default function GlobalError({
               href={`https://wa.me/${SUPPORT_WA}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ padding: '0.5rem 1rem', border: '1px solid #e5e7eb', borderRadius: '0.375rem', textDecoration: 'none', color: 'inherit' }}
+              style={{
+                padding: '0.5rem 1rem',
+                border: '1px solid #e5e7eb',
+                borderRadius: '0.375rem',
+                textDecoration: 'none',
+                color: 'inherit',
+              }}
             >
               WhatsApp support
             </a>

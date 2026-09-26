@@ -29,11 +29,7 @@ export default function ErrorBoundary({
         <Button onClick={reset}>Try again</Button>
         {SUPPORT_WA && (
           <Button variant="outline" asChild>
-            <a
-              href={`https://wa.me/${SUPPORT_WA}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href={`https://wa.me/${SUPPORT_WA}`} target="_blank" rel="noopener noreferrer">
               WhatsApp support
             </a>
           </Button>

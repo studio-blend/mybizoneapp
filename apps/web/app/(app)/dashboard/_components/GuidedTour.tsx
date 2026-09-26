@@ -28,9 +28,19 @@ export function GuidedTour({ hasProducts, hasSales, hasInvoices }: Props) {
   }, []);
 
   const steps: Step[] = [
-    { label: 'Add your first product', done: hasProducts, href: '/products/new', cta: 'Add product' },
+    {
+      label: 'Add your first product',
+      done: hasProducts,
+      href: '/products/new',
+      cta: 'Add product',
+    },
     { label: 'Record your first sale', done: hasSales, href: '/sales/new', cta: 'New sale' },
-    { label: 'Generate your first GST invoice', done: hasInvoices, href: '/invoices/new', cta: 'New invoice' },
+    {
+      label: 'Generate your first GST invoice',
+      done: hasInvoices,
+      href: '/invoices/new',
+      cta: 'New invoice',
+    },
   ];
 
   const allDone = steps.every((s) => s.done);
@@ -56,9 +66,7 @@ export function GuidedTour({ hasProducts, hasSales, hasInvoices }: Props) {
             <li key={step.href} className="flex items-center gap-3 text-sm">
               <span
                 className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
-                  step.done
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-muted text-muted-foreground'
+                  step.done ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'
                 }`}
               >
                 {step.done ? '✓' : i + 1}

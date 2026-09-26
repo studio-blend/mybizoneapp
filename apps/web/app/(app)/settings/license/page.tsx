@@ -1,7 +1,8 @@
+import { canManageInstanceBackups } from '@/lib/backup-access';
 import { env } from '@/lib/env';
+import { requireUser } from '@/lib/session';
 import { verifyLicenseKey } from '@mybizone/auth-config/license';
 import { redirect } from 'next/navigation';
-import { requireUser } from '@/lib/session';
 
 export default async function LicensePage() {
   await requireUser();
@@ -9,6 +10,7 @@ export default async function LicensePage() {
   if (!env.LAN_MODE) {
     redirect('/settings/billing');
   }
+  if (!(await canManageInstanceBackups())) redirect('/settings/account');
 
   const token = env.LICENSE_KEY;
   const result = token ? verifyLicenseKey(token) : null;
@@ -27,15 +29,17 @@ export default async function LicensePage() {
       <div className="rounded-lg border p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">License key</h2>
-          <span className={`rounded-full px-3 py-0.5 text-xs font-medium ${result ? statusColor : 'bg-muted text-muted-foreground'}`}>
+          <span
+            className={`rounded-full px-3 py-0.5 text-xs font-medium ${result ? statusColor : 'bg-muted text-muted-foreground'}`}
+          >
             {!result ? 'Not set' : result.valid ? 'Active' : 'Invalid'}
           </span>
         </div>
 
         {!result && (
           <p className="text-sm text-muted-foreground">
-            No LICENSE_KEY set. The app runs in free-tier mode. Contact{' '}
-            <a href="https://mybizone.in" className="underline">mybizone.in</a> to purchase a license.
+            No license has been activated. The app runs on the Free plan. Contact the person who
+            supplied your installation to discuss a license.
           </p>
         )}
 
@@ -55,7 +59,9 @@ export default async function LicensePage() {
               <dt className="text-muted-foreground">Expires</dt>
               <dd className="font-medium">
                 {new Date(result.payload.exp * 1000).toLocaleDateString('en-IN', {
-                  day: 'numeric', month: 'long', year: 'numeric',
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
                 })}
               </dd>
             </div>

@@ -1,106 +1,115 @@
+import { getPublicContact } from '@/lib/public-config';
 import { Button } from '@mybizone/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@mybizone/ui/card';
 import Link from 'next/link';
 
-const FEATURES = [
-  {
-    title: 'POS that fits your shop',
-    body: 'Search-and-add products in one keystroke. Decimal qty for kg + metres. Atomic stock.',
-  },
-  {
-    title: 'GST invoicing built in',
-    body: 'CGST/SGST/IGST split per HSN code. PDF invoices with one click. Skip when not needed.',
-  },
-  {
-    title: 'Inventory you can trust',
-    body: 'Per-store stock, low-stock alerts, full audit log of every price + role change.',
-  },
-];
+export const dynamic = 'force-dynamic';
 
-const PLANS = [
-  {
-    name: 'Self-hosted',
-    price: '₹7,999 / store',
-    sub: 'one-time license + ₹1,999/yr support',
-    bullets: ['Runs on your shop PC', 'Data never leaves your premises', 'Works offline'],
-    cta: 'Talk to us',
-    href: 'https://wa.me/919999999999',
-  },
-  {
-    name: 'Cloud (free)',
-    price: '₹0',
-    sub: 'free during early access',
-    bullets: ['Hosted at mybizone.in', 'Mobile + desktop', 'Email support'],
-    cta: 'Get started',
-    href: '/signup',
-  },
+const features = [
+  [
+    'Billing at the counter',
+    'Create bills, record cash or digital payments, and keep your sales history in one place.',
+  ],
+  [
+    'Stock across your stores',
+    'Manage products, purchases, returns and damaged stock. Check stock levels before your next order.',
+  ],
+  [
+    'Customers and accounts',
+    'Track customer dues, supplier payments and expenses alongside your daily sales.',
+  ],
 ];
 
 export default function LandingPage() {
+  const contact = getPublicContact();
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-16 px-4 py-12">
-      <section className="flex flex-col items-center gap-6 pt-8 text-center">
+    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-14 px-4 py-8 sm:py-12">
+      <header className="flex items-center justify-between gap-4">
+        <span className="text-lg font-semibold">MyBizOne</span>
+        <nav aria-label="Main navigation" className="flex gap-4 text-sm">
+          <Link href="/guide" className="underline underline-offset-4">
+            Getting started
+          </Link>
+          <Link href="/login" className="underline underline-offset-4">
+            Log in
+          </Link>
+        </nav>
+      </header>
+      <section className="space-y-6 py-6 text-center sm:py-12">
+        <p className="text-sm font-medium text-muted-foreground">For Indian retail businesses</p>
         <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">MyBizOne</h1>
-        <p className="max-w-2xl text-lg text-muted-foreground">
-          Inventory + POS + GST invoicing for Indian retail shops. Built for Bharat — works on your
-          phone, hosts on your PC, and doesn't pretend to be from California.
+        <p className="mx-auto max-w-2xl text-xl">Your sales, stock and accounts. Together.</p>
+        <p className="mx-auto max-w-2xl text-muted-foreground">
+          Keep everyday shop work organised, from the first purchase to the last bill of the day.
         </p>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           <Button asChild size="lg">
-            <Link href="/signup">Get started — free</Link>
+            <Link href="/signup">Get started</Link>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link href="/login">Log in</Link>
+            <Link href="/guide">Explore the workflow</Link>
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Questions? WhatsApp{' '}
-          <a className="underline" href="https://wa.me/919999999999">
-            +91 99999 99999
-          </a>
-        </p>
       </section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        {FEATURES.map((f) => (
-          <Card key={f.title}>
+      <section aria-label="Features" className="grid gap-4 md:grid-cols-3">
+        {features.map(([title, body]) => (
+          <Card key={title}>
             <CardHeader>
-              <CardTitle className="text-lg">{f.title}</CardTitle>
+              <CardTitle className="text-lg">{title}</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">{f.body}</CardContent>
+            <CardContent className="text-sm text-muted-foreground">{body}</CardContent>
           </Card>
         ))}
       </section>
-
-      <section className="space-y-4">
-        <h2 className="text-center text-2xl font-semibold">Pick what fits</h2>
+      <section className="space-y-5">
+        <h2 className="text-center text-2xl font-semibold">Choose how your shop runs</h2>
         <div className="grid gap-4 md:grid-cols-2">
-          {PLANS.map((p) => (
-            <Card key={p.name}>
-              <CardHeader>
-                <CardTitle>{p.name}</CardTitle>
-                <CardDescription>
-                  <span className="text-2xl font-bold text-foreground">{p.price}</span>
-                  <span className="ml-2 text-xs">{p.sub}</span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  {p.bullets.map((b) => (
-                    <li key={b}>· {b}</li>
-                  ))}
-                </ul>
-                <Button asChild className="w-full">
-                  <a href={p.href}>{p.cta}</a>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+          <Card>
+            <CardHeader>
+              <CardTitle>Cloud</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <p>Use your browser on a computer or phone. An internet connection is required.</p>
+              <p className="text-muted-foreground">
+                Start with one store, up to 500 products and one user. Paid plans are available when
+                enabled by your provider.
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Windows desktop</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <p>
+                Run the application and database on a shop PC, with access from devices on your
+                local network.
+              </p>
+              <p className="text-muted-foreground">
+                Local billing uses the shop PC. Online payments, email and connected services
+                require internet. Keep a separate backup of your shop data.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </section>
-
-      <footer className="border-t pt-6 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} MyBizOne · Made in India.
+      <footer className="flex flex-wrap items-center justify-between gap-4 border-t pt-6 text-sm text-muted-foreground">
+        <p>© {new Date().getFullYear()} MyBizOne</p>
+        <div className="flex flex-wrap gap-4">
+          <Link href="/guide" className="underline">
+            Help
+          </Link>
+          {contact.email && (
+            <a href={`mailto:${contact.email}`} className="underline">
+              Email support
+            </a>
+          )}
+          {contact.whatsappUrl && (
+            <a href={contact.whatsappUrl} className="underline">
+              WhatsApp support
+            </a>
+          )}
+        </div>
       </footer>
     </main>
   );

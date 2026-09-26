@@ -28,7 +28,7 @@ Indian SMB retail management SaaS — billing, inventory, GST compliance, CRM, a
 ## Local Development
 
 ### Prerequisites
-- Node 20+ (`nvm use` if using `.nvmrc`)
+- Node 22 LTS (`nvm use` if using `.nvmrc`)
 - pnpm 9 (`npm i -g pnpm`)
 - Docker (for local Postgres)
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LogoutButton } from './logout-button';
 
 interface NavGroup {
@@ -81,6 +81,7 @@ const NAV_GROUPS: NavGroup[] = [
 function ChevronIcon({ open }: { open: boolean }) {
   return (
     <svg
+      aria-hidden="true"
       className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`}
       fill="none"
       stroke="currentColor"
@@ -108,6 +109,7 @@ function Dropdown({ group }: { group: NavGroup }) {
   return (
     <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         className={`flex items-center gap-1 rounded px-2 py-1 text-sm hover:bg-muted transition-colors ${isActive ? 'font-semibold' : ''}`}
       >
@@ -147,6 +149,7 @@ function UserMenu({ email }: { email: string }) {
   return (
     <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 rounded px-2 py-1 text-sm hover:bg-muted transition-colors"
         aria-label="User menu"
@@ -223,7 +226,10 @@ export function NavHeader({ email }: NavHeaderProps) {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1 flex-1">
-            <Link href="/dashboard" className="rounded px-2 py-1 text-sm hover:bg-muted transition-colors">
+            <Link
+              href="/dashboard"
+              className="rounded px-2 py-1 text-sm hover:bg-muted transition-colors"
+            >
               Dashboard
             </Link>
             {NAV_GROUPS.map((group) => (
@@ -238,17 +244,40 @@ export function NavHeader({ email }: NavHeaderProps) {
 
           {/* Mobile hamburger */}
           <button
+            type="button"
             className="md:hidden rounded p-1.5 hover:bg-muted"
             onClick={() => setMobileOpen((o) => !o)}
             aria-label="Toggle menu"
           >
             {mobileOpen ? (
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             ) : (
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             )}
           </button>
@@ -271,6 +300,7 @@ export function NavHeader({ email }: NavHeaderProps) {
               return (
                 <div key={group.label}>
                   <button
+                    type="button"
                     onClick={() => toggleMobileGroup(group.label)}
                     className={`w-full flex items-center justify-between rounded px-3 py-2 text-sm hover:bg-muted transition-colors ${isActive ? 'font-semibold' : ''}`}
                   >
@@ -312,7 +342,9 @@ export function NavHeader({ email }: NavHeaderProps) {
                 Help &amp; Support
               </Link>
               <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground truncate max-w-[160px]">{email}</span>
+                <span className="text-xs text-muted-foreground truncate max-w-[160px]">
+                  {email}
+                </span>
                 <LogoutButton />
               </div>
             </div>

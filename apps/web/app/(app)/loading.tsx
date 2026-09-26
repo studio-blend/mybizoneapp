@@ -13,8 +13,8 @@ export default function AppLoading() {
           <div className="h-5 w-32 rounded bg-muted" />
         </div>
         {/* Table rows */}
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-4 border-b px-6 py-4 last:border-0">
+        {['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((rowKey) => (
+          <div key={rowKey} className="flex items-center gap-4 border-b px-6 py-4 last:border-0">
             <div className="h-4 w-40 rounded bg-muted" />
             <div className="h-4 w-24 rounded bg-muted" />
             <div className="h-4 w-32 rounded bg-muted" />
