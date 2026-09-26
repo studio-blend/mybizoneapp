@@ -1,3 +1,7 @@
+import { captureRequestError } from '@sentry/nextjs';
+
+export const onRequestError = captureRequestError;
+
 export async function register() {
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
   if (!dsn) return;

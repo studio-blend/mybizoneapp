@@ -7,6 +7,19 @@ const nextConfig = {
   poweredByHeader: false,
   // standalone bundles server.js + only-used node_modules for portable/Docker deploys
   output: 'standalone',
+  // Keep PDF JSX and its React 18 renderer together in Node, outside RSC's React runtime.
+  serverExternalPackages: ['@mybizone/pdf'],
+  webpack(config, { isServer }) {
+    if (isServer) {
+      // Workspace symlinks resolve outside node_modules, so force the same native
+      // boundary for the invoice entry rather than letting RSC bundle its JSX.
+      config.externals = [
+        { '@mybizone/pdf/invoice': 'import @mybizone/pdf/invoice' },
+        ...(Array.isArray(config.externals) ? config.externals : [config.externals ?? {}]),
+      ];
+    }
+    return config;
+  },
   experimental: {
     serverActions: { bodySizeLimit: '2mb' },
   },
@@ -15,8 +28,10 @@ const nextConfig = {
 
 export default withSentryConfig(nextConfig, {
   silent: !process.env.SENTRY_AUTH_TOKEN,
-  hideSourceMaps: true,
-  dryRun: !process.env.NEXT_PUBLIC_SENTRY_DSN,
+  sourcemaps: {
+    disable: !process.env.NEXT_PUBLIC_SENTRY_DSN || !process.env.SENTRY_AUTH_TOKEN,
+    deleteSourcemapsAfterUpload: true,
+  },
   telemetry: false,
   webpack: { treeshake: { removeDebugLogging: true } },
 });

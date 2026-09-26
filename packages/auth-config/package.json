@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@mybizone/db": "workspace:*",
-    "better-auth": "1.1.1",
+    "better-auth": "1.6.33",
     "resend": "4.0.1"
   },
   "devDependencies": {

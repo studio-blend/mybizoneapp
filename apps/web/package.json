@@ -5,12 +5,12 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
+    "dev": "pnpm --filter @mybizone/pdf build && next dev -p 3000",
+    "build": "pnpm --filter @mybizone/pdf build && next build",
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "pnpm --filter @mybizone/pdf build && vitest run",
+    "test:watch": "pnpm --filter @mybizone/pdf build && vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
@@ -25,9 +25,9 @@
     "@opentelemetry/api": "^1.9.1",
     "@sentry/nextjs": "^10.51.0",
     "bcryptjs": "^3.0.3",
-    "better-auth": "1.1.1",
-    "drizzle-orm": "0.36.4",
-    "next": "14.2.18",
+    "better-auth": "1.6.33",
+    "drizzle-orm": "0.45.2",
+    "next": "15.5.24",
     "posthog-js": "1.181.0",
     "posthog-node": "4.2.1",
     "razorpay": "^2.9.6",
@@ -35,20 +35,20 @@
     "react-dom": "18.3.1",
     "react-hook-form": "7.53.1",
     "recharts": "^3.8.1",
-    "xlsx": "^0.18.5",
-    "zod": "3.23.8"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@mybizone/config": "workspace:*",
-    "@playwright/test": "1.48.2",
+    "@playwright/test": "1.63.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "20.17.6",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "autoprefixer": "10.4.20",
-    "postcss": "8.4.49",
+    "postcss": "8.5.28",
     "tailwindcss": "3.4.14",
     "typescript": "5.6.3",
-    "vitest": "2.1.5"
+    "vitest": "4.1.11"
   }
 }

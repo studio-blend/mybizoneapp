@@ -17,6 +17,6 @@
     "@mybizone/config": "workspace:*",
     "@types/node": "20.17.6",
     "typescript": "5.6.3",
-    "vitest": "2.1.5"
+    "vitest": "4.1.11"
   }
 }

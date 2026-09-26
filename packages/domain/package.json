@@ -9,6 +9,8 @@
     "./money": "./src/money.ts",
     "./catalog": "./src/catalog.ts",
     "./sale": "./src/sale.ts",
+    "./returns": "./src/returns.ts",
+    "./emi": "./src/emi.ts",
     "./gst": "./src/gst.ts",
     "./profit": "./src/profit.ts",
     "./plans": "./src/plans.ts",
@@ -21,6 +23,6 @@
   "devDependencies": {
     "@mybizone/config": "workspace:*",
     "typescript": "5.6.3",
-    "vitest": "2.1.5"
+    "vitest": "4.1.11"
   }
 }

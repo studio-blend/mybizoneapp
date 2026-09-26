@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const schema = z.object({
   DATABASE_URL: z.string().url(),
@@ -13,7 +13,10 @@ const schema = z.object({
   STORAGE_BACKEND: z.enum(['local', 'r2']).default('local'),
   STORAGE_DIR: z.string().optional().default('./storage'),
   R2_BUCKET: z.string().optional().default(''),
-  LAN_MODE: z.enum(['true', 'false']).default('false').transform(v => v === 'true'),
+  LAN_MODE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   NEXT_PUBLIC_SUPPORT_WHATSAPP: z.string().optional().default(''),
   // Google OAuth — optional; social sign-in is disabled when unset.
@@ -29,9 +32,15 @@ const schema = z.object({
   // License key for self-hosted LAN deployments
   LICENSE_KEY: z.string().optional().default(''),
   // Portable desktop mode — set by the Go launcher before starting Next.js
-  PORTABLE_MODE: z.enum(['true', 'false']).default('false').transform(v => v === 'true'),
+  PORTABLE_MODE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   // Whether the one-time setup wizard has been completed (written to config.json by launcher)
-  SETUP_COMPLETE: z.enum(['true', 'false']).default('true').transform(v => v === 'true'),
+  SETUP_COMPLETE: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
   // Port the server is listening on (informational — used by /settings/system)
   PORT: z.string().optional().default('3000'),
   // App version injected at build time by the release CI job

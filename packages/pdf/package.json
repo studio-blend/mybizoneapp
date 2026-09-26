@@ -5,14 +5,22 @@
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./invoice": "./src/invoice.tsx"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./invoice": {
+      "types": "./src/invoice.tsx",
+      "default": "./dist/invoice.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm build && node --test tests/invoice.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@react-pdf/renderer": "4.0.0",
+    "@react-pdf/renderer": "4.9.0",
     "react": "18.3.1"
   },
   "devDependencies": {
