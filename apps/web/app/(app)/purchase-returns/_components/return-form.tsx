@@ -15,7 +15,7 @@ import { Select } from '@mybizone/ui/select';
 import { Textarea } from '@mybizone/ui/textarea';
 import { useToast } from '@mybizone/ui/use-toast';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPurchaseReturnAction } from '../actions';
 
 interface Props {
@@ -33,6 +33,7 @@ interface Props {
 }
 
 interface ItemRow {
+  rowKey: number;
   productId: string;
   qty: string;
 }
@@ -49,30 +50,21 @@ export function PurchaseReturnForm({ products, suppliers }: Props) {
   const [supplierName, setSupplierName] = useState('');
   const [reason, setReason] = useState('');
 
-  const [items, setItems] = useState<ItemRow[]>([{ productId: '', qty: '' }]);
+  const nextRowKey = useRef(1);
+  const [items, setItems] = useState<ItemRow[]>([{ productId: '', qty: '', rowKey: 0 }]);
 
   function addItemRow() {
-    setItems((prev) => [...prev, { productId: '', qty: '' }]);
+    const rowKey = nextRowKey.current++;
+    setItems((prev) => [...prev, { productId: '', qty: '', rowKey }]);
   }
 
   function removeItemRow(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function updateItem(index: number, field: keyof ItemRow, value: string) {
-    setItems((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
-    );
+  function updateItem(index: number, field: 'productId' | 'qty', value: string) {
+    setItems((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   }
-
-  // Compute running total from selected products + qty
-  const runningTotal = items.reduce((acc, row) => {
-    const p = products.find((pr) => pr.id === row.productId);
-    if (!p || !row.qty) return acc;
-    const qty = parseFloat(row.qty);
-    if (Number.isNaN(qty)) return acc;
-    return acc + qty * parseFloat(p.price);
-  }, 0);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -87,6 +79,7 @@ export function PurchaseReturnForm({ products, suppliers }: Props) {
     setPending(true);
 
     const result = await createPurchaseReturnAction({
+      originalBillNo,
       supplierId: supplierId || undefined,
       supplierName: supplierName || undefined,
       reason: reason || undefined,
@@ -115,14 +108,15 @@ export function PurchaseReturnForm({ products, suppliers }: Props) {
         <CardHeader>
           <CardTitle>Return details</CardTitle>
           <CardDescription>
-            Optionally link to the original purchase bill and select the supplier.
+            Link to the original purchase bill and select the supplier.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="originalBillNo">Original purchase bill number (optional)</Label>
+            <Label htmlFor="originalBillNo">Original purchase bill number</Label>
             <Input
               id="originalBillNo"
+              required
               name="originalBillNo"
               maxLength={40}
               placeholder="PUR-2526-0001"
@@ -193,7 +187,7 @@ export function PurchaseReturnForm({ products, suppliers }: Props) {
         </CardHeader>
         <CardContent className="space-y-4">
           {items.map((row, idx) => (
-            <div key={idx} className="flex gap-2 items-end">
+            <div key={row.rowKey} className="flex gap-2 items-end">
               <div className="flex-1 space-y-1">
                 <Label htmlFor={`product-${idx}`}>Product</Label>
                 <Select
@@ -240,11 +234,9 @@ export function PurchaseReturnForm({ products, suppliers }: Props) {
             + Add item
           </Button>
 
-          {runningTotal > 0 && (
-            <p className="text-sm font-medium text-right">
-              Total: ₹{runningTotal.toFixed(2)}
-            </p>
-          )}
+          <p className="text-sm text-muted-foreground">
+            The refund uses prices and tax from the original bill.
+          </p>
         </CardContent>
 
         {error && (

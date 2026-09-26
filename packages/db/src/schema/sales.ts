@@ -1,4 +1,17 @@
-import { boolean, date, index, jsonb, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import {
+  boolean,
+  check,
+  date,
+  index,
+  jsonb,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { user } from './auth';
 import { businesses } from './businesses';
 import { customers } from './customers';
@@ -28,6 +41,13 @@ export const sales = pgTable(
     subtotal: numeric('subtotal', { precision: 12, scale: 2 }).notNull(),
     discount: numeric('discount', { precision: 12, scale: 2 }).notNull().default('0'),
     taxTotal: numeric('tax_total', { precision: 12, scale: 2 }).notNull().default('0'),
+    // Frozen at sale creation. Null identifies legacy records needing reconciliation.
+    gstEnabledAtSale: boolean('gst_enabled_at_sale'),
+    businessGstinAtSale: text('business_gstin_at_sale'),
+    isInterstate: boolean('is_interstate'),
+    cgst: numeric('cgst', { precision: 12, scale: 2 }),
+    sgst: numeric('sgst', { precision: 12, scale: 2 }),
+    igst: numeric('igst', { precision: 12, scale: 2 }),
     total: numeric('total', { precision: 12, scale: 2 }).notNull(),
     paymentMethod: text('payment_method').notNull(), // 'cash' | 'upi' | 'card_debit' | 'card_credit' | 'finance_emi' | 'cheque' | 'credit' | 'other'
     // M8: structured payment breakdown — UPI ref, last4 + bank, EMI details, cheque no., etc.
@@ -48,6 +68,15 @@ export const sales = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    taxSnapshotConsistent: check(
+      'sales_tax_snapshot_consistent',
+      sql`
+      (${t.cgst} IS NULL AND ${t.sgst} IS NULL AND ${t.igst} IS NULL)
+      OR (${t.cgst} IS NOT NULL AND ${t.sgst} IS NOT NULL AND ${t.igst} IS NOT NULL
+        AND ${t.cgst} >= 0 AND ${t.sgst} >= 0 AND ${t.igst} >= 0
+        AND ${t.cgst} + ${t.sgst} + ${t.igst} = ${t.taxTotal})
+    `,
+    ),
     businessCreatedIdx: index('sales_business_created_at_idx').on(t.businessId, t.createdAt),
     storeCreatedIdx: index('sales_store_created_at_idx').on(t.storeId, t.createdAt),
     employeeIdx: index('sales_employee_id_idx').on(t.employeeId),

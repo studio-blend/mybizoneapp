@@ -1,7 +1,10 @@
 import { db } from '@/lib/db';
+import { getUserRoles } from '@/lib/get-user-roles';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
+import { hasPermission } from '@mybizone/domain';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Input } from '@mybizone/ui/input';
@@ -14,14 +17,28 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { storeId?: string; from?: string; to?: string };
+  searchParams: Promise<{ storeId?: string; from?: string; to?: string }>;
 }
 
-export default async function SalesPage({ searchParams }: PageProps) {
+export default async function SalesPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
+  const roles = await getUserRoles(user);
+  const defaultStoreId = hasPermission(roles, 'view_sales')
+    ? null
+    : (roles.find(
+        (role) => role.storeId && hasPermission([role], 'view_sales', { storeId: role.storeId }),
+      )?.storeId ?? null);
   const filterStoreId =
-    searchParams.storeId && searchParams.storeId.length === 36 ? searchParams.storeId : null;
+    searchParams.storeId && searchParams.storeId.length === 36
+      ? searchParams.storeId
+      : defaultStoreId;
+  await requirePermission(
+    user,
+    'view_sales',
+    filterStoreId ? { storeId: filterStoreId } : undefined,
+  );
   const fromDate = parseDate(searchParams.from);
   const toDate = parseDate(searchParams.to);
 
@@ -50,7 +67,10 @@ export default async function SalesPage({ searchParams }: PageProps) {
       .where(and(...conditions))
       .orderBy(desc(sales.createdAt))
       .limit(100);
-    return { stores: sts, rows };
+    return {
+      stores: sts.filter((store) => hasPermission(roles, 'view_sales', { storeId: store.id })),
+      rows,
+    };
   });
 
   const exportQs = new URLSearchParams();

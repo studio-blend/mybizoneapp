@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { customers, emiPayments, emiSchedules, sales } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -11,8 +12,10 @@ import { RecordPaymentForm } from './_components/record-payment-form';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EmiDetailPage({ params }: { params: { id: string } }) {
+export default async function EmiDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
+  await requirePermission(user, 'view_sales');
   const data = await withTenant(db, user.businessId, async (tx) => {
     const [schedule] = await tx
       .select({
@@ -33,9 +36,7 @@ export default async function EmiDetailPage({ params }: { params: { id: string }
       .from(emiSchedules)
       .leftJoin(customers, eq(customers.id, emiSchedules.customerId))
       .leftJoin(sales, eq(sales.id, emiSchedules.saleId))
-      .where(
-        and(eq(emiSchedules.id, params.id), eq(emiSchedules.businessId, user.businessId)),
-      );
+      .where(and(eq(emiSchedules.id, params.id), eq(emiSchedules.businessId, user.businessId)));
     if (!schedule) return null;
 
     const payments = await tx

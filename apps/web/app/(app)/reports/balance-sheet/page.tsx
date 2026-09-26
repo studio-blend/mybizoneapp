@@ -1,6 +1,16 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
-import { customers, expenseEntries, openingBalances, products, saleItems, sales, salesReturns, suppliers } from '@mybizone/db';
+import {
+  customers,
+  expenseEntries,
+  openingBalances,
+  products,
+  saleItems,
+  sales,
+  salesReturns,
+  suppliers,
+} from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { round2 } from '@mybizone/domain/money';
 import { Button } from '@mybizone/ui/button';
@@ -11,7 +21,7 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { asOf?: string };
+  searchParams: Promise<{ asOf?: string }>;
 }
 
 function todayStr(): string {
@@ -23,17 +33,26 @@ function fmt(n: number): string {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function SectionRow({ label, amount, indent = false, bold = false }: { label: string; amount: number; indent?: boolean; bold?: boolean }) {
+function SectionRow({
+  label,
+  amount,
+  indent = false,
+  bold = false,
+}: { label: string; amount: number; indent?: boolean; bold?: boolean }) {
   return (
-    <div className={`flex justify-between py-2 ${indent ? 'pl-6' : ''} ${bold ? 'font-semibold' : ''} border-b last:border-0`}>
+    <div
+      className={`flex justify-between py-2 ${indent ? 'pl-6' : ''} ${bold ? 'font-semibold' : ''} border-b last:border-0`}
+    >
       <span className="text-sm">{label}</span>
       <span className="text-sm tabular-nums">₹{fmt(amount)}</span>
     </div>
   );
 }
 
-export default async function BalanceSheetPage({ searchParams }: PageProps) {
+export default async function BalanceSheetPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
   const asOfStr = searchParams.asOf ?? todayStr();
   const asOfDate = new Date(`${asOfStr}T23:59:59`);
 
@@ -41,7 +60,10 @@ export default async function BalanceSheetPage({ searchParams }: PageProps) {
     // Stock value: products inventory × cost_price
     const stockRows = await tx
       .select({
-        stockValue: sql<string>`sum(${products.inventory}::numeric * coalesce(${products.costPrice}::numeric, ${products.price}::numeric))`.as('stock_value'),
+        stockValue:
+          sql<string>`sum(${products.inventory}::numeric * coalesce(${products.costPrice}::numeric, ${products.price}::numeric))`.as(
+            'stock_value',
+          ),
       })
       .from(products)
       .where(eq(products.businessId, user.businessId));
@@ -97,7 +119,9 @@ export default async function BalanceSheetPage({ searchParams }: PageProps) {
 
     const cogsRows = await tx
       .select({
-        cogs: sql<string>`sum(${saleItems.qty}::numeric * coalesce(${saleItems.costPriceAtSale}::numeric, 0))`.as('cogs'),
+        cogs: sql<string>`sum(${saleItems.qty}::numeric * coalesce(${saleItems.costPriceAtSale}::numeric, 0))`.as(
+          'cogs',
+        ),
       })
       .from(saleItems)
       .innerJoin(sales, eq(sales.id, saleItems.saleId))
@@ -123,9 +147,20 @@ export default async function BalanceSheetPage({ searchParams }: PageProps) {
       );
 
     const expensesRows = await tx
-      .select({ total: sql<string>`sum(case when ${expenseEntries.type}='expense' then ${expenseEntries.amount}::numeric else -${expenseEntries.amount}::numeric end)`.as('total') })
+      .select({
+        total:
+          sql<string>`sum(case when ${expenseEntries.type}='expense' then ${expenseEntries.amount}::numeric else -${expenseEntries.amount}::numeric end)`.as(
+            'total',
+          ),
+      })
       .from(expenseEntries)
-      .where(and(eq(expenseEntries.businessId, user.businessId), gte(expenseEntries.entryDate, new Date('2000-01-01')), lt(expenseEntries.entryDate, asOfDate)));
+      .where(
+        and(
+          eq(expenseEntries.businessId, user.businessId),
+          gte(expenseEntries.entryDate, new Date('2000-01-01')),
+          lt(expenseEntries.entryDate, asOfDate),
+        ),
+      );
 
     return {
       stockValue: Number(stockRows[0]?.stockValue ?? 0),
@@ -155,7 +190,9 @@ export default async function BalanceSheetPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-semibold">Simplified Balance Sheet</h1>
           <p className="text-sm text-muted-foreground">As of {asOfStr}</p>
-          <p className="text-xs text-muted-foreground mt-1">Management view — not an audited financial statement</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Management view — not an audited financial statement
+          </p>
         </div>
         <Button asChild variant="outline">
           <Link href="/reports">Back to Reports</Link>
@@ -165,7 +202,9 @@ export default async function BalanceSheetPage({ searchParams }: PageProps) {
       {/* Date selector */}
       <form method="GET" className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
-          <label htmlFor="asOf" className="text-xs font-medium text-muted-foreground">As of Date</label>
+          <label htmlFor="asOf" className="text-xs font-medium text-muted-foreground">
+            As of Date
+          </label>
           <input
             id="asOf"
             type="date"
@@ -174,16 +213,24 @@ export default async function BalanceSheetPage({ searchParams }: PageProps) {
             className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
-        <Button type="submit" variant="outline">Apply</Button>
+        <Button type="submit" variant="outline">
+          Apply
+        </Button>
       </form>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Assets */}
         <Card>
-          <CardHeader><CardTitle>Assets</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Assets</CardTitle>
+          </CardHeader>
           <CardContent>
             <SectionRow label="Stock Value (Inventory)" amount={data.stockValue} />
-            <SectionRow label="Trade Receivables (Customers)" amount={data.tradeReceivables} indent />
+            <SectionRow
+              label="Trade Receivables (Customers)"
+              amount={data.tradeReceivables}
+              indent
+            />
             <SectionRow label="Opening Bal. (Customers)" amount={data.obCustomer} indent />
             <SectionRow label="Total Assets" amount={totalAssets} bold />
           </CardContent>
@@ -192,7 +239,9 @@ export default async function BalanceSheetPage({ searchParams }: PageProps) {
         {/* Liabilities + Equity */}
         <div className="space-y-4">
           <Card>
-            <CardHeader><CardTitle>Liabilities</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Liabilities</CardTitle>
+            </CardHeader>
             <CardContent>
               <SectionRow label="Trade Payables (Suppliers)" amount={data.tradePayables} />
               <SectionRow label="Opening Bal. (Suppliers)" amount={data.obSupplier} indent />
@@ -201,7 +250,9 @@ export default async function BalanceSheetPage({ searchParams }: PageProps) {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Equity</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Equity</CardTitle>
+            </CardHeader>
             <CardContent>
               <SectionRow label="Retained Earnings" amount={retainedEarnings} />
               <SectionRow label="Total Equity" amount={totalEquity} bold />
@@ -211,7 +262,13 @@ export default async function BalanceSheetPage({ searchParams }: PageProps) {
       </div>
 
       {/* Balance check */}
-      <Card className={Math.abs(totalAssets - liabilitiesPlusEquity) < 0.01 ? 'border-green-200' : 'border-yellow-200'}>
+      <Card
+        className={
+          Math.abs(totalAssets - liabilitiesPlusEquity) < 0.01
+            ? 'border-green-200'
+            : 'border-yellow-200'
+        }
+      >
         <CardContent className="pt-6">
           <div className="flex justify-between items-center">
             <span className="text-sm font-semibold">Total Assets</span>
@@ -219,11 +276,15 @@ export default async function BalanceSheetPage({ searchParams }: PageProps) {
           </div>
           <div className="flex justify-between items-center mt-1">
             <span className="text-sm font-semibold">Liabilities + Equity</span>
-            <span className="text-sm tabular-nums font-semibold">₹{fmt(liabilitiesPlusEquity)}</span>
+            <span className="text-sm tabular-nums font-semibold">
+              ₹{fmt(liabilitiesPlusEquity)}
+            </span>
           </div>
           {Math.abs(totalAssets - liabilitiesPlusEquity) >= 0.01 && (
             <p className="text-xs text-yellow-700 mt-2">
-              Note: Balance sheet does not balance by ₹{fmt(Math.abs(totalAssets - liabilitiesPlusEquity))} — some transactions may use cash/bank accounts not tracked here.
+              Note: Balance sheet does not balance by ₹
+              {fmt(Math.abs(totalAssets - liabilitiesPlusEquity))} — some transactions may use
+              cash/bank accounts not tracked here.
             </p>
           )}
         </CardContent>

@@ -1,5 +1,7 @@
 'use client';
 
+import { UpgradeAlert } from '@/components/upgrade-alert';
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 import {
   UNIT_SYMBOLS_BY_TYPE,
   UNIT_TYPES,
@@ -20,9 +22,8 @@ import { Label } from '@mybizone/ui/label';
 import { Select } from '@mybizone/ui/select';
 import { Textarea } from '@mybizone/ui/textarea';
 import { useToast } from '@mybizone/ui/use-toast';
-import { type FormEvent, useMemo, useState, useCallback } from 'react';
-import { UpgradeAlert } from '@/components/upgrade-alert';
-import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
+import { useRouter } from 'next/navigation';
+import { type FormEvent, useCallback, useMemo, useState } from 'react';
 import { createProductAction, updateProductAction, uploadProductImageAction } from '../actions';
 
 interface Option {
@@ -75,7 +76,7 @@ interface Props {
 
 type FieldErrors = Partial<Record<string, string>>;
 
-const DECIMAL_RE = /^\d+(\.\d+)?$/;
+const _DECIMAL_RE = /^\d+(\.\d+)?$/;
 const PRICE_RE = /^\d{1,8}(\.\d{1,2})?$/;
 const INVENTORY_RE = /^\d{1,9}(\.\d{1,3})?$/;
 
@@ -88,7 +89,7 @@ function validateDecimalField(value: string, label: string, re: RegExp): string 
 
 function validateForm(
   fd: FormData,
-  effectiveCategoryId: string,
+  _effectiveCategoryId: string,
   unitType: string,
   unitSymbol: string,
 ): FieldErrors {
@@ -149,6 +150,7 @@ function deriveSelected(categories: CategoryNode[], categoryId: string | null) {
 }
 
 export function ProductForm({ mode, stores, categories, brands, initial, gstEnabled }: Props) {
+  const router = useRouter();
   const { toast } = useToast();
   const [pending, setPending] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -190,6 +192,9 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
     e.preventDefault();
     setServerError(null);
     const fd = new FormData(e.currentTarget);
+    // React clears currentTarget after the handler yields; capture the file now.
+    const image = fd.get('image');
+    const fileToUpload = image instanceof File && image.size > 0 ? image : null;
     const errors = validateForm(fd, effectiveCategoryId, unitType, symbolOptions[0] ?? '');
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -226,7 +231,7 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
       rate4: fd.get('rate4') ?? '',
       minStock: fd.get('minStock') ?? '',
       inventory: fd.get('inventory'),
-      hsnCode: fd.get('hsnCode'),
+      hsnCode: fd.get('hsnCode') ?? '',
       gstRate: fd.get('gstRate') ?? '',
       specs: JSON.stringify(specsPayload),
     };
@@ -241,10 +246,6 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
       setServerError(saveResult.error);
       return;
     }
-
-    const fileInput = e.currentTarget.elements.namedItem('image');
-    const fileToUpload =
-      fileInput instanceof HTMLInputElement && fileInput.files?.[0] ? fileInput.files[0] : null;
 
     if (fileToUpload) {
       const upFd = new FormData();
@@ -264,7 +265,8 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
       title: mode === 'create' ? 'Product created' : 'Product updated',
       description: saveResult.data.name,
     });
-    safeNavigate('/products');
+    // The save succeeded. The pending callback still holds the old dirty state.
+    router.push('/products');
   }
 
   const title = mode === 'create' ? 'New product' : 'Edit product';
@@ -280,7 +282,6 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
       </CardHeader>
       <form onSubmit={onSubmit} encType="multipart/form-data" onChange={markDirty}>
         <CardContent className="space-y-6">
-
           {/* Basic info */}
           <div className="rounded-md border p-4 space-y-4">
             <p className="text-sm font-medium">Basic Info</p>
@@ -304,11 +305,21 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="barcode">Barcode (optional)</Label>
-                <Input id="barcode" name="barcode" maxLength={60} defaultValue={initial?.barcode ?? ''} />
+                <Input
+                  id="barcode"
+                  name="barcode"
+                  maxLength={60}
+                  defaultValue={initial?.barcode ?? ''}
+                />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="description">Description (optional)</Label>
-                <Textarea id="description" name="description" maxLength={2000} defaultValue={initial?.description ?? ''} />
+                <Textarea
+                  id="description"
+                  name="description"
+                  maxLength={2000}
+                  defaultValue={initial?.description ?? ''}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="storeId">
@@ -320,9 +331,13 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                   defaultValue={initial?.storeId ?? ''}
                   aria-invalid={!!fieldErrors.storeId}
                 >
-                  <option value="" disabled>Select a store…</option>
+                  <option value="" disabled>
+                    Select a store…
+                  </option>
                   {stores.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
                   ))}
                 </Select>
                 <FieldError msg={fieldErrors.storeId} />
@@ -332,7 +347,9 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                 <Select id="brandId" name="brandId" defaultValue={initial?.brandId ?? ''}>
                   <option value="">— none —</option>
                   {brands.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
                   ))}
                 </Select>
               </div>
@@ -356,7 +373,9 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                 >
                   <option value="">— none —</option>
                   {topLevelCats.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
                   ))}
                 </Select>
               </div>
@@ -375,11 +394,15 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                   >
                     <option value="">— select sub-category —</option>
                     {subCategories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
                     ))}
                   </Select>
                   {hasSubcategories && !selectedSubId && (
-                    <p className="text-xs text-amber-600">Select a sub-category to assign this product correctly.</p>
+                    <p className="text-xs text-amber-600">
+                      Select a sub-category to assign this product correctly.
+                    </p>
                   )}
                 </div>
               )}
@@ -396,7 +419,9 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                       <Label>
                         {attr.name}
                         {attr.unit && (
-                          <span className="ml-1 text-muted-foreground font-normal">({attr.unit})</span>
+                          <span className="ml-1 text-muted-foreground font-normal">
+                            ({attr.unit})
+                          </span>
                         )}
                       </Label>
                       <Input
@@ -434,7 +459,9 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                   aria-invalid={!!fieldErrors.unitType}
                 >
                   {UNIT_TYPES.map((t) => (
-                    <option key={t} value={t}>{t}</option>
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
                   ))}
                 </Select>
                 <FieldError msg={fieldErrors.unitType} />
@@ -451,7 +478,9 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                   aria-invalid={!!fieldErrors.unitSymbol}
                 >
                   {symbolOptions.map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
                   ))}
                 </Select>
                 <FieldError msg={fieldErrors.unitSymbol} />
@@ -497,14 +526,16 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                   Pricing tiers (optional) — leave blank to use the main Price above.
                 </p>
               </div>
-              {([
-                ['mrp', 'MRP ₹', '120.00'],
-                ['wholesalePrice', 'Wholesale ₹', '80.00'],
-                ['rate1', 'Rate 1 ₹', ''],
-                ['rate2', 'Rate 2 ₹', ''],
-                ['rate3', 'Rate 3 ₹', ''],
-                ['rate4', 'Rate 4 ₹', ''],
-              ] as const).map(([key, label, ph]) => (
+              {(
+                [
+                  ['mrp', 'MRP ₹', '120.00'],
+                  ['wholesalePrice', 'Wholesale ₹', '80.00'],
+                  ['rate1', 'Rate 1 ₹', ''],
+                  ['rate2', 'Rate 2 ₹', ''],
+                  ['rate3', 'Rate 3 ₹', ''],
+                  ['rate4', 'Rate 4 ₹', ''],
+                ] as const
+              ).map(([key, label, ph]) => (
                 <div key={key} className="space-y-1.5">
                   <Label htmlFor={key}>{label}</Label>
                   <Input
@@ -513,7 +544,9 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                     type="text"
                     inputMode="decimal"
                     placeholder={ph}
-                    defaultValue={(initial as Record<string, string | null> | undefined)?.[key] ?? ''}
+                    defaultValue={
+                      (initial as Record<string, string | null> | undefined)?.[key] ?? ''
+                    }
                     aria-invalid={!!fieldErrors[key]}
                   />
                   <FieldError msg={fieldErrors[key]} />
@@ -565,7 +598,12 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="hsnCode">HSN code (optional)</Label>
-                  <Input id="hsnCode" name="hsnCode" maxLength={20} defaultValue={initial?.hsnCode ?? ''} />
+                  <Input
+                    id="hsnCode"
+                    name="hsnCode"
+                    maxLength={20}
+                    defaultValue={initial?.hsnCode ?? ''}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="gstRate">GST rate %</Label>

@@ -1,103 +1,44 @@
 import { db } from '@/lib/db';
+import { getClosingStock, validStockDate } from '@/lib/reports/closing-stock';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { withTenant } from '@mybizone/db/tenant';
 import { round2 } from '@mybizone/domain/money';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
-import { sql } from 'drizzle-orm';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { asOfDate?: string; category?: string };
+  searchParams: Promise<{ asOfDate?: string; category?: string }>;
 }
 
 function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
 function fmt(n: number): string {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-interface StockRow {
-  id: string;
-  name: string;
-  sku: string | null;
-  unit_symbol: string;
-  category_name: string | null;
-  cost_price: string | null;
-  closing_qty: string;
-}
-
-export default async function ClosingStockPage({ searchParams }: PageProps) {
+export default async function ClosingStockPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
-  const asOfDate = searchParams.asOfDate ?? todayStr();
+  await requirePermission(user, 'view_reports');
+  const suppliedDate = searchParams.asOfDate ?? '';
+  const invalidDate = !!suppliedDate && !validStockDate(suppliedDate);
+  const asOfDate = suppliedDate && !invalidDate ? suppliedDate : todayStr();
   const categoryFilter = searchParams.category ?? '';
 
-  const rows = await withTenant(db, user.businessId, async (tx) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result: any = await tx.execute(sql`
-      SELECT
-        p.id,
-        p.name,
-        p.sku,
-        p.unit_symbol,
-        c.name AS category_name,
-        p.cost_price,
-        COALESCE(pi_sum.qty, 0)
-          - COALESCE(si_sum.qty, 0)
-          + COALESCE(pri_sum.qty, 0)
-          - COALESCE(dl_sum.qty, 0)
-          AS closing_qty
-      FROM products p
-      LEFT JOIN categories c ON c.id = p.category_id
-      LEFT JOIN (
-        SELECT pi.product_id, SUM(pi.qty::numeric) AS qty
-        FROM purchase_items pi
-        JOIN purchases pu ON pi.purchase_id = pu.id
-        WHERE pu.purchase_date::date <= ${asOfDate}::date
-        GROUP BY pi.product_id
-      ) pi_sum ON pi_sum.product_id = p.id
-      LEFT JOIN (
-        SELECT si.product_id, SUM(si.qty::numeric) AS qty
-        FROM sale_items si
-        JOIN sales s ON si.sale_id = s.id
-        WHERE s.created_at::date <= ${asOfDate}::date
-          AND s.bill_type != 'estimate'
-          AND s.status = 'completed'
-        GROUP BY si.product_id
-      ) si_sum ON si_sum.product_id = p.id
-      LEFT JOIN (
-        SELECT pri.product_id, SUM(pri.qty::numeric) AS qty
-        FROM purchase_return_items pri
-        JOIN purchase_returns pr ON pri.return_id = pr.id
-        WHERE pr.created_at::date <= ${asOfDate}::date
-          AND pr.status = 'completed'
-        GROUP BY pri.product_id
-      ) pri_sum ON pri_sum.product_id = p.id
-      LEFT JOIN (
-        SELECT dl.product_id, SUM(dl.qty::numeric) AS qty
-        FROM damage_logs dl
-        WHERE dl.logged_at::date <= ${asOfDate}::date
-        GROUP BY dl.product_id
-      ) dl_sum ON dl_sum.product_id = p.id
-      WHERE p.business_id = current_setting('app.business_id')::uuid
-        AND p.active = true
-      ORDER BY p.name
-    `);
-    // drizzle node-postgres execute returns QueryResult which has .rows
-    return (result?.rows ?? result) as StockRow[];
-  });
+  const rows = await withTenant(db, user.businessId, (tx) => getClosingStock(tx, asOfDate));
 
-  const allCategories = [...new Set(rows.map((r) => r.category_name).filter(Boolean))].sort() as string[];
+  const allCategories = [
+    ...new Set(rows.map((r) => r.category_name).filter(Boolean)),
+  ].sort() as string[];
 
-  const filtered = categoryFilter
-    ? rows.filter((r) => r.category_name === categoryFilter)
-    : rows;
+  const filtered = categoryFilter ? rows.filter((r) => r.category_name === categoryFilter) : rows;
 
   let totalStockValue = 0;
   const enriched = filtered.map((r) => {
@@ -113,13 +54,30 @@ export default async function ClosingStockPage({ searchParams }: PageProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Closing Stock Report</h1>
-          <p className="text-sm text-muted-foreground">Stock position as of {asOfDate}</p>
+          <p className="text-sm text-muted-foreground">
+            Stock position at the end of {asOfDate} (India time)
+          </p>
         </div>
         <Button asChild variant="outline">
           <Link href="/reports">Back to Reports</Link>
         </Button>
       </div>
 
+      <p className="text-sm text-muted-foreground">
+        Valued at current cost prices. Historical quantities include recorded stock movements and
+        stock adjustments.
+      </p>
+      {invalidDate && (
+        <p role="alert" className="text-sm text-red-600">
+          Invalid date. Showing today&apos;s stock.
+        </p>
+      )}
+      {rows.some((row) => row.incomplete_adjustments > 0) && (
+        <p role="alert" className="text-sm text-amber-700">
+          Some older product edits lack stock adjustment details. Reconcile those products before
+          using this historical report for accounting.
+        </p>
+      )}
       {/* Filters */}
       <form method="GET" className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
@@ -231,7 +189,9 @@ export default async function ClosingStockPage({ searchParams }: PageProps) {
           </Table>
           {enriched.length > 0 && (
             <div className="flex justify-end border-t p-4">
-              <span className="text-sm font-semibold">Total Stock Value: ₹{fmt(totalStockValue)}</span>
+              <span className="text-sm font-semibold">
+                Total Stock Value: ₹{fmt(totalStockValue)}
+              </span>
             </div>
           )}
         </CardContent>

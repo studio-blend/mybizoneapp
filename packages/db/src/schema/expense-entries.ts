@@ -28,7 +28,10 @@ export const expenseEntries = pgTable(
   },
   (t) => ({
     businessIdx: index('expense_entries_business_id_idx').on(t.businessId),
-    businessEntryDateIdx: index('expense_entries_business_entry_date_idx').on(t.businessId, t.entryDate),
+    businessEntryDateIdx: index('expense_entries_business_entry_date_idx').on(
+      t.businessId,
+      t.entryDate,
+    ),
     businessTypeIdx: index('expense_entries_business_type_idx').on(t.businessId, t.type),
   }),
 );

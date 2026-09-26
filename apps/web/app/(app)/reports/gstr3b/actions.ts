@@ -1,12 +1,13 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { businesses, purchases, sales, suppliers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { round2 } from '@mybizone/domain/money';
 import { and, eq, gte, isNotNull, lte, sql } from 'drizzle-orm';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const paramsSchema = z.object({
   fromDate: z.string(),
@@ -34,6 +35,7 @@ export interface Gstr3bData {
 export async function fetchGstr3bData(rawParams: Params): Promise<Gstr3bData | { error: string }> {
   try {
     const user = await requireUser();
+    await requirePermission(user, 'view_reports');
     const params = paramsSchema.parse(rawParams);
     const fromDate = new Date(`${params.fromDate}T00:00:00`);
     const toDate = new Date(`${params.toDate}T23:59:59`);
@@ -132,11 +134,14 @@ export async function fetchGstr3bData(rawParams: Params): Promise<Gstr3bData | {
   }
 }
 
-export async function downloadGstr3bPdfAction(rawParams: Params): Promise<{
-  data: string;
-  filename: string;
-  mimeType: string;
-} | { error: string }> {
+export async function downloadGstr3bPdfAction(rawParams: Params): Promise<
+  | {
+      data: string;
+      filename: string;
+      mimeType: string;
+    }
+  | { error: string }
+> {
   try {
     const result = await fetchGstr3bData(rawParams);
     if ('error' in result) return result;

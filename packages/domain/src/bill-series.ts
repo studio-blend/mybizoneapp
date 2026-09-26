@@ -21,6 +21,9 @@ export const financialYear = getFinancialYear;
  */
 export function formatBillNo(prefix: string, financialYear: string, seq: number): string {
   // '2025-26' → '25-26'
-  const fyShort = financialYear.split('-').map((s) => s.slice(-2)).join('-');
+  const fyShort = financialYear
+    .split('-')
+    .map((s) => s.slice(-2))
+    .join('-');
   return `${prefix}-${fyShort}-${String(seq).padStart(4, '0')}`;
 }

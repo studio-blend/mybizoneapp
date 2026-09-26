@@ -29,18 +29,14 @@ describe('calculateProfit', () => {
   });
 
   it('reports zero coverage when all costs are null', () => {
-    const r = calculateProfit([
-      { lineTotal: 500, qty: 5, costPriceAtSale: null },
-    ]);
+    const r = calculateProfit([{ lineTotal: 500, qty: 5, costPriceAtSale: null }]);
     expect(r.estimatedProfit).toBe(0);
     expect(r.coveredItems).toBe(0);
     expect(r.totalItems).toBe(1);
   });
 
   it('handles negative margin (cost > price)', () => {
-    const r = calculateProfit([
-      { lineTotal: 50, qty: 1, costPriceAtSale: 80 },
-    ]);
+    const r = calculateProfit([{ lineTotal: 50, qty: 1, costPriceAtSale: 80 }]);
     expect(r.estimatedProfit).toBe(-30);
   });
 });

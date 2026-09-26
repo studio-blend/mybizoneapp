@@ -1,18 +1,20 @@
 'use server';
 
-import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import {
   auditLogs,
   customers,
+  emiPayments,
+  emiSchedules,
   purchaseSettlements,
   salesSettlements,
   suppliers,
 } from '@mybizone/db';
-import { withTenant } from '@mybizone/db/tenant';
-import { and, eq, sql } from 'drizzle-orm';
+import { round2 } from '@mybizone/domain/money';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const moneyText = z.string().regex(/^\d{1,10}(?:\.\d{1,2})?$/, {
@@ -40,6 +42,7 @@ const SalesSettlementInput = z.object({
 export const createSalesSettlementAction = safeAction(
   SalesSettlementInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_customers');
     // 1. Fetch the customer row
     const [customer] = await tx
       .select({
@@ -48,9 +51,8 @@ export const createSalesSettlementAction = safeAction(
         outstandingBalance: customers.outstandingBalance,
       })
       .from(customers)
-      .where(
-        and(eq(customers.id, input.customerId), eq(customers.businessId, user.businessId)),
-      );
+      .where(and(eq(customers.id, input.customerId), eq(customers.businessId, user.businessId)))
+      .for('update');
 
     // 2. Guard: customer must exist in this business
     if (!customer) throw new Error('customer not found');
@@ -58,11 +60,34 @@ export const createSalesSettlementAction = safeAction(
     // 3. Guard: amount must be positive
     if (Number(input.amount) <= 0) throw new Error('amount must be greater than zero');
 
-    // 4. Overpay is allowed — just log it
+    // The ledger has no advance-credit account: reject excess instead of losing it.
     if (Number(input.amount) > Number(customer.outstandingBalance)) {
-      console.info(
-        `[settlements] overpayment: customer ${customer.id} owes ${customer.outstandingBalance}, received ${input.amount}`,
+      throw new Error('amount exceeds outstanding balance');
+    }
+
+    // EMI payments have their own ledger. Keep general receipts from consuming
+    // principal that will later be collected again through the EMI screen.
+    const [finance] = await tx
+      .select({
+        amount: sql<string>`COALESCE(SUM(
+      ROUND((${emiSchedules.principalAmount} - ${emiSchedules.downPayment}) * ${emiPayments.instalmentNumber} / ${emiSchedules.tenureMonths}, 2)
+      - ROUND((${emiSchedules.principalAmount} - ${emiSchedules.downPayment}) * (${emiPayments.instalmentNumber} - 1) / ${emiSchedules.tenureMonths}, 2)
+    ), 0)`,
+      })
+      .from(emiSchedules)
+      .innerJoin(emiPayments, eq(emiPayments.emiScheduleId, emiSchedules.id))
+      .where(
+        and(
+          eq(emiSchedules.customerId, input.customerId),
+          eq(emiSchedules.businessId, user.businessId),
+          ne(emiPayments.status, 'paid'),
+        ),
       );
+    if (
+      Number(input.amount) >
+      round2(Number(customer.outstandingBalance) - Number(finance?.amount ?? 0))
+    ) {
+      throw new Error('amount includes EMI principal; record EMI payments from the EMI schedule');
     }
 
     // 5. Insert settlement record
@@ -87,9 +112,7 @@ export const createSalesSettlementAction = safeAction(
         outstandingBalance: sql`GREATEST(0, ${customers.outstandingBalance} - ${input.amount}::numeric)`,
         updatedAt: new Date(),
       })
-      .where(
-        and(eq(customers.id, input.customerId), eq(customers.businessId, user.businessId)),
-      );
+      .where(and(eq(customers.id, input.customerId), eq(customers.businessId, user.businessId)));
 
     // 7. Audit log
     await tx.insert(auditLogs).values({
@@ -132,6 +155,7 @@ const PurchaseSettlementInput = z.object({
 export const createPurchaseSettlementAction = safeAction(
   PurchaseSettlementInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_suppliers');
     // 1. Fetch the supplier row
     const [supplier] = await tx
       .select({
@@ -140,9 +164,8 @@ export const createPurchaseSettlementAction = safeAction(
         outstandingBalance: suppliers.outstandingBalance,
       })
       .from(suppliers)
-      .where(
-        and(eq(suppliers.id, input.supplierId), eq(suppliers.businessId, user.businessId)),
-      );
+      .where(and(eq(suppliers.id, input.supplierId), eq(suppliers.businessId, user.businessId)))
+      .for('update');
 
     // 2. Guard: supplier must exist in this business
     if (!supplier) throw new Error('supplier not found');
@@ -150,11 +173,9 @@ export const createPurchaseSettlementAction = safeAction(
     // 3. Guard: amount must be positive
     if (Number(input.amount) <= 0) throw new Error('amount must be greater than zero');
 
-    // 4. Overpay is allowed — just log it
+    // The ledger has no advance-credit account: reject excess instead of losing it.
     if (Number(input.amount) > Number(supplier.outstandingBalance)) {
-      console.info(
-        `[settlements] overpayment: supplier ${supplier.id} owes ${supplier.outstandingBalance}, paid ${input.amount}`,
-      );
+      throw new Error('amount exceeds outstanding balance');
     }
 
     // 5. Insert settlement record
@@ -179,9 +200,7 @@ export const createPurchaseSettlementAction = safeAction(
         outstandingBalance: sql`GREATEST(0, ${suppliers.outstandingBalance} - ${input.amount}::numeric)`,
         updatedAt: new Date(),
       })
-      .where(
-        and(eq(suppliers.id, input.supplierId), eq(suppliers.businessId, user.businessId)),
-      );
+      .where(and(eq(suppliers.id, input.supplierId), eq(suppliers.businessId, user.businessId)));
 
     // 7. Audit log
     await tx.insert(auditLogs).values({

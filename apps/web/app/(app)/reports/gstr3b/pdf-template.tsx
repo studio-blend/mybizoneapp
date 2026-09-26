@@ -5,12 +5,30 @@ const pdfStyles = StyleSheet.create({
   page: { padding: 32, fontSize: 10, fontFamily: 'Helvetica' },
   title: { fontSize: 16, fontWeight: 700, marginBottom: 4 },
   subtitle: { fontSize: 10, color: '#444', marginBottom: 16 },
-  sectionTitle: { fontSize: 12, fontWeight: 700, marginTop: 16, marginBottom: 4, backgroundColor: '#eee', padding: 4 },
-  row: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#ccc', paddingVertical: 4 },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: 700,
+    marginTop: 16,
+    marginBottom: 4,
+    backgroundColor: '#eee',
+    padding: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#ccc',
+    paddingVertical: 4,
+  },
   headerRow: { flexDirection: 'row', backgroundColor: '#ddd', paddingVertical: 4, fontWeight: 700 },
   col1: { width: '40%', paddingLeft: 4 },
   col2: { width: '15%', textAlign: 'right', paddingRight: 4 },
-  totalRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#000', paddingVertical: 6, fontWeight: 700 },
+  totalRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#000',
+    paddingVertical: 6,
+    fontWeight: 700,
+  },
 });
 
 function fmt(n: number) {
@@ -23,10 +41,13 @@ export function Gstr3bPdf({ data }: { data: Gstr3bData }) {
       <Page size="A4" style={pdfStyles.page}>
         <Text style={pdfStyles.title}>GSTR-3B Summary</Text>
         <Text style={pdfStyles.subtitle}>
-          {data.businessName} | GSTIN: {data.gstin || 'N/A'} | Period: {data.periodFrom} to {data.periodTo}
+          {data.businessName} | GSTIN: {data.gstin || 'N/A'} | Period: {data.periodFrom} to{' '}
+          {data.periodTo}
         </Text>
 
-        <Text style={pdfStyles.sectionTitle}>3.1 Details of Outward Supplies and Inward Supplies</Text>
+        <Text style={pdfStyles.sectionTitle}>
+          3.1 Details of Outward Supplies and Inward Supplies
+        </Text>
         <View style={pdfStyles.headerRow}>
           <Text style={pdfStyles.col1}>Nature of Supplies</Text>
           <Text style={pdfStyles.col2}>Taxable Value</Text>
@@ -90,20 +111,21 @@ export function Gstr3bPdf({ data }: { data: Gstr3bData }) {
         <View style={pdfStyles.row}>
           <Text style={pdfStyles.col1}>Net ITC Available</Text>
           <Text style={pdfStyles.col2}>{fmt(data.netItc)}</Text>
-          <Text style={pdfStyles.col2}></Text>
-          <Text style={pdfStyles.col2}></Text>
-          <Text style={pdfStyles.col2}></Text>
+          <Text style={pdfStyles.col2} />
+          <Text style={pdfStyles.col2} />
+          <Text style={pdfStyles.col2} />
         </View>
         <View style={pdfStyles.totalRow}>
           <Text style={pdfStyles.col1}>5.1 Net Tax Payable</Text>
           <Text style={pdfStyles.col2}>{fmt(data.netPayable)}</Text>
-          <Text style={pdfStyles.col2}></Text>
-          <Text style={pdfStyles.col2}></Text>
-          <Text style={pdfStyles.col2}></Text>
+          <Text style={pdfStyles.col2} />
+          <Text style={pdfStyles.col2} />
+          <Text style={pdfStyles.col2} />
         </View>
 
         <Text style={{ marginTop: 24, fontSize: 8, color: '#888' }}>
-          Note: This is a management summary for reference. Consult a CA for official GSTR-3B filing.
+          Note: This is a management summary for reference. Consult a CA for official GSTR-3B
+          filing.
         </Text>
       </Page>
     </Document>

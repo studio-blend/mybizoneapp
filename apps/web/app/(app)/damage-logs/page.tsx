@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { damageLogs } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -31,6 +32,7 @@ const REASON_LABELS: Record<string, string> = {
 
 export default async function DamageLogsPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_inventory');
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);

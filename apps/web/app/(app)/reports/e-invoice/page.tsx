@@ -1,11 +1,12 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { eInvoices, sales } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { EInvoiceActions } from './_components/e-invoice-actions';
 
@@ -20,6 +21,7 @@ const STATUS_BADGE: Record<string, string> = {
 
 export default async function EInvoicePage() {
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
 
   const rows = await withTenant(db, user.businessId, async (tx) => {
     // All GST bills with their e-invoice status (if any)
@@ -51,7 +53,7 @@ export default async function EInvoicePage() {
   });
 
   // Deduplicate — take most recent e-invoice per sale
-  const saleMap = new Map<string, typeof rows[0]>();
+  const saleMap = new Map<string, (typeof rows)[0]>();
   for (const row of rows) {
     const existing = saleMap.get(row.saleId);
     if (!existing || (row.status === 'generated' && existing.status !== 'generated')) {
@@ -105,10 +107,14 @@ export default async function EInvoicePage() {
                       <TableCell className="font-mono text-sm">{row.billNo}</TableCell>
                       <TableCell>{row.createdAt.toLocaleDateString('en-IN')}</TableCell>
                       <TableCell>{row.customerName ?? '—'}</TableCell>
-                      <TableCell className="font-mono text-xs">{row.customerGstin ?? '—'}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {row.customerGstin ?? '—'}
+                      </TableCell>
                       <TableCell className="text-right">₹{Number(row.total).toFixed(2)}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[status] ?? 'bg-gray-100 text-gray-800'}`}>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[status] ?? 'bg-gray-100 text-gray-800'}`}
+                        >
                           {status}
                         </span>
                       </TableCell>
@@ -132,7 +138,8 @@ export default async function EInvoicePage() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        IRN generation uses GSTN IRP Sandbox API. Set GSTN_SANDBOX=false and add credentials in .env to use production.
+        IRN generation uses GSTN IRP Sandbox API. Set GSTN_SANDBOX=false and add credentials in .env
+        to use production.
       </p>
     </div>
   );

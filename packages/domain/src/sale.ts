@@ -81,13 +81,21 @@ export function calculateSaleTotals(input: SaleTotalsInput): SaleTotalsCalc {
     if (!Number.isFinite(l.unitPrice) || l.unitPrice < 0) {
       throw new SaleCalcError(`unitPrice must be >= 0 (got ${l.unitPrice})`);
     }
+    if (l.gstRate !== null && (!Number.isFinite(l.gstRate) || l.gstRate < 0 || l.gstRate > 100)) {
+      throw new SaleCalcError('invalid GST rate');
+    }
+    if (!Number.isFinite(l.itemDiscount ?? 0)) throw new SaleCalcError('invalid itemDiscount');
     const lineSubtotal = round2(l.qty * l.unitPrice);
+    if (!Number.isSafeInteger(Math.round(lineSubtotal * 100)))
+      throw new SaleCalcError('line amount exceeds supported precision');
     const itemDiscount = round2(l.itemDiscount ?? 0);
     if (itemDiscount < 0) {
       throw new SaleCalcError(`itemDiscount must be >= 0 (got ${itemDiscount})`);
     }
     if (itemDiscount > lineSubtotal) {
-      throw new SaleCalcError(`itemDiscount exceeds line subtotal (line ₹${lineSubtotal}, disc ₹${itemDiscount})`);
+      throw new SaleCalcError(
+        `itemDiscount exceeds line subtotal (line ₹${lineSubtotal}, disc ₹${itemDiscount})`,
+      );
     }
     return {
       ...l,
@@ -107,6 +115,7 @@ export function calculateSaleTotals(input: SaleTotalsInput): SaleTotalsCalc {
   );
 
   const requestedDiscount = input.discount ?? 0;
+  if (!Number.isFinite(requestedDiscount)) throw new SaleCalcError('invalid discount');
   if (requestedDiscount < 0) throw new SaleCalcError('discount must be >= 0');
   if (requestedDiscount > allocBase) {
     throw new SaleCalcError('discount exceeds subtotal');
@@ -114,17 +123,9 @@ export function calculateSaleTotals(input: SaleTotalsInput): SaleTotalsCalc {
   const discount = round2(requestedDiscount);
 
   // Pass 2: allocate bill-level discount proportionally across non-free lines, then GST.
-  // Find the last non-free line so it absorbs the rounding remainder.
-  let lastNonFreeIdx = -1;
-  for (let i = linesPre.length - 1; i >= 0; i--) {
-    if (linesPre[i] && !linesPre[i]?.isFreeItem) {
-      lastNonFreeIdx = i;
-      break;
-    }
-  }
-
   const lines: SaleLineCalc[] = [];
   let allocated = 0;
+  let cumulativeBase = 0;
   for (let i = 0; i < linesPre.length; i++) {
     const l = linesPre[i];
     if (!l) throw new SaleCalcError(`missing line ${i}`);
@@ -146,10 +147,12 @@ export function calculateSaleTotals(input: SaleTotalsInput): SaleTotalsCalc {
     }
 
     const postItem = round2(l.lineSubtotal - l.itemDiscount);
-    const isLastNonFree = i === lastNonFreeIdx;
-    const ratio = allocBase > 0 ? postItem / allocBase : 0;
-    const billLineDiscount = isLastNonFree ? round2(discount - allocated) : round2(discount * ratio);
-    allocated = round2(allocated + billLineDiscount);
+    // Round cumulative shares, not each share independently. Independent rounding
+    // can over-allocate and make the last line negative on small-value carts.
+    cumulativeBase = round2(cumulativeBase + postItem);
+    const cumulativeDiscount = allocBase > 0 ? round2((discount * cumulativeBase) / allocBase) : 0;
+    const billLineDiscount = round2(cumulativeDiscount - allocated);
+    allocated = cumulativeDiscount;
 
     const lineTaxable = round2(postItem - billLineDiscount);
     const gstApplies = input.gstEnabled && l.gstRate !== null && l.gstRate > 0;
@@ -171,7 +174,9 @@ export function calculateSaleTotals(input: SaleTotalsInput): SaleTotalsCalc {
   }
 
   // Total discount visible on the bill summary = item discounts + bill-level discount.
-  const totalItemDiscount = round2(linesPre.reduce((s, l) => s + (l.isFreeItem ? l.lineSubtotal : l.itemDiscount), 0));
+  const totalItemDiscount = round2(
+    linesPre.reduce((s, l) => s + (l.isFreeItem ? l.lineSubtotal : l.itemDiscount), 0),
+  );
   const summaryDiscount = round2(totalItemDiscount + discount);
   const taxableAmount = round2(subtotal - summaryDiscount);
 

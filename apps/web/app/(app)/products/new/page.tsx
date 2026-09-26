@@ -1,7 +1,9 @@
 import { db } from '@/lib/db';
+import { getUserRoles } from '@/lib/get-user-roles';
 import { requireUser } from '@/lib/session';
 import { brands, businesses, categories, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
+import { hasPermission } from '@mybizone/domain';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { asc, eq } from 'drizzle-orm';
 import Link from 'next/link';
@@ -11,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function NewProductPage() {
   const user = await requireUser();
+  const roles = await getUserRoles(user);
   const data = await withTenant(db, user.businessId, async (tx) => {
     const [biz] = await tx
       .select({ gstEnabled: businesses.gstEnabled })
@@ -20,12 +23,18 @@ export default async function NewProductPage() {
       .select({ id: stores.id, name: stores.name })
       .from(stores)
       .orderBy(asc(stores.name));
+    const allowedStores = sts.filter((store) =>
+      hasPermission(roles, 'manage_products', { storeId: store.id }),
+    );
+    if (!allowedStores.length && !hasPermission(roles, 'manage_products'))
+      throw new Error('Permission denied');
     const cats = await tx
       .select({
         id: categories.id,
         name: categories.name,
         parentId: categories.parentId,
         attributes: categories.attributes,
+        storeId: categories.storeId,
       })
       .from(categories)
       .orderBy(asc(categories.name));
@@ -33,7 +42,15 @@ export default async function NewProductPage() {
       .select({ id: brands.id, name: brands.name })
       .from(brands)
       .orderBy(asc(brands.name));
-    return { gstEnabled: biz?.gstEnabled ?? false, stores: sts, categories: cats, brands: brs };
+    return {
+      gstEnabled: biz?.gstEnabled ?? false,
+      stores: allowedStores,
+      categories: cats.filter(
+        (category) =>
+          !category.storeId || allowedStores.some((store) => store.id === category.storeId),
+      ),
+      brands: brs,
+    };
   });
 
   if (data.stores.length === 0) {

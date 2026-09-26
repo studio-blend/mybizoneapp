@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { getSessionUser } from '@/lib/session';
 import { brands, categories, products, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -12,6 +13,12 @@ export async function GET(_req: NextRequest) {
   if (!user || !user.businessId) {
     return new NextResponse('unauthorized', { status: 401 });
   }
+  try {
+    await requirePermission({ ...user, businessId: user.businessId }, 'view_reports');
+  } catch {
+    return new NextResponse('forbidden', { status: 403 });
+  }
+  if (user.mustChangePassword) return new NextResponse('forbidden', { status: 403 });
   const businessId = user.businessId;
 
   const rows = await withTenant(db, businessId, (tx) =>

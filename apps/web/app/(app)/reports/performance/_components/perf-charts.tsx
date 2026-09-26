@@ -17,9 +17,7 @@ export function DailyRevenueChart({ data }: { data: DailyRevenue[] }) {
           tickFormatter={(v) => `₹${(Number(v) / 1000).toFixed(0)}k`}
         />
         <Tooltip
-          formatter={(v) =>
-            `₹${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
-          }
+          formatter={(v) => `₹${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
         />
         <Line
           type="monotone"

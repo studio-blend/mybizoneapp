@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { saleItems, sales } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -11,7 +12,7 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { from?: string; to?: string };
+  searchParams: Promise<{ from?: string; to?: string }>;
 }
 
 function firstOfMonth(): string {
@@ -24,8 +25,10 @@ function todayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export default async function GstReportPage({ searchParams }: PageProps) {
+export default async function GstReportPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
   const fromStr = searchParams.from ?? firstOfMonth();
   const toStr = searchParams.to ?? todayStr();
 
@@ -38,8 +41,9 @@ export default async function GstReportPage({ searchParams }: PageProps) {
         hsnCode: saleItems.hsnCode,
         gstRate: saleItems.gstRate,
         totalQty: sql<string>`sum(${saleItems.qty})`.as('total_qty'),
-        taxableAmount:
-          sql<string>`sum(${saleItems.lineTotal} - ${saleItems.gstAmount})`.as('taxable_amount'),
+        taxableAmount: sql<string>`sum(${saleItems.lineTotal} - ${saleItems.gstAmount})`.as(
+          'taxable_amount',
+        ),
         totalGst: sql<string>`sum(${saleItems.gstAmount})`.as('total_gst'),
         totalAmount: sql<string>`sum(${saleItems.lineTotal})`.as('total_amount'),
       })
@@ -168,12 +172,8 @@ export default async function GstReportPage({ searchParams }: PageProps) {
                   <TableRow className="border-t-2 font-semibold bg-muted/30">
                     <TableCell colSpan={3}>Total</TableCell>
                     <TableCell className="text-right">{totals.taxableAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">
-                      {(totals.totalGst / 2).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {(totals.totalGst / 2).toFixed(2)}
-                    </TableCell>
+                    <TableCell className="text-right">{(totals.totalGst / 2).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{(totals.totalGst / 2).toFixed(2)}</TableCell>
                     <TableCell className="text-right">{totals.totalGst.toFixed(2)}</TableCell>
                     <TableCell className="text-right">{totals.totalAmount.toFixed(2)}</TableCell>
                   </TableRow>

@@ -101,12 +101,7 @@ export function PurchaseSettlementForm({ suppliers }: Props) {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="supplierId">Supplier</Label>
-            <Select
-              id="supplierId"
-              name="supplierId"
-              required
-              onChange={handleSupplierChange}
-            >
+            <Select id="supplierId" name="supplierId" required onChange={handleSupplierChange}>
               <option value="">Select a supplier…</option>
               {sorted.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -153,17 +148,10 @@ export function PurchaseSettlementForm({ suppliers }: Props) {
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (optional)</Label>
-            <Textarea
-              id="notes"
-              name="notes"
-              maxLength={500}
-              placeholder="Any additional notes"
-            />
+            <Textarea id="notes" name="notes" maxLength={500} placeholder="Any additional notes" />
           </div>
 
-          {error && (
-            <p className="text-sm font-medium text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm font-medium text-destructive">{error}</p>}
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={pending}>

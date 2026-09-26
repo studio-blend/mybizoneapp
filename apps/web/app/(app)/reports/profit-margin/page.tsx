@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
-import { brands, categories, products, saleItems, sales } from '@mybizone/db';
+import { brands, products, saleItems, sales } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
@@ -12,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function ProfitMarginPage() {
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
   const since = new Date();
   since.setDate(since.getDate() - 29);
   since.setHours(0, 0, 0, 0);
@@ -20,10 +22,16 @@ export default async function ProfitMarginPage() {
     const byBrand = await tx
       .select({
         brandName: brands.name,
-        revenue: sum(saleItems.lineTotal).as('revenue'),
+        revenue: sql<string>`sum(${saleItems.lineTotal} - ${saleItems.gstAmount})`.as('revenue'),
         cost: sql<string>`sum(${saleItems.costPriceAtSale} * ${saleItems.qty})`.as('cost'),
-        profit: sql<string>`sum(${saleItems.lineTotal} - ${saleItems.costPriceAtSale} * ${saleItems.qty})`.as('profit'),
-        margin: sql<string>`ROUND(100.0 * sum(${saleItems.lineTotal} - ${saleItems.costPriceAtSale} * ${saleItems.qty}) / NULLIF(sum(${saleItems.lineTotal}), 0), 1)`.as('margin'),
+        profit:
+          sql<string>`sum(${saleItems.lineTotal} - ${saleItems.gstAmount} - ${saleItems.costPriceAtSale} * ${saleItems.qty})`.as(
+            'profit',
+          ),
+        margin:
+          sql<string>`ROUND(100.0 * sum(${saleItems.lineTotal} - ${saleItems.gstAmount} - ${saleItems.costPriceAtSale} * ${saleItems.qty}) / NULLIF(sum(${saleItems.lineTotal} - ${saleItems.gstAmount}), 0), 1)`.as(
+            'margin',
+          ),
       })
       .from(saleItems)
       .innerJoin(sales, eq(sales.id, saleItems.saleId))
@@ -34,13 +42,14 @@ export default async function ProfitMarginPage() {
           eq(saleItems.businessId, user.businessId),
           gte(sales.createdAt, since),
           eq(sales.status, 'completed'),
+          sql`${sales.billType} != 'estimate'`,
           sql`${saleItems.costPriceAtSale} IS NOT NULL`,
         ),
       )
       .groupBy(brands.name)
       .orderBy(
         desc(
-          sql`sum(${saleItems.lineTotal} - ${saleItems.costPriceAtSale} * ${saleItems.qty})`,
+          sql`sum(${saleItems.lineTotal} - ${saleItems.gstAmount} - ${saleItems.costPriceAtSale} * ${saleItems.qty})`,
         ),
       )
       .limit(20);
@@ -49,9 +58,15 @@ export default async function ProfitMarginPage() {
       .select({
         name: saleItems.productName,
         qtySold: sum(saleItems.qty).as('qty_sold'),
-        revenue: sum(saleItems.lineTotal).as('revenue'),
-        profit: sql<string>`sum(${saleItems.lineTotal} - ${saleItems.costPriceAtSale} * ${saleItems.qty})`.as('profit'),
-        margin: sql<string>`ROUND(100.0 * sum(${saleItems.lineTotal} - ${saleItems.costPriceAtSale} * ${saleItems.qty}) / NULLIF(sum(${saleItems.lineTotal}), 0), 1)`.as('margin'),
+        revenue: sql<string>`sum(${saleItems.lineTotal} - ${saleItems.gstAmount})`.as('revenue'),
+        profit:
+          sql<string>`sum(${saleItems.lineTotal} - ${saleItems.gstAmount} - ${saleItems.costPriceAtSale} * ${saleItems.qty})`.as(
+            'profit',
+          ),
+        margin:
+          sql<string>`ROUND(100.0 * sum(${saleItems.lineTotal} - ${saleItems.gstAmount} - ${saleItems.costPriceAtSale} * ${saleItems.qty}) / NULLIF(sum(${saleItems.lineTotal} - ${saleItems.gstAmount}), 0), 1)`.as(
+            'margin',
+          ),
       })
       .from(saleItems)
       .innerJoin(sales, eq(sales.id, saleItems.saleId))
@@ -60,13 +75,14 @@ export default async function ProfitMarginPage() {
           eq(saleItems.businessId, user.businessId),
           gte(sales.createdAt, since),
           eq(sales.status, 'completed'),
+          sql`${sales.billType} != 'estimate'`,
           sql`${saleItems.costPriceAtSale} IS NOT NULL`,
         ),
       )
       .groupBy(saleItems.productName)
       .orderBy(
         desc(
-          sql`sum(${saleItems.lineTotal} - ${saleItems.costPriceAtSale} * ${saleItems.qty})`,
+          sql`sum(${saleItems.lineTotal} - ${saleItems.gstAmount} - ${saleItems.costPriceAtSale} * ${saleItems.qty})`,
         ),
       )
       .limit(20);

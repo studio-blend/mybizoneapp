@@ -1,7 +1,10 @@
 import { db } from '@/lib/db';
+import { getUserRoles } from '@/lib/get-user-roles';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { brands, categories, products, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
+import { hasPermission } from '@mybizone/domain';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
@@ -33,23 +36,46 @@ function collectDescendants(
 }
 
 interface Props {
-  searchParams: { q?: string; categoryId?: string; storeId?: string; brandId?: string };
+  searchParams: Promise<{ q?: string; categoryId?: string; storeId?: string; brandId?: string }>;
 }
 
-export default async function ProductsPage({ searchParams }: Props) {
+export default async function ProductsPage(props: Props) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
+  const roles = await getUserRoles(user);
   const { q, categoryId, storeId, brandId } = searchParams;
 
   const data = await withTenant(db, user.businessId, async (tx) => {
     // Load filter options in parallel — rows query depends on allCats so runs after
-    const [allCats, allStores, allBrands] = await Promise.all([
-      tx.select({ id: categories.id, name: categories.name, parentId: categories.parentId }).from(categories).orderBy(asc(categories.name)),
+    const [categoryRows, storeRows, allBrands] = await Promise.all([
+      tx
+        .select({
+          id: categories.id,
+          name: categories.name,
+          parentId: categories.parentId,
+          storeId: categories.storeId,
+        })
+        .from(categories)
+        .orderBy(asc(categories.name)),
       tx.select({ id: stores.id, name: stores.name }).from(stores).orderBy(asc(stores.name)),
       tx.select({ id: brands.id, name: brands.name }).from(brands).orderBy(asc(brands.name)),
     ]);
+    const allStores = storeRows.filter((store) =>
+      hasPermission(roles, 'manage_products', { storeId: store.id }),
+    );
+    if (!allStores.length && !hasPermission(roles, 'manage_products'))
+      throw new Error('Permission denied');
+    if (storeId) await requirePermission(user, 'manage_products', { storeId });
+    const allowedIds = allStores.map((store) => store.id);
+    const allCats = categoryRows.filter(
+      (category) => !category.storeId || allowedIds.includes(category.storeId),
+    );
 
     // Build WHERE conditions
-    const conditions = [eq(products.businessId, user.businessId)];
+    const conditions = [
+      eq(products.businessId, user.businessId),
+      inArray(products.storeId, allowedIds),
+    ];
 
     if (q?.trim()) {
       conditions.push(ilike(products.name, `%${q.trim()}%`));
@@ -104,11 +130,7 @@ export default async function ProductsPage({ searchParams }: Props) {
 
       {/* Filter bar */}
       <Suspense>
-        <ProductFilters
-          categories={data.allCats}
-          stores={data.allStores}
-          brands={data.allBrands}
-        />
+        <ProductFilters categories={data.allCats} stores={data.allStores} brands={data.allBrands} />
       </Suspense>
 
       {data.rows.length === 0 ? (

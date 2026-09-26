@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent } from '@mybizone/ui/card';
+import { useState } from 'react';
 
 interface ProductRow {
   id: string;
@@ -23,11 +23,11 @@ export function BarcodeSheet({ products }: Props) {
 
   function toggleAll() {
     if (selected.size === products.length) setSelected(new Set());
-    else setSelected(new Set(products.map(p => p.id)));
+    else setSelected(new Set(products.map((p) => p.id)));
   }
 
   function toggle(id: string) {
-    setSelected(prev => {
+    setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -40,19 +40,26 @@ export function BarcodeSheet({ products }: Props) {
   }
 
   function printLabels() {
-    const toPrint = products.filter(p => selected.has(p.id));
-    if (toPrint.length === 0) { alert('Select at least one product'); return; }
+    const toPrint = products.filter((p) => selected.has(p.id));
+    if (toPrint.length === 0) {
+      alert('Select at least one product');
+      return;
+    }
 
     // Generate a print window with barcode SVGs using JsBarcode from CDN
-    const labelsHtml = Array.from({ length: copies }).flatMap(() =>
-      toPrint.map(p => `
+    const labelsHtml = Array.from({ length: copies })
+      .flatMap(() =>
+        toPrint.map(
+          (p) => `
         <div class="label">
           <svg class="barcode" data-barcode="${barcodeValue(p)}"></svg>
           <div class="name">${p.name}</div>
           <div class="price">₹ ${p.mrp ?? p.price}</div>
         </div>
-      `)
-    ).join('');
+      `,
+        ),
+      )
+      .join('');
 
     const html = `<!DOCTYPE html><html><head>
       <title>Barcode Labels</title>
@@ -79,7 +86,10 @@ export function BarcodeSheet({ products }: Props) {
     </body></html>`;
 
     const win = window.open('', '_blank');
-    if (win) { win.document.write(html); win.document.close(); }
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    }
   }
 
   return (
@@ -95,7 +105,7 @@ export function BarcodeSheet({ products }: Props) {
             min={1}
             max={10}
             value={copies}
-            onChange={e => setCopies(Number(e.target.value))}
+            onChange={(e) => setCopies(Number(e.target.value))}
             className="w-16 rounded border px-2 py-1 text-sm"
           />
         </label>
@@ -105,7 +115,7 @@ export function BarcodeSheet({ products }: Props) {
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {products.map(p => (
+        {products.map((p) => (
           <Card
             key={p.id}
             className={`cursor-pointer transition-colors ${selected.has(p.id) ? 'ring-2 ring-primary' : ''}`}

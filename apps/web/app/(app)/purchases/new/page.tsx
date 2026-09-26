@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { products, suppliers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function NewPurchasePage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_purchases');
   const data = await withTenant(db, user.businessId, async (tx) => {
     const ps = await tx
       .select({

@@ -23,7 +23,9 @@ export const quotations = pgTable(
     taxTotal: numeric('tax_total', { precision: 12, scale: 2 }).notNull().default('0'),
     total: numeric('total', { precision: 12, scale: 2 }).notNull(),
     notes: text('notes'),
-    convertedToSaleId: uuid('converted_to_sale_id').references(() => sales.id, { onDelete: 'set null' }),
+    convertedToSaleId: uuid('converted_to_sale_id').references(() => sales.id, {
+      onDelete: 'set null',
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

@@ -1,15 +1,20 @@
 import { db } from '@/lib/db';
+import { getUserRoles } from '@/lib/get-user-roles';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { brands, businesses, categories, products, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
+import { hasPermission } from '@mybizone/domain';
 import { and, asc, eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import { ProductForm } from '../../_components/product-form';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditProductPage({ params }: { params: { id: string } }) {
+export default async function EditProductPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
+  const roles = await getUserRoles(user);
   const data = await withTenant(db, user.businessId, async (tx) => {
     const [row] = await tx
       .select({
@@ -41,6 +46,7 @@ export default async function EditProductPage({ params }: { params: { id: string
       .from(products)
       .where(and(eq(products.id, params.id), eq(products.businessId, user.businessId)));
     if (!row) return null;
+    await requirePermission(user, 'manage_products', { storeId: row.storeId });
 
     const [biz] = await tx
       .select({ gstEnabled: businesses.gstEnabled })
@@ -56,6 +62,7 @@ export default async function EditProductPage({ params }: { params: { id: string
         name: categories.name,
         parentId: categories.parentId,
         attributes: categories.attributes,
+        storeId: categories.storeId,
       })
       .from(categories)
       .orderBy(asc(categories.name));
@@ -63,12 +70,18 @@ export default async function EditProductPage({ params }: { params: { id: string
       .select({ id: brands.id, name: brands.name })
       .from(brands)
       .orderBy(asc(brands.name));
+    const allowedStores = sts.filter((store) =>
+      hasPermission(roles, 'manage_products', { storeId: store.id }),
+    );
 
     return {
       row,
       gstEnabled: biz?.gstEnabled ?? false,
-      stores: sts,
-      categories: cats,
+      stores: allowedStores,
+      categories: cats.filter(
+        (category) =>
+          !category.storeId || allowedStores.some((store) => store.id === category.storeId),
+      ),
       brands: brs,
     };
   });

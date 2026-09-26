@@ -1,14 +1,16 @@
+import { requirePermission } from '@/lib/require-permission';
+import { requireUser } from '@/lib/session';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
 import Link from 'next/link';
-import { fetchGstr3bData } from './actions';
 import { Gstr3bDownloadButton } from './_components/download-button';
+import { fetchGstr3bData } from './actions';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { from?: string; to?: string };
+  searchParams: Promise<{ from?: string; to?: string }>;
 }
 
 function financialYearStart(): string {
@@ -26,7 +28,10 @@ function fmt(n: number): string {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default async function Gstr3bPage({ searchParams }: PageProps) {
+export default async function Gstr3bPage(props: PageProps) {
+  const user = await requireUser();
+  await requirePermission(user, 'view_reports');
+  const searchParams = await props.searchParams;
   const fromStr = searchParams.from ?? financialYearStart();
   const toStr = searchParams.to ?? todayStr();
 
@@ -58,20 +63,40 @@ export default async function Gstr3bPage({ searchParams }: PageProps) {
       {/* Date filter */}
       <form method="GET" className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
-          <label htmlFor="from" className="text-xs font-medium text-muted-foreground">From</label>
-          <input id="from" type="date" name="from" defaultValue={fromStr} className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+          <label htmlFor="from" className="text-xs font-medium text-muted-foreground">
+            From
+          </label>
+          <input
+            id="from"
+            type="date"
+            name="from"
+            defaultValue={fromStr}
+            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="to" className="text-xs font-medium text-muted-foreground">To</label>
-          <input id="to" type="date" name="to" defaultValue={toStr} className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+          <label htmlFor="to" className="text-xs font-medium text-muted-foreground">
+            To
+          </label>
+          <input
+            id="to"
+            type="date"
+            name="to"
+            defaultValue={toStr}
+            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
         </div>
-        <Button type="submit" variant="outline">Apply</Button>
+        <Button type="submit" variant="outline">
+          Apply
+        </Button>
       </form>
 
       {/* 3.1 Outward Supplies */}
       <Card>
         <CardHeader>
-          <CardTitle>3.1 Details of Outward Supplies and Inward Supplies Liable to Reverse Charge</CardTitle>
+          <CardTitle>
+            3.1 Details of Outward Supplies and Inward Supplies Liable to Reverse Charge
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -86,7 +111,9 @@ export default async function Gstr3bPage({ searchParams }: PageProps) {
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell>(a) Taxable supplies (other than zero rated, nil and exempted)</TableCell>
+                <TableCell>
+                  (a) Taxable supplies (other than zero rated, nil and exempted)
+                </TableCell>
                 <TableCell className="text-right">{fmt(data.outwardTaxable.taxable)}</TableCell>
                 <TableCell className="text-right">{fmt(data.outwardTaxable.igst)}</TableCell>
                 <TableCell className="text-right">{fmt(data.outwardTaxable.cgst)}</TableCell>
@@ -120,7 +147,9 @@ export default async function Gstr3bPage({ searchParams }: PageProps) {
 
       {/* 4. ITC */}
       <Card>
-        <CardHeader><CardTitle>4. Eligible ITC</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>4. Eligible ITC</CardTitle>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -154,7 +183,9 @@ export default async function Gstr3bPage({ searchParams }: PageProps) {
 
       {/* Net summary */}
       <Card>
-        <CardHeader><CardTitle>5. Net ITC and Tax Payable</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>5. Net ITC and Tax Payable</CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
@@ -163,11 +194,18 @@ export default async function Gstr3bPage({ searchParams }: PageProps) {
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-sm">Total Tax on Outward Supplies</span>
-              <span className="text-sm tabular-nums">₹{fmt(data.outwardTaxable.cgst + data.outwardTaxable.sgst + data.outwardTaxable.igst)}</span>
+              <span className="text-sm tabular-nums">
+                ₹
+                {fmt(
+                  data.outwardTaxable.cgst + data.outwardTaxable.sgst + data.outwardTaxable.igst,
+                )}
+              </span>
             </div>
             <div className="flex justify-between py-3">
               <span className="text-base font-bold">5.1 Net Tax Payable</span>
-              <span className={`text-xl font-bold tabular-nums ${data.netPayable <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <span
+                className={`text-xl font-bold tabular-nums ${data.netPayable <= 0 ? 'text-green-600' : 'text-red-600'}`}
+              >
                 ₹{fmt(data.netPayable)}
               </span>
             </div>

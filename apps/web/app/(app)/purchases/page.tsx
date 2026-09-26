@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { purchases } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -34,6 +35,7 @@ function formatDate(d: Date | string): string {
 
 export default async function PurchasesPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_purchases');
   const rows = await withTenant(db, user.businessId, (tx) =>
     tx
       .select({
@@ -83,9 +85,7 @@ export default async function PurchasesPage() {
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">{r.billNo}</TableCell>
                     <TableCell>{formatDate(r.purchaseDate)}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {r.supplierName || '—'}
-                    </TableCell>
+                    <TableCell className="text-muted-foreground">{r.supplierName || '—'}</TableCell>
                     <TableCell className="text-right">{r.total}</TableCell>
                     <TableCell>
                       <PaymentBadge method={r.paymentMethod} />

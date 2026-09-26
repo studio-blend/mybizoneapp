@@ -1,10 +1,11 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { auditLogs, expenseEntries } from '@mybizone/db';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const optionalText = (max: number) =>
@@ -20,9 +21,17 @@ const PAYMENT_METHODS = ['cash', 'upi', 'card', 'cheque', 'other'] as const;
 
 const CreateExpenseEntryInput = z.object({
   type: z.enum(ENTRY_TYPES),
-  category: z.string().min(1).max(60).transform((v) => v.trim()),
+  category: z
+    .string()
+    .min(1)
+    .max(60)
+    .transform((v) => v.trim()),
   amount: moneyText,
-  description: z.string().min(1).max(200).transform((v) => v.trim()),
+  description: z
+    .string()
+    .min(1)
+    .max(200)
+    .transform((v) => v.trim()),
   paymentMethod: z.enum(PAYMENT_METHODS),
   referenceNo: optionalText(100),
   notes: optionalText(500),
@@ -35,6 +44,7 @@ const CreateExpenseEntryInput = z.object({
 export const createExpenseEntryAction = safeAction(
   CreateExpenseEntryInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_expenses');
     const [row] = await tx
       .insert(expenseEntries)
       .values({
@@ -79,14 +89,10 @@ const DeleteExpenseEntryInput = z.object({
 export const deleteExpenseEntryAction = safeAction(
   DeleteExpenseEntryInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_expenses');
     const deleted = await tx
       .delete(expenseEntries)
-      .where(
-        and(
-          eq(expenseEntries.id, input.id),
-          eq(expenseEntries.businessId, user.businessId),
-        ),
-      )
+      .where(and(eq(expenseEntries.id, input.id), eq(expenseEntries.businessId, user.businessId)))
       .returning({ id: expenseEntries.id });
 
     if (deleted.length === 0) throw new Error('expense entry not found');

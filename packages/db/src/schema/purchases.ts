@@ -35,8 +35,14 @@ export const purchases = pgTable(
   (t) => ({
     businessIdx: index('purchases_business_id_idx').on(t.businessId),
     supplierIdx: index('purchases_supplier_id_idx').on(t.supplierId),
-    businessPurchaseDateIdx: index('purchases_business_purchase_date_idx').on(t.businessId, t.purchaseDate),
-    businessFinancialYearIdx: index('purchases_business_financial_year_idx').on(t.businessId, t.financialYear),
+    businessPurchaseDateIdx: index('purchases_business_purchase_date_idx').on(
+      t.businessId,
+      t.purchaseDate,
+    ),
+    businessFinancialYearIdx: index('purchases_business_financial_year_idx').on(
+      t.businessId,
+      t.financialYear,
+    ),
   }),
 );
 

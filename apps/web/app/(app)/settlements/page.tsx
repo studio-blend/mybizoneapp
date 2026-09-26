@@ -1,21 +1,10 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
-import {
-  customers,
-  purchaseSettlements,
-  salesSettlements,
-  suppliers,
-} from '@mybizone/db';
+import { customers, purchaseSettlements, salesSettlements, suppliers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Card, CardContent } from '@mybizone/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@mybizone/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
 import { desc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { PurchaseSettlementForm } from './_components/purchase-settlement-form';
@@ -24,7 +13,7 @@ import { SalesSettlementForm } from './_components/sales-settlement-form';
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { tab?: string };
+  searchParams: Promise<{ tab?: string }>;
 }
 
 function formatDate(d: Date | string | null) {
@@ -47,8 +36,10 @@ function formatMethod(m: string) {
   return labels[m] ?? m;
 }
 
-export default async function SettlementsPage({ searchParams }: PageProps) {
+export default async function SettlementsPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
+  await requirePermission(user, 'manage_expenses');
   const tab = searchParams.tab === 'purchases' ? 'purchases' : 'sales';
 
   const [customerList, supplierList, salesRows, purchaseRows] = await withTenant(

@@ -2,8 +2,8 @@
 
 import { Input } from '@mybizone/ui/input';
 import { Select } from '@mybizone/ui/select';
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useCallback, useTransition, useState, useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState, useTransition } from 'react';
 
 interface CategoryNode {
   id: string;
@@ -50,9 +50,7 @@ export function ProductFilters({ categories, stores, brands }: Props) {
 
   // Derive top-level and sub from current URL param
   const selectedCat = categories.find((c) => c.id === currentCatId);
-  const initTopId = selectedCat?.parentId
-    ? selectedCat.parentId
-    : (selectedCat ? currentCatId : '');
+  const initTopId = selectedCat?.parentId ? selectedCat.parentId : selectedCat ? currentCatId : '';
   const initSubId = selectedCat?.parentId ? currentCatId : '';
 
   const [selectedTopId, setSelectedTopId] = useState(initTopId);
@@ -87,7 +85,7 @@ export function ProductFilters({ categories, stores, brands }: Props) {
   function handleTopCatChange(topId: string) {
     setSelectedTopId(topId);
     setSelectedSubId('');
-    const subs = categories.filter((c) => c.parentId === topId);
+    const _subs = categories.filter((c) => c.parentId === topId);
     // If no subcategories, filter by top-level directly
     applyParams({ categoryId: topId });
   }
@@ -128,7 +126,9 @@ export function ProductFilters({ categories, stores, brands }: Props) {
         >
           <option value="">All categories</option>
           {topLevelCats.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
           ))}
         </Select>
       </div>
@@ -143,7 +143,9 @@ export function ProductFilters({ categories, stores, brands }: Props) {
           >
             <option value="">All sub-categories</option>
             {subCategories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </Select>
         </div>
@@ -159,7 +161,9 @@ export function ProductFilters({ categories, stores, brands }: Props) {
           >
             <option value="">All stores</option>
             {stores.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
             ))}
           </Select>
         </div>
@@ -175,7 +179,9 @@ export function ProductFilters({ categories, stores, brands }: Props) {
           >
             <option value="">All brands</option>
             {brands.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
             ))}
           </Select>
         </div>
@@ -183,6 +189,7 @@ export function ProductFilters({ categories, stores, brands }: Props) {
 
       {hasFilters && (
         <button
+          type="button"
           onClick={handleReset}
           className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors whitespace-nowrap"
         >

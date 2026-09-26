@@ -1,17 +1,18 @@
 import { db } from '@/lib/db';
+import { validStockDate } from '@/lib/reports/closing-stock';
+import { getProfitLoss } from '@/lib/reports/profit-loss';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
-import { expenseEntries, saleItems, sales, salesReturns } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { round2 } from '@mybizone/domain/money';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@mybizone/ui/card';
-import { and, eq, gte, lte, ne, sql, sum } from 'drizzle-orm';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { from?: string; to?: string };
+  searchParams: Promise<{ from?: string; to?: string }>;
 }
 
 function financialYearStart(): string {
@@ -29,9 +30,16 @@ function fmt(n: number): string {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function Row({ label, amount, indent = false, bold = false }: { label: string; amount: number; indent?: boolean; bold?: boolean }) {
+function Row({
+  label,
+  amount,
+  indent = false,
+  bold = false,
+}: { label: string; amount: number; indent?: boolean; bold?: boolean }) {
   return (
-    <div className={`flex justify-between py-2 ${indent ? 'pl-6' : ''} ${bold ? 'font-semibold' : ''} border-b last:border-0`}>
+    <div
+      className={`flex justify-between py-2 ${indent ? 'pl-6' : ''} ${bold ? 'font-semibold' : ''} border-b last:border-0`}
+    >
       <span className="text-sm">{label}</span>
       <span className={`text-sm tabular-nums ${amount < 0 ? 'text-red-600' : ''}`}>
         ₹{fmt(amount)}
@@ -40,87 +48,24 @@ function Row({ label, amount, indent = false, bold = false }: { label: string; a
   );
 }
 
-export default async function PlReportPage({ searchParams }: PageProps) {
+export default async function PlReportPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
-  const fromStr = searchParams.from ?? financialYearStart();
-  const toStr = searchParams.to ?? todayStr();
+  await requirePermission(user, 'view_reports');
+  const fromStr =
+    searchParams.from && validStockDate(searchParams.from)
+      ? searchParams.from
+      : financialYearStart();
+  const toStr = searchParams.to && validStockDate(searchParams.to) ? searchParams.to : todayStr();
 
-  const fromDate = new Date(`${fromStr}T00:00:00`);
-  const toDate = new Date(`${toStr}T23:59:59`);
+  const fromDate = new Date(`${fromStr}T00:00:00+05:30`);
+  const toDate = new Date(new Date(`${toStr}T00:00:00+05:30`).getTime() + 86_400_000);
 
   const { revenue, cogs, returns, expenseByCategory } = await withTenant(
     db,
     user.businessId,
     async (tx) => {
-      // Revenue: completed gst_bill + non_gst_bill sales (not estimates)
-      const revenueRows = await tx
-        .select({ total: sum(sales.total) })
-        .from(sales)
-        .where(
-          and(
-            eq(sales.businessId, user.businessId),
-            eq(sales.status, 'completed'),
-            ne(sales.billType, 'estimate'),
-            gte(sales.createdAt, fromDate),
-            lte(sales.createdAt, toDate),
-          ),
-        );
-
-      // COGS: sum of qty × cost_price_at_sale for non-free items
-      const cogsRows = await tx
-        .select({
-          cogs: sql<string>`sum(${saleItems.qty}::numeric * ${saleItems.costPriceAtSale}::numeric)`.as('cogs'),
-        })
-        .from(saleItems)
-        .innerJoin(sales, eq(sales.id, saleItems.saleId))
-        .where(
-          and(
-            eq(saleItems.businessId, user.businessId),
-            eq(sales.status, 'completed'),
-            ne(sales.billType, 'estimate'),
-            eq(saleItems.isFreeItem, false),
-            gte(sales.createdAt, fromDate),
-            lte(sales.createdAt, toDate),
-          ),
-        );
-
-      // Sales returns
-      const returnsRows = await tx
-        .select({ total: sum(salesReturns.total) })
-        .from(salesReturns)
-        .where(
-          and(
-            eq(salesReturns.businessId, user.businessId),
-            eq(salesReturns.status, 'completed'),
-            gte(salesReturns.createdAt, fromDate),
-            lte(salesReturns.createdAt, toDate),
-          ),
-        );
-
-      // Expenses by category
-      const expenseRows = await tx
-        .select({
-          category: expenseEntries.category,
-          type: expenseEntries.type,
-          total: sum(expenseEntries.amount),
-        })
-        .from(expenseEntries)
-        .where(
-          and(
-            eq(expenseEntries.businessId, user.businessId),
-            gte(expenseEntries.entryDate, fromDate),
-            lte(expenseEntries.entryDate, toDate),
-          ),
-        )
-        .groupBy(expenseEntries.category, expenseEntries.type)
-        .orderBy(expenseEntries.category);
-
-      return {
-        revenue: Number(revenueRows[0]?.total ?? 0),
-        cogs: Number(cogsRows[0]?.cogs ?? 0),
-        returns: Number(returnsRows[0]?.total ?? 0),
-        expenseByCategory: expenseRows,
-      };
+      return getProfitLoss(tx, user.businessId, fromDate, toDate);
     },
   );
 
@@ -140,7 +85,10 @@ export default async function PlReportPage({ searchParams }: PageProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Profit & Loss Report</h1>
-          <p className="text-sm text-muted-foreground">{fromStr} to {toStr}</p>
+          <p className="text-sm text-muted-foreground">
+            {fromStr} to {toStr} (India time). Sales and returns exclude GST. Missing cost prices
+            are excluded from cost of goods.
+          </p>
         </div>
         <Button asChild variant="outline">
           <Link href="/reports">Back to Reports</Link>
@@ -150,7 +98,9 @@ export default async function PlReportPage({ searchParams }: PageProps) {
       {/* Date range filter */}
       <form method="GET" className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
-          <label htmlFor="from" className="text-xs font-medium text-muted-foreground">From</label>
+          <label htmlFor="from" className="text-xs font-medium text-muted-foreground">
+            From
+          </label>
           <input
             id="from"
             type="date"
@@ -160,7 +110,9 @@ export default async function PlReportPage({ searchParams }: PageProps) {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="to" className="text-xs font-medium text-muted-foreground">To</label>
+          <label htmlFor="to" className="text-xs font-medium text-muted-foreground">
+            To
+          </label>
           <input
             id="to"
             type="date"
@@ -169,12 +121,16 @@ export default async function PlReportPage({ searchParams }: PageProps) {
             className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
-        <Button type="submit" variant="outline">Apply</Button>
+        <Button type="submit" variant="outline">
+          Apply
+        </Button>
       </form>
 
       {/* Revenue */}
       <Card>
-        <CardHeader><CardTitle>Revenue</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Revenue</CardTitle>
+        </CardHeader>
         <CardContent>
           <Row label="Gross Revenue (Sales)" amount={revenue} />
           <Row label="Less: Sales Returns" amount={-returns} indent />
@@ -184,7 +140,9 @@ export default async function PlReportPage({ searchParams }: PageProps) {
 
       {/* COGS */}
       <Card>
-        <CardHeader><CardTitle>Cost of Goods Sold</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Cost of Goods Sold</CardTitle>
+        </CardHeader>
         <CardContent>
           <Row label="Cost of Goods Sold (Purchase Cost)" amount={cogs} />
           <Row label="Gross Profit" amount={grossProfit} bold />
@@ -193,7 +151,9 @@ export default async function PlReportPage({ searchParams }: PageProps) {
 
       {/* Expenses */}
       <Card>
-        <CardHeader><CardTitle>Expenses</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Expenses</CardTitle>
+        </CardHeader>
         <CardContent>
           {expenseByCategory.filter((e) => e.type === 'expense').length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">No expense entries in this period.</p>
@@ -201,12 +161,7 @@ export default async function PlReportPage({ searchParams }: PageProps) {
             expenseByCategory
               .filter((e) => e.type === 'expense')
               .map((e) => (
-                <Row
-                  key={e.category}
-                  label={e.category}
-                  amount={Number(e.total ?? 0)}
-                  indent
-                />
+                <Row key={e.category} label={e.category} amount={Number(e.total ?? 0)} indent />
               ))
           )}
           <Row label="Total Expenses" amount={totalExpenses} bold />
@@ -216,17 +171,14 @@ export default async function PlReportPage({ searchParams }: PageProps) {
       {/* Other Income */}
       {totalOtherIncome > 0 && (
         <Card>
-          <CardHeader><CardTitle>Other Income</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Other Income</CardTitle>
+          </CardHeader>
           <CardContent>
             {expenseByCategory
               .filter((e) => e.type === 'income')
               .map((e) => (
-                <Row
-                  key={e.category}
-                  label={e.category}
-                  amount={Number(e.total ?? 0)}
-                  indent
-                />
+                <Row key={e.category} label={e.category} amount={Number(e.total ?? 0)} indent />
               ))}
             <Row label="Total Other Income" amount={totalOtherIncome} bold />
           </CardContent>
@@ -238,7 +190,9 @@ export default async function PlReportPage({ searchParams }: PageProps) {
         <CardContent className="pt-6">
           <div className="flex justify-between items-center">
             <span className="text-lg font-bold">Net Profit</span>
-            <span className={`text-2xl font-bold tabular-nums ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <span
+              className={`text-2xl font-bold tabular-nums ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}
+            >
               ₹{fmt(netProfit)}
             </span>
           </div>

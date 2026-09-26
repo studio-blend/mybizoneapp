@@ -20,7 +20,9 @@ export const customers = pgTable(
     creditLimit: numeric('credit_limit', { precision: 12, scale: 2 }).notNull().default('0'),
     // outstandingBalance is the running sum of unpaid bills minus settlements.
     // Updated transactionally on each sale + settlement.
-    outstandingBalance: numeric('outstanding_balance', { precision: 12, scale: 2 }).notNull().default('0'),
+    outstandingBalance: numeric('outstanding_balance', { precision: 12, scale: 2 })
+      .notNull()
+      .default('0'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

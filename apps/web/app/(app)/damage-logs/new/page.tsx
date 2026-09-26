@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { products } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function NewDamageLogPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_inventory');
   const rows = await withTenant(db, user.businessId, (tx) =>
     tx
       .select({

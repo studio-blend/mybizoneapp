@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { products, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -12,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function MinStockPage() {
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
 
   const rows = await withTenant(db, user.businessId, async (tx) => {
     return tx
@@ -40,9 +42,7 @@ export default async function MinStockPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Low Stock Report</h1>
-          <p className="text-sm text-muted-foreground">
-            Products at or below their reorder level.
-          </p>
+          <p className="text-sm text-muted-foreground">Products at or below their reorder level.</p>
         </div>
         <Button asChild variant="outline">
           <Link href="/reports">Back to Reports</Link>
@@ -88,9 +88,7 @@ export default async function MinStockPage() {
                           {p.name}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {p.storeName ?? '—'}
-                      </TableCell>
+                      <TableCell className="text-muted-foreground">{p.storeName ?? '—'}</TableCell>
                       <TableCell className="text-right">
                         {current} {p.unitSymbol}
                       </TableCell>

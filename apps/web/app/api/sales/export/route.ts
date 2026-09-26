@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { getSessionUser } from '@/lib/session';
 import { sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -19,6 +20,16 @@ export async function GET(req: NextRequest) {
   }
   const url = new URL(req.url);
   const storeId = pickUuid(url.searchParams.get('storeId'));
+  try {
+    await requirePermission(
+      { ...user, businessId: user.businessId },
+      'view_sales',
+      storeId ? { storeId } : undefined,
+    );
+  } catch {
+    return new NextResponse('forbidden', { status: 403 });
+  }
+  if (user.mustChangePassword) return new NextResponse('forbidden', { status: 403 });
   const fromDate = parseDate(url.searchParams.get('from'));
   const toDate = parseDate(url.searchParams.get('to'));
 

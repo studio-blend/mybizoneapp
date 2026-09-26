@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { categories, products } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -6,21 +7,23 @@ import { round2 } from '@mybizone/domain/money';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
-import { and, asc, eq, gt, sql, sum } from 'drizzle-orm';
+import { and, asc, eq, sql, sum } from 'drizzle-orm';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { view?: string };
+  searchParams: Promise<{ view?: string }>;
 }
 
 function fmt(n: number): string {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default async function InventoryValuationPage({ searchParams }: PageProps) {
+export default async function InventoryValuationPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
   const view = searchParams.view === 'category' ? 'category' : 'product';
 
   const { byProduct, byCategory, totalValue } = await withTenant(
@@ -49,13 +52,18 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
           categoryName: categories.name,
           totalQty: sum(products.inventory).as('total_qty'),
           avgCost: sql<string>`ROUND(AVG(${products.costPrice}::numeric),2)`.as('avg_cost'),
-          totalValue: sql<string>`ROUND(SUM(${products.inventory}::numeric * COALESCE(${products.costPrice}::numeric,0)),2)`.as('total_value'),
+          totalValue:
+            sql<string>`ROUND(SUM(${products.inventory}::numeric * COALESCE(${products.costPrice}::numeric,0)),2)`.as(
+              'total_value',
+            ),
         })
         .from(products)
         .leftJoin(categories, eq(categories.id, products.categoryId))
         .where(and(eq(products.businessId, user.businessId), eq(products.active, true)))
         .groupBy(categories.name)
-        .orderBy(sql`SUM(${products.inventory}::numeric * COALESCE(${products.costPrice}::numeric,0)) DESC`);
+        .orderBy(
+          sql`SUM(${products.inventory}::numeric * COALESCE(${products.costPrice}::numeric,0)) DESC`,
+        );
 
       let totalValue = 0;
       const enrichedProducts = productRows.map((p) => {
@@ -76,7 +84,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
         <div>
           <h1 className="text-2xl font-semibold">Inventory Valuation</h1>
           <p className="text-sm text-muted-foreground">
-            Current stock valuation (weighted average cost)
+            Current stock valuation at saved product cost prices
           </p>
         </div>
         <Button asChild variant="outline">
@@ -145,7 +153,10 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
               <TableBody>
                 {byProduct.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                    <TableCell
+                      colSpan={7}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
                       No active products.
                     </TableCell>
                   </TableRow>
@@ -160,9 +171,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
                       <TableCell className="font-mono text-xs">{p.sku ?? '—'}</TableCell>
                       <TableCell>{p.categoryName ?? '—'}</TableCell>
                       <TableCell>{p.unitSymbol}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {p.qty.toFixed(3)}
-                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{p.qty.toFixed(3)}</TableCell>
                       <TableCell className="text-right tabular-nums">{fmt(p.cost)}</TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
                         {p.qty > 0 ? fmt(p.val) : '—'}
@@ -174,9 +183,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
             </Table>
             {byProduct.length > 0 && (
               <div className="flex justify-end border-t p-4">
-                <span className="text-sm font-semibold">
-                  Total: ₹{fmt(totalValue)}
-                </span>
+                <span className="text-sm font-semibold">Total: ₹{fmt(totalValue)}</span>
               </div>
             )}
           </CardContent>
@@ -199,14 +206,19 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
               <TableBody>
                 {byCategory.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
+                    <TableCell
+                      colSpan={4}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
                       No data.
                     </TableCell>
                   </TableRow>
                 ) : (
                   byCategory.map((row, i) => (
                     <TableRow key={row.categoryName ?? i}>
-                      <TableCell className="font-medium">{row.categoryName ?? 'Uncategorised'}</TableCell>
+                      <TableCell className="font-medium">
+                        {row.categoryName ?? 'Uncategorised'}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {Number(row.totalQty ?? 0).toFixed(3)}
                       </TableCell>
@@ -223,9 +235,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
             </Table>
             {byCategory.length > 0 && (
               <div className="flex justify-end border-t p-4">
-                <span className="text-sm font-semibold">
-                  Total: ₹{fmt(totalValue)}
-                </span>
+                <span className="text-sm font-semibold">Total: ₹{fmt(totalValue)}</span>
               </div>
             )}
           </CardContent>

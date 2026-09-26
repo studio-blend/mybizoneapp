@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { formatBillNo, getFinancialYear } from '@mybizone/domain/bill-series';
+import { describe, expect, it } from 'vitest';
 
 describe('getFinancialYear', () => {
   it('April 1 starts new FY', () => {

@@ -9,9 +9,10 @@ import { generateInvoiceAction } from '../../../invoices/actions';
 interface Props {
   saleId: string;
   existingPdfKey: string | null;
+  isGstInvoice: boolean;
 }
 
-export function GenerateInvoiceButton({ saleId, existingPdfKey }: Props) {
+export function GenerateInvoiceButton({ saleId, existingPdfKey, isGstInvoice }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, setPending] = useState(false);
@@ -24,15 +25,21 @@ export function GenerateInvoiceButton({ saleId, existingPdfKey }: Props) {
       toast({ title: 'Failed', description: result.error, variant: 'destructive' });
       return;
     }
-    toast({ title: `Invoice ${result.data.invoiceNo} ready` });
+    toast({ title: `${isGstInvoice ? 'Invoice' : 'Receipt'} ${result.data.invoiceNo} ready` });
     router.refresh();
     window.open(`/api/files/${result.data.pdfKey}`, '_blank');
   }
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <Button onClick={onClick} disabled={pending}>
-        {pending ? 'Generating…' : existingPdfKey ? 'Regenerate invoice' : 'Generate GST invoice'}
+        {pending
+          ? 'Generating…'
+          : existingPdfKey
+            ? 'Open PDF'
+            : isGstInvoice
+              ? 'Generate GST invoice'
+              : 'Generate receipt'}
       </Button>
       {existingPdfKey && (
         <Button asChild variant="outline">

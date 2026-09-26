@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { categories, customers, products, saleItems, sales, salesReturns } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -13,7 +14,7 @@ import { DailyRevenueChart } from './_components/perf-charts';
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { tab?: string; from?: string; to?: string };
+  searchParams: Promise<{ tab?: string; from?: string; to?: string }>;
 }
 
 function financialYearStart(): string {
@@ -39,8 +40,10 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]['key'];
 
-export default async function PerformancePage({ searchParams }: PageProps) {
+export default async function PerformancePage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
   const tab: TabKey = (searchParams.tab as TabKey) ?? 'sales';
   const fromStr = searchParams.from ?? financialYearStart();
   const toStr = searchParams.to ?? todayStr();
@@ -104,9 +107,7 @@ export default async function PerformancePage({ searchParams }: PageProps) {
       .limit(25);
 
     // Get outstanding balances for top customers
-    const customerIds = topCustomersRaw
-      .map((c) => c.customerId)
-      .filter(Boolean) as string[];
+    const customerIds = topCustomersRaw.map((c) => c.customerId).filter(Boolean) as string[];
 
     const outstandingMap: Record<string, number> = {};
     if (customerIds.length > 0) {
@@ -302,10 +303,10 @@ export default async function PerformancePage({ searchParams }: PageProps) {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data.dailySalesRaw.map((r, i) => {
+                    data.dailySalesRaw.map((r) => {
                       const rev = Number(r.revenue ?? 0);
                       return (
-                        <TableRow key={i}>
+                        <TableRow key={r.date}>
                           <TableCell>{r.date}</TableCell>
                           <TableCell className="text-right">{r.bills}</TableCell>
                           <TableCell className="text-right tabular-nums">{fmt(rev)}</TableCell>
@@ -358,15 +359,16 @@ export default async function PerformancePage({ searchParams }: PageProps) {
               <TableBody>
                 {data.topCustomersRaw.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                    <TableCell
+                      colSpan={6}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
                       No sales in this period.
                     </TableCell>
                   </TableRow>
                 ) : (
                   data.topCustomersRaw.map((c, i) => {
-                    const outstanding = c.customerId
-                      ? (data.outstandingMap[c.customerId] ?? 0)
-                      : 0;
+                    const outstanding = c.customerId ? (data.outstandingMap[c.customerId] ?? 0) : 0;
                     return (
                       <TableRow key={c.customerId ?? i}>
                         <TableCell className="text-muted-foreground">{i + 1}</TableCell>
@@ -376,7 +378,7 @@ export default async function PerformancePage({ searchParams }: PageProps) {
                               {c.customerName ?? 'Walk-in'}
                             </Link>
                           ) : (
-                            c.customerName ?? 'Walk-in'
+                            (c.customerName ?? 'Walk-in')
                           )}
                         </TableCell>
                         <TableCell className="text-right">{c.orders}</TableCell>
@@ -418,7 +420,10 @@ export default async function PerformancePage({ searchParams }: PageProps) {
               <TableBody>
                 {data.catRaw.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
+                    <TableCell
+                      colSpan={4}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
                       No sales in this period.
                     </TableCell>
                   </TableRow>

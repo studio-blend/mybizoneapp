@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { saleItems, sales } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -17,26 +18,47 @@ function formatMonth(raw: string | Date): string {
 
 export default async function TrendsPage() {
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
 
   const { monthly, topProducts } = await withTenant(db, user.businessId, async (tx) => {
     const [monthly, topProducts] = await Promise.all([
       // Monthly sales for last 12 months
-      tx.select({
-        month: sql<string>`DATE_TRUNC('month', ${sales.createdAt})`.as('month'),
-        billCount: sql<number>`COUNT(*)::int`.as('bill_count'),
-        revenue: sum(sales.total).as('revenue'),
-      }).from(sales).where(
-        and(eq(sales.businessId, user.businessId), eq(sales.status, 'completed'), sql`${sales.createdAt} >= DATE_TRUNC('month', NOW()) - INTERVAL '11 months'`),
-      ).groupBy(sql`DATE_TRUNC('month', ${sales.createdAt})`).orderBy(sql`DATE_TRUNC('month', ${sales.createdAt})`),
+      tx
+        .select({
+          month: sql<string>`DATE_TRUNC('month', ${sales.createdAt})`.as('month'),
+          billCount: sql<number>`COUNT(*)::int`.as('bill_count'),
+          revenue: sum(sales.total).as('revenue'),
+        })
+        .from(sales)
+        .where(
+          and(
+            eq(sales.businessId, user.businessId),
+            eq(sales.status, 'completed'),
+            sql`${sales.createdAt} >= DATE_TRUNC('month', NOW()) - INTERVAL '11 months'`,
+          ),
+        )
+        .groupBy(sql`DATE_TRUNC('month', ${sales.createdAt})`)
+        .orderBy(sql`DATE_TRUNC('month', ${sales.createdAt})`),
       // Top 10 products this calendar month
-      tx.select({
-        productId: saleItems.productId,
-        productName: saleItems.productName,
-        totalQty: sum(saleItems.qty).as('total_qty'),
-        totalRevenue: sum(saleItems.lineTotal).as('total_revenue'),
-      }).from(saleItems).innerJoin(sales, eq(sales.id, saleItems.saleId)).where(
-        and(eq(saleItems.businessId, user.businessId), eq(sales.status, 'completed'), sql`${sales.createdAt} >= DATE_TRUNC('month', NOW())`),
-      ).groupBy(saleItems.productId, saleItems.productName).orderBy(desc(sum(saleItems.lineTotal))).limit(10),
+      tx
+        .select({
+          productId: saleItems.productId,
+          productName: saleItems.productName,
+          totalQty: sum(saleItems.qty).as('total_qty'),
+          totalRevenue: sum(saleItems.lineTotal).as('total_revenue'),
+        })
+        .from(saleItems)
+        .innerJoin(sales, eq(sales.id, saleItems.saleId))
+        .where(
+          and(
+            eq(saleItems.businessId, user.businessId),
+            eq(sales.status, 'completed'),
+            sql`${sales.createdAt} >= DATE_TRUNC('month', NOW())`,
+          ),
+        )
+        .groupBy(saleItems.productId, saleItems.productName)
+        .orderBy(desc(sum(saleItems.lineTotal)))
+        .limit(10),
     ]);
     return { monthly, topProducts };
   });
@@ -46,7 +68,9 @@ export default async function TrendsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Monthly Sales Trends</h1>
-          <p className="text-sm text-muted-foreground">Last 12 months — current month top products.</p>
+          <p className="text-sm text-muted-foreground">
+            Last 12 months — current month top products.
+          </p>
         </div>
         <Button asChild variant="outline">
           <Link href="/reports">Back to Reports</Link>

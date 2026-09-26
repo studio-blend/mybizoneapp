@@ -22,14 +22,19 @@ export const deliveryChallans = pgTable(
     subtotal: numeric('subtotal', { precision: 12, scale: 2 }).notNull(),
     total: numeric('total', { precision: 12, scale: 2 }).notNull(),
     notes: text('notes'),
-    convertedToSaleId: uuid('converted_to_sale_id').references(() => sales.id, { onDelete: 'set null' }),
+    convertedToSaleId: uuid('converted_to_sale_id').references(() => sales.id, {
+      onDelete: 'set null',
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     businessIdx: index('delivery_challans_business_id_idx').on(t.businessId),
     customerIdx: index('delivery_challans_customer_id_idx').on(t.customerId),
-    businessCreatedIdx: index('delivery_challans_business_created_at_idx').on(t.businessId, t.createdAt),
+    businessCreatedIdx: index('delivery_challans_business_created_at_idx').on(
+      t.businessId,
+      t.createdAt,
+    ),
   }),
 );
 

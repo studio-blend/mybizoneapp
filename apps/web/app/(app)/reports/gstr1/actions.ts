@@ -1,17 +1,18 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
-import { customers, saleItems, sales } from '@mybizone/db';
+import { saleItems, sales } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
-import { round2 } from '@mybizone/domain/money';
 import { isInterstate } from '@mybizone/domain/gst';
+import { round2 } from '@mybizone/domain/money';
 import { and, eq, gte, isNotNull, lte, ne, sql, sum } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const paramsSchema = z.object({
-  financialYear: z.string(),   // '2025-26'
+  financialYear: z.string(), // '2025-26'
   fromDate: z.string(),
   toDate: z.string(),
   businessGstin: z.string().optional(),
@@ -84,7 +85,10 @@ async function fetchGstr1Data(params: Params, businessId: string) {
         unitSymbol: sql<string>`max(${saleItems.unitSymbol})`.as('unit_symbol'),
         totalQty: sum(saleItems.qty),
         totalValue: sum(saleItems.lineTotal),
-        taxableValue: sql<string>`sum(${saleItems.lineTotal}::numeric - ${saleItems.gstAmount}::numeric)`.as('taxable_value'),
+        taxableValue:
+          sql<string>`sum(${saleItems.lineTotal}::numeric - ${saleItems.gstAmount}::numeric)`.as(
+            'taxable_value',
+          ),
         totalGst: sum(saleItems.gstAmount),
         gstRate: sql<string>`max(${saleItems.gstRate}::text)`.as('gst_rate'),
       })
@@ -117,7 +121,10 @@ async function fetchGstr1Data(params: Params, businessId: string) {
         .select({
           saleId: saleItems.saleId,
           gstRate: saleItems.gstRate,
-          taxableValue: sql<string>`sum(${saleItems.lineTotal}::numeric - ${saleItems.gstAmount}::numeric)`.as('taxable_value'),
+          taxableValue:
+            sql<string>`sum(${saleItems.lineTotal}::numeric - ${saleItems.gstAmount}::numeric)`.as(
+              'taxable_value',
+            ),
           gstAmount: sql<string>`sum(${saleItems.gstAmount}::numeric)`.as('gst_amount'),
         })
         .from(saleItems)
@@ -135,15 +142,22 @@ async function fetchGstr1Data(params: Params, businessId: string) {
   });
 }
 
-export async function downloadGstr1ExcelAction(rawParams: Params): Promise<{
-  data: string;
-  filename: string;
-  mimeType: string;
-} | { error: string }> {
+export async function downloadGstr1ExcelAction(rawParams: Params): Promise<
+  | {
+      data: string;
+      filename: string;
+      mimeType: string;
+    }
+  | { error: string }
+> {
   try {
     const user = await requireUser();
+    await requirePermission(user, 'view_reports');
     const params = paramsSchema.parse(rawParams);
-    const { b2bSales, b2csSales, hsnSummary, b2bItems } = await fetchGstr1Data(params, user.businessId);
+    const { b2bSales, b2csSales, hsnSummary, b2bItems } = await fetchGstr1Data(
+      params,
+      user.businessId,
+    );
 
     const bizGstin = params.businessGstin ?? '';
 
@@ -156,7 +170,20 @@ export async function downloadGstr1ExcelAction(rawParams: Params): Promise<{
 
     // B2B sheet
     const b2bRows: (string | number)[][] = [
-      ['GSTIN of Buyer', 'Receiver Name', 'Invoice Number', 'Invoice Date', 'Invoice Value', 'Taxable Value', 'CGST Rate', 'CGST Amount', 'SGST Rate', 'SGST Amount', 'IGST Rate', 'IGST Amount'],
+      [
+        'GSTIN of Buyer',
+        'Receiver Name',
+        'Invoice Number',
+        'Invoice Date',
+        'Invoice Value',
+        'Taxable Value',
+        'CGST Rate',
+        'CGST Amount',
+        'SGST Rate',
+        'SGST Amount',
+        'IGST Rate',
+        'IGST Amount',
+      ],
     ];
     for (const sale of b2bSales) {
       const interstate = isInterstate(bizGstin, sale.customerGstin ?? '') ?? false;
@@ -186,7 +213,7 @@ export async function downloadGstr1ExcelAction(rawParams: Params): Promise<{
     }
 
     // B2CS sheet
-    const b2csTotal = Number(b2csSales[0]?.total ?? 0);
+    const _b2csTotal = Number(b2csSales[0]?.total ?? 0);
     const b2csTax = Number(b2csSales[0]?.taxTotal ?? 0);
     const b2csTaxable = Number(b2csSales[0]?.subtotal ?? 0);
     const b2csRows: (string | number)[][] = [
@@ -196,7 +223,18 @@ export async function downloadGstr1ExcelAction(rawParams: Params): Promise<{
 
     // HSN sheet
     const hsnRows: (string | number)[][] = [
-      ['HSN Code', 'Description', 'UOM', 'Total Qty', 'Total Value', 'Taxable Value', 'Rate', 'IGST', 'CGST', 'SGST'],
+      [
+        'HSN Code',
+        'Description',
+        'UOM',
+        'Total Qty',
+        'Total Value',
+        'Taxable Value',
+        'Rate',
+        'IGST',
+        'CGST',
+        'SGST',
+      ],
     ];
     for (const row of hsnSummary) {
       const gst = Number(row.totalGst ?? 0);
@@ -233,15 +271,22 @@ export async function downloadGstr1ExcelAction(rawParams: Params): Promise<{
   }
 }
 
-export async function downloadGstr1JsonAction(rawParams: Params): Promise<{
-  data: string;
-  filename: string;
-  mimeType: string;
-} | { error: string }> {
+export async function downloadGstr1JsonAction(rawParams: Params): Promise<
+  | {
+      data: string;
+      filename: string;
+      mimeType: string;
+    }
+  | { error: string }
+> {
   try {
     const user = await requireUser();
+    await requirePermission(user, 'view_reports');
     const params = paramsSchema.parse(rawParams);
-    const { b2bSales, b2csSales, hsnSummary, b2bItems } = await fetchGstr1Data(params, user.businessId);
+    const { b2bSales, b2csSales, hsnSummary, b2bItems } = await fetchGstr1Data(
+      params,
+      user.businessId,
+    );
 
     const bizGstin = params.businessGstin ?? '';
 

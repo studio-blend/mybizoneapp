@@ -327,7 +327,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
 
   return (
     <form ref={formRef} onSubmit={onSubmit} className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-4 lg:col-span-2">
+      <div className="min-w-0 space-y-4 lg:col-span-2">
         <Card>
           <CardHeader>
             <CardTitle>New sale</CardTitle>
@@ -471,7 +471,9 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className={l.isFreeItem ? 'text-muted-foreground line-through' : ''}>
+                          <span
+                            className={l.isFreeItem ? 'text-muted-foreground line-through' : ''}
+                          >
                             {p.price}
                           </span>
                         </TableCell>
@@ -553,7 +555,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
         </Card>
       </div>
 
-      <Card className="lg:sticky lg:top-4 lg:self-start">
+      <Card className="min-w-0 lg:sticky lg:top-4 lg:self-start">
         <CardHeader>
           <CardTitle>Bill</CardTitle>
         </CardHeader>
@@ -716,7 +718,11 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="chequeNo">Cheque no.</Label>
-                <Input id="chequeNo" value={chequeNo} onChange={(e) => setChequeNo(e.target.value)} />
+                <Input
+                  id="chequeNo"
+                  value={chequeNo}
+                  onChange={(e) => setChequeNo(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="chequeBank">Bank</Label>

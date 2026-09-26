@@ -1,7 +1,8 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { db } from '@/lib/db';
-import { getUserRoles } from '@/lib/get-user-roles';
+import { requirePermission } from '@/lib/require-permission';
 import { type ActionResult, safeAction } from '@/lib/server-action';
 import { requireUser } from '@/lib/session';
 import { uploadFile } from '@/lib/storage';
@@ -18,11 +19,12 @@ import {
 } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { financialYear, formatBillNo } from '@mybizone/domain/bill-series';
-import { hasPermission } from '@mybizone/domain';
+import { emiDueDate } from '@mybizone/domain/emi';
+import { round2 } from '@mybizone/domain/money';
 import { calculateSaleTotals } from '@mybizone/domain/sale';
 import { and, eq, gte, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const optionalText = (max: number) =>
@@ -55,7 +57,11 @@ const SaleLineInput = z.object({
   productId: uuid,
   qty: qtyText,
   // M8: per-line ₹ discount and free flag.
-  itemDiscount: z.union([z.literal(''), moneyText]).optional().default('0').transform((v) => (v === '' ? '0' : (v ?? '0'))),
+  itemDiscount: z
+    .union([z.literal(''), moneyText])
+    .optional()
+    .default('0')
+    .transform((v) => (v === '' ? '0' : (v ?? '0'))),
   isFreeItem: z.boolean().optional().default(false),
 });
 
@@ -81,7 +87,7 @@ const CreateSaleInput = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD')
     .optional()
     .or(z.literal('').transform(() => undefined)),
-  lines: z.array(SaleLineInput).min(1, 'add at least one product'),
+  lines: z.array(SaleLineInput).min(1, 'add at least one product').max(500),
 });
 
 interface CreateSaleResult {
@@ -110,11 +116,7 @@ interface CreateSaleResult {
  * Either every step persists or none does — no partial inventory drift.
  */
 export const createSaleAction = safeAction(CreateSaleInput, async (input, { user, tx }) => {
-  // Permission gate: super_admin always passes; others need create_sale
-  const myRoles = await getUserRoles(user);
-  if (!hasPermission(myRoles, 'create_sale')) {
-    throw new Error('Permission denied — you do not have access to create sales');
-  }
+  await requirePermission(user, 'create_sale', { storeId: input.storeId });
 
   // Snapshot product rows — RLS already scopes to tenant, store check verifies the cart's store.
   const productRows = await tx
@@ -142,6 +144,23 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
     }
   }
 
+  if (input.customerId) {
+    // Customer accounts and balances are shared across the business.
+    await requirePermission(user, 'create_sale');
+    const [customer] = await tx
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(eq(customers.id, input.customerId), eq(customers.businessId, user.businessId)));
+    if (!customer) throw new Error('customer not found');
+  }
+  if (
+    input.billType !== 'estimate' &&
+    ['credit', 'finance_emi'].includes(input.paymentMethod) &&
+    !input.customerId
+  ) {
+    throw new Error('select a customer for credit or EMI sales');
+  }
+
   // Read business GST settings (also snapshot for invoice gen later).
   const [biz] = await tx
     .select({ gstEnabled: businesses.gstEnabled, gstin: businesses.gstin })
@@ -151,7 +170,7 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
 
   // M8: estimates and non-GST bills both force GST OFF for the calculator,
   // regardless of business setting.
-  const effectiveGstEnabled = biz.gstEnabled && input.billType !== 'non_gst_bill';
+  const effectiveGstEnabled = biz.gstEnabled && input.billType === 'gst_bill';
 
   const calc = calculateSaleTotals({
     gstEnabled: effectiveGstEnabled,
@@ -170,6 +189,34 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
     }),
   });
 
+  const pd = input.paymentDetails ?? {};
+  const downPaymentRaw = input.paymentMethod === 'finance_emi' ? Number(pd.downPayment ?? 0) : 0;
+  if (
+    !Number.isFinite(downPaymentRaw) ||
+    downPaymentRaw < 0 ||
+    downPaymentRaw > calc.total ||
+    round2(downPaymentRaw) !== downPaymentRaw
+  ) {
+    throw new Error(
+      'down payment must be between zero and the sale total, with at most two decimals',
+    );
+  }
+  const paymentStatus =
+    input.paymentMethod === 'credit'
+      ? 'due'
+      : input.paymentMethod === 'finance_emi'
+        ? downPaymentRaw > 0
+          ? 'partial'
+          : 'due'
+        : input.paymentStatus;
+  if (
+    input.paymentMethod !== 'credit' &&
+    input.paymentMethod !== 'finance_emi' &&
+    paymentStatus !== 'paid'
+  ) {
+    throw new Error('use credit for unpaid sales');
+  }
+
   // Atomic FY-aware bill number via bill_series table.
   // M8: estimates use 'EST' prefix + a synthetic suffix and DO NOT burn a series number —
   // they aren't legal invoices and shouldn't be counted as such for GST audits.
@@ -178,12 +225,21 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
   let billNo: string;
   if (input.billType === 'estimate') {
     // Synthetic unique id; uniqueness already enforced by sales_business_bill_no_unique.
-    billNo = `EST-${fy.split('-').map((s) => s.slice(-2)).join('-')}-${Date.now().toString().slice(-8)}`;
+    billNo = `EST-${fy
+      .split('-')
+      .map((s) => s.slice(-2))
+      .join('-')}-${randomUUID()}`;
   } else {
     const prefix = input.billType === 'non_gst_bill' ? 'BILL' : 'GST';
     const [seriesRow] = await tx
       .insert(billSeries)
-      .values({ businessId: user.businessId, docType: 'sale', financialYear: fy, prefix, lastSeq: 1 })
+      .values({
+        businessId: user.businessId,
+        docType: 'sale',
+        financialYear: fy,
+        prefix,
+        lastSeq: 1,
+      })
       .onConflictDoUpdate({
         target: [billSeries.businessId, billSeries.docType, billSeries.financialYear],
         set: { lastSeq: sql`${billSeries.lastSeq} + 1` },
@@ -209,11 +265,17 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
       subtotal: calc.subtotal.toFixed(2),
       discount: calc.discount.toFixed(2),
       taxTotal: calc.taxTotal.toFixed(2),
+      gstEnabledAtSale: effectiveGstEnabled,
+      businessGstinAtSale: effectiveGstEnabled ? biz.gstin : null,
+      isInterstate: effectiveGstEnabled && input.isInterstate,
+      cgst: calc.cgst.toFixed(2),
+      sgst: calc.sgst.toFixed(2),
+      igst: calc.igst.toFixed(2),
       total: calc.total.toFixed(2),
       paymentMethod: input.paymentMethod,
       paymentDetails: input.paymentDetails ?? null,
       billType: input.billType,
-      paymentStatus: input.paymentStatus,
+      paymentStatus,
       dueDate: input.dueDate ?? null,
       notes: input.notes,
     })
@@ -276,7 +338,7 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
     await tx
       .update(customers)
       .set({
-        outstandingBalance: sql`${customers.outstandingBalance} + ${calc.total.toFixed(2)}::numeric`,
+        outstandingBalance: sql`${customers.outstandingBalance} + ${round2(calc.total - downPaymentRaw).toFixed(2)}::numeric`,
         updatedAt: new Date(),
       })
       .where(and(eq(customers.id, input.customerId), eq(customers.businessId, user.businessId)));
@@ -285,16 +347,23 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
   // M8: finance_emi generates an emi_schedules row + N emi_payments (one per instalment).
   // The finance company / tenure / EMI amount come in via paymentDetails from the POS form.
   if (input.paymentMethod === 'finance_emi' && input.billType !== 'estimate') {
-    const pd = input.paymentDetails ?? {};
     const financeCompany = typeof pd.financeCompany === 'string' ? pd.financeCompany.trim() : '';
     if (!financeCompany) throw new Error('finance_emi requires paymentDetails.financeCompany');
-    const tenureMonths = Math.max(1, Math.floor(Number(pd.tenureMonths ?? 0) || 0));
-    if (tenureMonths < 1) throw new Error('finance_emi requires tenureMonths >= 1');
+    const tenureMonths = Number(pd.tenureMonths);
+    if (!Number.isInteger(tenureMonths) || tenureMonths < 1 || tenureMonths > 120)
+      throw new Error('finance_emi requires an integer tenure between 1 and 120 months');
     const emiAmountRaw = Number(pd.emiAmount ?? 0);
     if (!Number.isFinite(emiAmountRaw) || emiAmountRaw <= 0) {
       throw new Error('finance_emi requires positive emiAmount');
     }
-    const downPaymentRaw = Number(pd.downPayment ?? 0) || 0;
+    if (
+      round2(emiAmountRaw) !== emiAmountRaw ||
+      round2(emiAmountRaw * tenureMonths) < round2(calc.total - downPaymentRaw)
+    ) {
+      throw new Error(
+        'EMI payments must cover the financed principal and use at most two decimals',
+      );
+    }
     const startDate = input.dueDate ?? new Date().toISOString().slice(0, 10);
 
     const [schedule] = await tx
@@ -315,15 +384,12 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
     if (!schedule) throw new Error('emi schedule insert failed');
 
     // Generate one row per instalment with month-stepped due dates.
-    const base = new Date(`${startDate}T00:00:00Z`);
     const rows = Array.from({ length: tenureMonths }, (_, idx) => {
-      const d = new Date(base);
-      d.setUTCMonth(d.getUTCMonth() + idx + 1);
       return {
         businessId: user.businessId,
         emiScheduleId: schedule.id,
         instalmentNumber: idx + 1,
-        dueDate: d.toISOString().slice(0, 10),
+        dueDate: emiDueDate(startDate, idx + 1),
         status: 'pending',
       };
     });
@@ -368,6 +434,19 @@ export async function uploadSaleBillImageAction(
   }
   if (!(fileValue instanceof Blob) || fileValue.size === 0) {
     return { ok: false, error: 'no file selected' };
+  }
+  const sale = await withTenant(db, user.businessId, async (tx) => {
+    const [row] = await tx
+      .select({ storeId: sales.storeId })
+      .from(sales)
+      .where(and(eq(sales.id, idValue), eq(sales.businessId, user.businessId)));
+    return row;
+  });
+  if (!sale) return { ok: false, error: 'sale not found' };
+  try {
+    await requirePermission(user, 'create_sale', { storeId: sale.storeId });
+  } catch {
+    return { ok: false, error: 'Permission denied' };
   }
 
   const buf = Buffer.from(await fileValue.arrayBuffer());

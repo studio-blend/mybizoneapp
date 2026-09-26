@@ -233,3 +233,48 @@ describe('calculateSaleTotals — M8 non-GST mode', () => {
     expect(out.total).toBe(250);
   });
 });
+
+describe('discount allocation integrity', () => {
+  it('does not over-allocate a one-paisa discount across tiny lines', () => {
+    const out = calculateSaleTotals({
+      gstEnabled: true,
+      discount: 0.02,
+      lines: Array.from({ length: 4 }, () => ({ qty: 1, unitPrice: 0.01, gstRate: 18 })),
+    });
+    expect(out.lines.every((line) => line.lineTotal >= 0 && line.lineDiscount >= 0)).toBe(true);
+    expect(out.lines.reduce((sum, line) => sum + Math.round(line.lineDiscount * 100), 0)).toBe(2);
+    expect(out.lines.reduce((sum, line) => sum + Math.round(line.lineTotal * 100), 0)).toBe(
+      Math.round(out.total * 100),
+    );
+  });
+  it('does not allocate a rounding remainder to a fully discounted last line', () => {
+    const out = calculateSaleTotals({
+      gstEnabled: false,
+      discount: 0.02,
+      lines: [
+        ...Array.from({ length: 3 }, () => ({ qty: 1, unitPrice: 0.01, gstRate: null })),
+        { qty: 1, unitPrice: 1, itemDiscount: 1, gstRate: null },
+      ],
+    });
+    expect(out.lines[3]?.lineTotal).toBe(0);
+    expect(out.lines.every((line) => line.lineDiscount <= line.lineSubtotal)).toBe(true);
+  });
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'rejects non-finite discount %s',
+    (discount) => {
+      expect(() =>
+        calculateSaleTotals({
+          gstEnabled: false,
+          discount,
+          lines: [{ qty: 1, unitPrice: 100, gstRate: null }],
+        }),
+      ).toThrow(SaleCalcError);
+      expect(() =>
+        calculateSaleTotals({
+          gstEnabled: false,
+          lines: [{ qty: 1, unitPrice: 100, gstRate: null, itemDiscount: discount }],
+        }),
+      ).toThrow(SaleCalcError);
+    },
+  );
+});

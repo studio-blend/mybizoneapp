@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { sales } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -13,11 +14,13 @@ export const dynamic = 'force-dynamic';
 type Bucket = 'all' | '0-30' | '31-60' | '61-90' | '90+';
 
 interface PageProps {
-  searchParams: { bucket?: string };
+  searchParams: Promise<{ bucket?: string }>;
 }
 
-export default async function DueBillsReportPage({ searchParams }: PageProps) {
+export default async function DueBillsReportPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
   const bucket: Bucket = isBucket(searchParams.bucket) ? searchParams.bucket : 'all';
 
   const rows = await withTenant(db, user.businessId, async (tx) => {
@@ -75,7 +78,12 @@ export default async function DueBillsReportPage({ searchParams }: PageProps) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-5">
-        <BucketCard label="Total outstanding" value={`₹${totalOutstanding.toFixed(2)}`} active={bucket === 'all'} href="/reports/due-bills" />
+        <BucketCard
+          label="Total outstanding"
+          value={`₹${totalOutstanding.toFixed(2)}`}
+          active={bucket === 'all'}
+          href="/reports/due-bills"
+        />
         <BucketCard
           label="0–30 days"
           value={`₹${bucketTotals['0-30'].toFixed(2)}`}
@@ -104,9 +112,7 @@ export default async function DueBillsReportPage({ searchParams }: PageProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            {bucket === 'all' ? 'All due bills' : `Aging: ${bucket} days`}
-          </CardTitle>
+          <CardTitle>{bucket === 'all' ? 'All due bills' : `Aging: ${bucket} days`}</CardTitle>
           <CardDescription>
             {filtered.length === 0
               ? 'No bills in this bucket.'

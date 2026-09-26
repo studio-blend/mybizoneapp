@@ -1,17 +1,11 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { purchaseReturns } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent } from '@mybizone/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@mybizone/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
 import { desc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 
@@ -19,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function PurchaseReturnsPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_purchases');
 
   const rows = await withTenant(db, user.businessId, async (tx) => {
     return tx
@@ -62,10 +57,7 @@ export default async function PurchaseReturnsPage() {
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center text-sm text-muted-foreground"
-                  >
+                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                     No purchase returns recorded yet.
                   </TableCell>
                 </TableRow>
@@ -74,9 +66,7 @@ export default async function PurchaseReturnsPage() {
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">{r.returnNo}</TableCell>
                     <TableCell>{formatDate(r.createdAt)}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {r.supplierName || '—'}
-                    </TableCell>
+                    <TableCell className="text-muted-foreground">{r.supplierName || '—'}</TableCell>
                     <TableCell className="text-right">{r.total}</TableCell>
                     <TableCell className="text-muted-foreground max-w-xs truncate">
                       {r.reason ?? '—'}

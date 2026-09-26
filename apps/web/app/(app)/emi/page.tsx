@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { customers, emiSchedules } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -12,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function EmiListPage() {
   const user = await requireUser();
+  await requirePermission(user, 'view_sales');
   const rows = await withTenant(db, user.businessId, async (tx) => {
     return tx
       .select({
@@ -74,7 +76,9 @@ export default async function EmiListPage() {
                   <TableRow key={r.id}>
                     <TableCell>{r.customerName ?? '—'}</TableCell>
                     <TableCell>{r.financeCompany}</TableCell>
-                    <TableCell className="text-right">₹{Number(r.principalAmount).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      ₹{Number(r.principalAmount).toFixed(2)}
+                    </TableCell>
                     <TableCell className="text-right">₹{Number(r.emiAmount).toFixed(2)}</TableCell>
                     <TableCell className="text-right">{r.tenureMonths} mo</TableCell>
                     <TableCell className="text-muted-foreground">{r.startDate}</TableCell>
@@ -112,7 +116,9 @@ export default async function EmiListPage() {
                   <TableRow key={r.id}>
                     <TableCell>{r.customerName ?? '—'}</TableCell>
                     <TableCell>{r.financeCompany}</TableCell>
-                    <TableCell className="text-right">₹{Number(r.principalAmount).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      ₹{Number(r.principalAmount).toFixed(2)}
+                    </TableCell>
                     <TableCell className="capitalize text-muted-foreground">{r.status}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" asChild>

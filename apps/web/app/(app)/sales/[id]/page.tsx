@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
-import { businesses, invoices, saleItems, sales, stores } from '@mybizone/db';
+import { invoices, saleItems, sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Card, CardContent, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
@@ -10,13 +11,17 @@ import { GenerateInvoiceButton } from './_components/generate-invoice-button';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SaleDetailPage({ params }: { params: { id: string } }) {
+export default async function SaleDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
   const data = await withTenant(db, user.businessId, async (tx) => {
     const [row] = await tx
       .select({
         id: sales.id,
+        storeId: sales.storeId,
         billNo: sales.billNo,
+        billType: sales.billType,
+        gstEnabledAtSale: sales.gstEnabledAtSale,
         createdAt: sales.createdAt,
         customerName: sales.customerName,
         customerPhone: sales.customerPhone,
@@ -33,6 +38,7 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
       .leftJoin(stores, eq(stores.id, sales.storeId))
       .where(and(eq(sales.id, params.id), eq(sales.businessId, user.businessId)));
     if (!row) return null;
+    await requirePermission(user, 'view_sales', { storeId: row.storeId });
     const items = await tx
       .select({
         id: saleItems.id,
@@ -47,28 +53,28 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
       .from(saleItems)
       .where(eq(saleItems.saleId, params.id))
       .orderBy(asc(saleItems.createdAt));
-    const [biz] = await tx
-      .select({ gstEnabled: businesses.gstEnabled })
-      .from(businesses)
-      .where(eq(businesses.id, user.businessId));
     const [inv] = await tx
       .select({ id: invoices.id, invoiceNo: invoices.invoiceNo, pdfKey: invoices.pdfKey })
       .from(invoices)
       .where(eq(invoices.saleId, params.id));
-    return { row, items, gstEnabled: biz?.gstEnabled ?? false, invoice: inv ?? null };
+    return { row, items, invoice: inv ?? null };
   });
 
   if (!data) notFound();
-  const { row, items, gstEnabled, invoice } = data;
+  const { row, items, invoice } = data;
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle>Bill {row.billNo}</CardTitle>
-            {gstEnabled && (
-              <GenerateInvoiceButton saleId={row.id} existingPdfKey={invoice?.pdfKey ?? null} />
+            {row.billType !== 'estimate' && (
+              <GenerateInvoiceButton
+                saleId={row.id}
+                existingPdfKey={invoice?.pdfKey ?? null}
+                isGstInvoice={row.gstEnabledAtSale === true && row.billType === 'gst_bill'}
+              />
             )}
           </div>
           {invoice && <p className="text-xs text-muted-foreground">Invoice: {invoice.invoiceNo}</p>}

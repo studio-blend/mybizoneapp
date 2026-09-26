@@ -14,7 +14,9 @@ export const purchaseReturns = pgTable(
     businessId: uuid('business_id')
       .notNull()
       .references(() => businesses.id, { onDelete: 'cascade' }),
-    originalPurchaseId: uuid('original_purchase_id').references(() => purchases.id, { onDelete: 'set null' }),
+    originalPurchaseId: uuid('original_purchase_id').references(() => purchases.id, {
+      onDelete: 'set null',
+    }),
     supplierId: uuid('supplier_id').references(() => suppliers.id, { onDelete: 'set null' }),
     supplierName: text('supplier_name').notNull(),
     returnNo: text('return_no').notNull(),
@@ -28,8 +30,13 @@ export const purchaseReturns = pgTable(
   },
   (t) => ({
     businessIdx: index('purchase_returns_business_id_idx').on(t.businessId),
-    originalPurchaseIdx: index('purchase_returns_original_purchase_id_idx').on(t.originalPurchaseId),
-    businessCreatedIdx: index('purchase_returns_business_created_at_idx').on(t.businessId, t.createdAt),
+    originalPurchaseIdx: index('purchase_returns_original_purchase_id_idx').on(
+      t.originalPurchaseId,
+    ),
+    businessCreatedIdx: index('purchase_returns_business_created_at_idx').on(
+      t.businessId,
+      t.createdAt,
+    ),
   }),
 );
 

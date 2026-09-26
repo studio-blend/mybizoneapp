@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { products, saleItems, sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -12,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function ReportsPage() {
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
   const since = new Date();
   since.setDate(since.getDate() - 29);
   since.setHours(0, 0, 0, 0);
@@ -31,6 +33,7 @@ export default async function ReportsPage() {
           eq(sales.businessId, user.businessId),
           gte(sales.createdAt, since),
           eq(sales.status, 'completed'),
+          sql`${sales.billType} != 'estimate'`,
         ),
       )
       .groupBy(sql`date_trunc('day', ${sales.createdAt})`)
@@ -52,6 +55,7 @@ export default async function ReportsPage() {
           eq(saleItems.businessId, user.businessId),
           gte(sales.createdAt, since),
           eq(sales.status, 'completed'),
+          sql`${sales.billType} != 'estimate'`,
         ),
       )
       .groupBy(saleItems.productId, saleItems.productName)
@@ -70,6 +74,7 @@ export default async function ReportsPage() {
           eq(sales.businessId, user.businessId),
           gte(sales.createdAt, since),
           eq(sales.status, 'completed'),
+          sql`${sales.billType} != 'estimate'`,
         ),
       )
       .groupBy(sales.paymentMethod);
@@ -99,12 +104,14 @@ export default async function ReportsPage() {
     // Returns null profit when no items have cost data.
     const [profitRow] = await tx
       .select({
-        estimatedProfit: sql<string>`sum(CASE WHEN ${saleItems.costPriceAtSale} IS NOT NULL THEN ${saleItems.lineTotal} - ${saleItems.costPriceAtSale} * ${saleItems.qty} ELSE 0 END)`.as(
-          'estimated_profit',
-        ),
-        coveredItems: sql<number>`count(CASE WHEN ${saleItems.costPriceAtSale} IS NOT NULL THEN 1 END)::int`.as(
-          'covered_items',
-        ),
+        estimatedProfit:
+          sql<string>`sum(CASE WHEN ${saleItems.costPriceAtSale} IS NOT NULL THEN ${saleItems.lineTotal} - ${saleItems.gstAmount} - ${saleItems.costPriceAtSale} * ${saleItems.qty} ELSE 0 END)`.as(
+            'estimated_profit',
+          ),
+        coveredItems:
+          sql<number>`count(CASE WHEN ${saleItems.costPriceAtSale} IS NOT NULL THEN 1 END)::int`.as(
+            'covered_items',
+          ),
         totalItems: sql<number>`count(*)::int`.as('total_items'),
       })
       .from(saleItems)
@@ -114,6 +121,7 @@ export default async function ReportsPage() {
           eq(saleItems.businessId, user.businessId),
           gte(sales.createdAt, since),
           eq(sales.status, 'completed'),
+          sql`${sales.billType} != 'estimate'`,
         ),
       );
 
@@ -127,7 +135,10 @@ export default async function ReportsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Reports</h1>
-          <p className="text-sm text-muted-foreground">Last 30 days.</p>
+          <p className="text-sm text-muted-foreground">
+            Last 30 days. Sales totals include GST; profit excludes GST and is before returns and
+            expenses.
+          </p>
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">

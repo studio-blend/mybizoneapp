@@ -1,13 +1,13 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { uploadFile } from '@/lib/storage';
 import { auditLogs, billCounters, businesses, invoices, saleItems, sales } from '@mybizone/db';
-import { isInterstate } from '@mybizone/domain/gst';
 import { type InvoiceData, renderInvoicePdf } from '@mybizone/pdf/invoice';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const GenerateInput = z.object({ saleId: z.string().uuid() });
 
@@ -18,23 +18,20 @@ interface GenerateResult {
 }
 
 /**
- * Generate (or regenerate) the invoice PDF for an existing sale.
+ * Issue an invoice PDF once; retries return the stored invoice unchanged.
  *
  * 1. Load sale + items + business under tenant scope.
- * 2. Decide intra/interstate via stored customer GSTIN where available,
- *    falling back to false (intrastate) when no GSTIN — owners can re-toggle
- *    by editing the sale's customer GSTIN if needed (M3 polish).
- * 3. Allocate invoice_no atomically via bill_counters.
- * 4. Recompute the GST split from the snapshotted sale_items so historical
- *    invoices stay correct even if products are later edited.
- * 5. UPSERT the invoices row (1:1 with sale).
+ * 2. Require frozen sale tax facts; unknown legacy context needs reconciliation.
+ * 3. Lock the sale and reuse an existing invoice; allocate a number only on first issuance.
+ * 4. Use the persisted CGST/SGST/IGST amounts from the sale or existing invoice.
+ * 5. Insert the immutable invoice snapshot (1:1 with sale).
  * 6. Render PDF, upload to storage, update invoices.pdf_key.
  *
  * Returns { invoiceId, invoiceNo, pdfKey } — UI links to /api/invoices/[id]/pdf.
  */
 export const generateInvoiceAction = safeAction(GenerateInput, async (input, { user, tx }) => {
   const [biz] = await tx
-    .select({ name: businesses.name, gstin: businesses.gstin, gstEnabled: businesses.gstEnabled })
+    .select({ name: businesses.name })
     .from(businesses)
     .where(eq(businesses.id, user.businessId));
   if (!biz) {
@@ -44,7 +41,9 @@ export const generateInvoiceAction = safeAction(GenerateInput, async (input, { u
   const [saleRow] = await tx
     .select({
       id: sales.id,
+      storeId: sales.storeId,
       billNo: sales.billNo,
+      billType: sales.billType,
       createdAt: sales.createdAt,
       customerName: sales.customerName,
       customerPhone: sales.customerPhone,
@@ -52,12 +51,36 @@ export const generateInvoiceAction = safeAction(GenerateInput, async (input, { u
       subtotal: sales.subtotal,
       discount: sales.discount,
       taxTotal: sales.taxTotal,
+      gstEnabledAtSale: sales.gstEnabledAtSale,
+      businessGstinAtSale: sales.businessGstinAtSale,
+      isInterstate: sales.isInterstate,
+      cgst: sales.cgst,
+      sgst: sales.sgst,
+      igst: sales.igst,
       total: sales.total,
     })
     .from(sales)
-    .where(and(eq(sales.id, input.saleId), eq(sales.businessId, user.businessId)));
+    .where(and(eq(sales.id, input.saleId), eq(sales.businessId, user.businessId)))
+    .for('update');
   if (!saleRow) {
     throw new Error('sale not found');
+  }
+
+  await requirePermission(user, 'view_sales', { storeId: saleRow.storeId });
+  if (saleRow.billType === 'estimate') throw new Error('estimates cannot generate invoices');
+
+  // Locking the sale serializes first issuance and retries. Once a PDF exists,
+  // serve that immutable document rather than renumbering or changing tax data.
+  const [existing] = await tx
+    .select()
+    .from(invoices)
+    .where(and(eq(invoices.saleId, saleRow.id), eq(invoices.businessId, user.businessId)));
+  if (existing?.pdfKey) {
+    return {
+      invoiceId: existing.id,
+      invoiceNo: existing.invoiceNo,
+      pdfKey: existing.pdfKey,
+    } satisfies GenerateResult;
   }
 
   const items = await tx
@@ -75,48 +98,42 @@ export const generateInvoiceAction = safeAction(GenerateInput, async (input, { u
     .where(eq(saleItems.saleId, saleRow.id))
     .orderBy(asc(saleItems.createdAt));
 
-  const interstate = isInterstate(biz.gstin, saleRow.customerGstin) ?? false;
-  const taxTotalNum = Number(saleRow.taxTotal);
-  const cgst = !interstate && taxTotalNum > 0 ? roundHalf(taxTotalNum) : 0;
-  const sgst = !interstate && taxTotalNum > 0 ? +(taxTotalNum - cgst).toFixed(2) : 0;
-  const igst = interstate ? taxTotalNum : 0;
-
-  // Allocate invoice_no atomically.
-  const [counter] = await tx
-    .insert(billCounters)
-    .values({ businessId: user.businessId, lastInvoiceNo: 1 })
-    .onConflictDoUpdate({
-      target: billCounters.businessId,
-      set: { lastInvoiceNo: sql`${billCounters.lastInvoiceNo} + 1` },
-    })
-    .returning({ lastInvoiceNo: billCounters.lastInvoiceNo });
-  if (!counter) {
-    throw new Error('invoice numbering failed');
+  if (
+    !existing &&
+    (saleRow.gstEnabledAtSale === null ||
+      saleRow.isInterstate === null ||
+      saleRow.cgst === null ||
+      saleRow.sgst === null ||
+      saleRow.igst === null)
+  ) {
+    throw new Error(
+      'Historical sale tax context is missing; reconcile its original tax details before issuing an invoice',
+    );
   }
-  const invoiceNo = `INV-${String(counter.lastInvoiceNo).padStart(6, '0')}`;
+  const interstate = existing?.isInterstate ?? saleRow.isInterstate ?? false;
+  const cgst = Number(existing?.cgst ?? saleRow.cgst);
+  const sgst = Number(existing?.sgst ?? saleRow.sgst);
+  const igst = Number(existing?.igst ?? saleRow.igst);
 
-  // UPSERT invoice row keyed on sale_id (unique). Re-generation overwrites.
-  const [inv] = await tx
-    .insert(invoices)
-    .values({
-      businessId: user.businessId,
-      saleId: saleRow.id,
-      invoiceNo,
-      businessGstin: biz.gstin,
-      customerGstin: saleRow.customerGstin,
-      customerName: saleRow.customerName,
-      isInterstate: interstate,
-      subtotal: saleRow.subtotal,
-      cgst: cgst.toFixed(2),
-      sgst: sgst.toFixed(2),
-      igst: igst.toFixed(2),
-      total: saleRow.total,
-    })
-    .onConflictDoUpdate({
-      target: invoices.saleId,
-      set: {
+  let inv = existing;
+  if (!inv) {
+    const [counter] = await tx
+      .insert(billCounters)
+      .values({ businessId: user.businessId, lastInvoiceNo: 1 })
+      .onConflictDoUpdate({
+        target: billCounters.businessId,
+        set: { lastInvoiceNo: sql`${billCounters.lastInvoiceNo} + 1` },
+      })
+      .returning({ lastInvoiceNo: billCounters.lastInvoiceNo });
+    if (!counter) throw new Error('invoice numbering failed');
+    const invoiceNo = `INV-${String(counter.lastInvoiceNo).padStart(6, '0')}`;
+    [inv] = await tx
+      .insert(invoices)
+      .values({
+        businessId: user.businessId,
+        saleId: saleRow.id,
         invoiceNo,
-        businessGstin: biz.gstin,
+        businessGstin: saleRow.businessGstinAtSale,
         customerGstin: saleRow.customerGstin,
         customerName: saleRow.customerName,
         isInterstate: interstate,
@@ -125,25 +142,25 @@ export const generateInvoiceAction = safeAction(GenerateInput, async (input, { u
         sgst: sgst.toFixed(2),
         igst: igst.toFixed(2),
         total: saleRow.total,
-      },
-    })
-    .returning({ id: invoices.id, invoiceNo: invoices.invoiceNo });
-  if (!inv) {
-    throw new Error('invoice persist failed');
+      })
+      .returning();
+    if (!inv) throw new Error('invoice persist failed');
   }
 
   const data: InvoiceData = {
-    isGstInvoice: biz.gstEnabled,
-    business: { name: biz.name, gstin: biz.gstin },
+    isGstInvoice:
+      saleRow.gstEnabledAtSale ??
+      (saleRow.billType === 'gst_bill' && (!!inv.businessGstin || cgst + sgst + igst > 0)),
+    business: { name: biz.name, gstin: inv.businessGstin },
     invoice: {
       number: inv.invoiceNo,
       date: new Date(saleRow.createdAt),
       isInterstate: interstate,
     },
     customer: {
-      name: saleRow.customerName,
+      name: inv.customerName,
       phone: saleRow.customerPhone,
-      gstin: saleRow.customerGstin,
+      gstin: inv.customerGstin,
       address: null,
     },
     lines: items.map((i) => ({
@@ -157,12 +174,12 @@ export const generateInvoiceAction = safeAction(GenerateInput, async (input, { u
       lineTotal: i.lineTotal,
     })),
     totals: {
-      subtotal: saleRow.subtotal,
+      subtotal: inv.subtotal,
       discount: saleRow.discount,
       cgst: cgst.toFixed(2),
       sgst: sgst.toFixed(2),
       igst: igst.toFixed(2),
-      total: saleRow.total,
+      total: inv.total,
     },
   };
 
@@ -192,8 +209,3 @@ export const generateInvoiceAction = safeAction(GenerateInput, async (input, { u
   revalidatePath(`/sales/${saleRow.id}`);
   return { invoiceId: inv.id, invoiceNo: inv.invoiceNo, pdfKey } satisfies GenerateResult;
 });
-
-function roundHalf(amount: number): number {
-  // Half of GST, rounded to 2 decimal places.
-  return Math.round((amount / 2 + Number.EPSILON) * 100) / 100;
-}

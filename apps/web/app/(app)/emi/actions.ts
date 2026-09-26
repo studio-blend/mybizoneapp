@@ -1,10 +1,12 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
-import { auditLogs, customers, emiPayments, emiSchedules } from '@mybizone/db';
-import { and, eq, sql } from 'drizzle-orm';
+import { auditLogs, customers, emiPayments, emiSchedules, sales } from '@mybizone/db';
+import { instalmentPrincipal } from '@mybizone/domain/emi';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const moneyText = z.string().regex(/^\d{1,10}(?:\.\d{1,2})?$/, 'expected money up to 2dp');
@@ -13,10 +15,14 @@ const dateText = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
 const RecordEmiPaymentInput = z.object({
   paymentId: uuid,
   scheduleId: uuid,
-  amountPaid: moneyText,
+  amountPaid: moneyText.refine((v) => Number(v) > 0, 'amount must be positive'),
   paidDate: dateText,
   paymentMethod: z.enum(['cash', 'upi', 'card_debit', 'card_credit', 'cheque', 'other']),
-  notes: z.string().max(500).optional().transform((v) => v?.trim() || null),
+  notes: z
+    .string()
+    .max(500)
+    .optional()
+    .transform((v) => v?.trim() || null),
 });
 
 /**
@@ -30,6 +36,20 @@ const RecordEmiPaymentInput = z.object({
 export const recordEmiPaymentAction = safeAction(
   RecordEmiPaymentInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_customers');
+    // Serialize every payment for this schedule: prevents double collection and
+    // makes the final-instalment completion check observe previous payments.
+    const [schedule] = await tx
+      .select()
+      .from(emiSchedules)
+      .where(
+        and(eq(emiSchedules.id, input.scheduleId), eq(emiSchedules.businessId, user.businessId)),
+      )
+      .for('update');
+    if (!schedule || schedule.status !== 'active') throw new Error('active EMI schedule not found');
+    if (Number(input.amountPaid) !== Number(schedule.emiAmount)) {
+      throw new Error('record the full scheduled instalment amount');
+    }
     const [payment] = await tx
       .select({
         id: emiPayments.id,
@@ -57,32 +77,24 @@ export const recordEmiPaymentAction = safeAction(
         paymentMethod: input.paymentMethod,
         notes: input.notes,
       })
-      .where(
-        and(eq(emiPayments.id, input.paymentId), eq(emiPayments.businessId, user.businessId)),
-      );
+      .where(and(eq(emiPayments.id, input.paymentId), eq(emiPayments.businessId, user.businessId)));
 
     // Decrement the linked customer's outstanding (the EMI principal increased it on sale).
-    const [schedule] = await tx
-      .select({ customerId: emiSchedules.customerId })
-      .from(emiSchedules)
-      .where(
-        and(
-          eq(emiSchedules.id, input.scheduleId),
-          eq(emiSchedules.businessId, user.businessId),
-        ),
-      );
-    if (schedule?.customerId) {
+    const principalPaid = instalmentPrincipal(
+      Number(schedule.principalAmount),
+      Number(schedule.downPayment),
+      schedule.tenureMonths,
+      payment.instalmentNumber,
+    );
+    if (schedule.customerId) {
       await tx
         .update(customers)
         .set({
-          outstandingBalance: sql`GREATEST(${customers.outstandingBalance} - ${input.amountPaid}::numeric, 0)`,
+          outstandingBalance: sql`GREATEST(${customers.outstandingBalance} - ${principalPaid.toFixed(2)}::numeric, 0)`,
           updatedAt: new Date(),
         })
         .where(
-          and(
-            eq(customers.id, schedule.customerId),
-            eq(customers.businessId, user.businessId),
-          ),
+          and(eq(customers.id, schedule.customerId), eq(customers.businessId, user.businessId)),
         );
     }
 
@@ -94,18 +106,21 @@ export const recordEmiPaymentAction = safeAction(
         and(
           eq(emiPayments.emiScheduleId, input.scheduleId),
           eq(emiPayments.businessId, user.businessId),
-          eq(emiPayments.status, 'pending'),
+          ne(emiPayments.status, 'paid'),
         ),
       );
     if (remaining.length === 0) {
+      if (schedule.saleId) {
+        await tx
+          .update(sales)
+          .set({ paymentStatus: 'paid', updatedAt: new Date() })
+          .where(and(eq(sales.id, schedule.saleId), eq(sales.businessId, user.businessId)));
+      }
       await tx
         .update(emiSchedules)
         .set({ status: 'completed' })
         .where(
-          and(
-            eq(emiSchedules.id, input.scheduleId),
-            eq(emiSchedules.businessId, user.businessId),
-          ),
+          and(eq(emiSchedules.id, input.scheduleId), eq(emiSchedules.businessId, user.businessId)),
         );
     }
 

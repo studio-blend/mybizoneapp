@@ -1,12 +1,13 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { requireUser } from '@/lib/session';
-import { businesses, customers, eInvoices, saleItems, sales } from '@mybizone/db';
-import { withTenant } from '@mybizone/db/tenant';
 import { env } from '@/lib/env';
-import { and, eq, sql } from 'drizzle-orm';
-import { z } from 'zod';
+import { requirePermission } from '@/lib/require-permission';
+import { requireUser } from '@/lib/session';
+import { businesses, eInvoices, saleItems, sales } from '@mybizone/db';
+import { withTenant } from '@mybizone/db/tenant';
+import { and, eq } from 'drizzle-orm';
+import { z } from 'zod/v3';
 
 const generateSchema = z.object({ saleId: z.string().uuid() });
 const cancelSchema = z.object({
@@ -23,6 +24,7 @@ export async function generateIrnAction(
 ): Promise<{ irn: string; ackNo: string; qrCode: string | null } | { error: string }> {
   try {
     const user = await requireUser();
+    await requirePermission(user, 'view_reports');
     const { saleId } = generateSchema.parse(rawData);
 
     const result = await withTenant(db, user.businessId, async (tx) => {
@@ -30,7 +32,13 @@ export async function generateIrnAction(
       const existing = await tx
         .select({ id: eInvoices.id, status: eInvoices.status, irn: eInvoices.irn })
         .from(eInvoices)
-        .where(and(eq(eInvoices.saleId, saleId), eq(eInvoices.status, 'generated')));
+        .where(
+          and(
+            eq(eInvoices.saleId, saleId),
+            eq(eInvoices.businessId, user.businessId),
+            eq(eInvoices.status, 'generated'),
+          ),
+        );
 
       if (existing.length > 0) {
         throw new Error(`IRN already generated: ${existing[0]?.irn ?? ''}`);
@@ -50,7 +58,7 @@ export async function generateIrnAction(
           businessId: sales.businessId,
         })
         .from(sales)
-        .where(eq(sales.id, saleId));
+        .where(and(eq(sales.id, saleId), eq(sales.businessId, user.businessId)));
 
       if (!saleRows.length || !saleRows[0]) throw new Error('Sale not found');
       const sale = saleRows[0];
@@ -95,7 +103,9 @@ export async function generateIrnAction(
           DocDtls: {
             Typ: 'INV',
             No: sale.billNo,
-            Dt: sale.createdAt.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-'),
+            Dt: sale.createdAt
+              .toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              .replace(/\//g, '-'),
           },
           SellerDtls: {
             Gstin: biz?.gstin ?? '',
@@ -166,7 +176,11 @@ export async function generateIrnAction(
           body: JSON.stringify(payload),
         });
 
-        const respJson = await resp.json() as { Status: number; Data?: { Irn: string; AckNo: string; SignedQRCode?: string }; ErrorDetails?: unknown[] };
+        const respJson = (await resp.json()) as {
+          Status: number;
+          Data?: { Irn: string; AckNo: string; SignedQRCode?: string };
+          ErrorDetails?: unknown[];
+        };
         if (respJson.Status !== 1 || !respJson.Data) {
           throw new Error(`GSTN API error: ${JSON.stringify(respJson.ErrorDetails ?? respJson)}`);
         }
@@ -205,6 +219,7 @@ export async function cancelIrnAction(
 ): Promise<{ success: true } | { error: string }> {
   try {
     const user = await requireUser();
+    await requirePermission(user, 'view_reports');
     const { eInvoiceId, reason } = cancelSchema.parse(rawData);
 
     await withTenant(db, user.businessId, async (tx) => {
@@ -239,8 +254,13 @@ export async function cancelIrnAction(
 
       await tx
         .update(eInvoices)
-        .set({ status: 'cancelled', cancelledAt: new Date(), cancelReason: reason, updatedAt: new Date() })
-        .where(eq(eInvoices.id, eInvoiceId));
+        .set({
+          status: 'cancelled',
+          cancelledAt: new Date(),
+          cancelReason: reason,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(eInvoices.id, eInvoiceId), eq(eInvoices.businessId, user.businessId)));
     });
 
     return { success: true };

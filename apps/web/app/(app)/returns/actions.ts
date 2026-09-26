@@ -1,6 +1,6 @@
 'use server';
 
-import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import {
   auditLogs,
@@ -8,185 +8,201 @@ import {
   customers,
   products,
   returnItems,
+  saleItems,
+  sales,
   salesReturns,
+  salesSettlements,
 } from '@mybizone/db';
-import { withTenant } from '@mybizone/db/tenant';
 import { financialYear, formatBillNo } from '@mybizone/domain/bill-series';
-import { and, eq, sql } from 'drizzle-orm';
+import { round2 } from '@mybizone/domain/money';
+import { calculateReturnLines } from '@mybizone/domain/returns';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
-const uuid = z.string().uuid();
-const optionalText = (max: number) =>
-  z
-    .string()
-    .max(max)
-    .optional()
-    .transform((v) => v?.trim() || null);
+const Input = z
+  .object({
+    originalSaleId: z.string().uuid().optional(),
+    originalBillNo: z.string().trim().max(80).optional(),
+    customerId: z.string().uuid().optional(),
+    customerName: z.string().trim().max(120).optional(),
+    reason: z.string().trim().max(500).optional(),
+    items: z
+      .array(
+        z.object({
+          productId: z.string().uuid(),
+          qty: z
+            .string()
+            .regex(/^\d{1,9}(?:\.\d{1,3})?$/)
+            .refine((v) => Number(v) > 0, 'quantity must be positive'),
+        }),
+      )
+      .min(1)
+      .max(500),
+  })
+  .refine((v) => !!v.originalSaleId || !!v.originalBillNo, 'provide the original bill number');
 
-const CreateSalesReturnInput = z.object({
-  originalSaleId: uuid.optional(),
-  customerId: uuid.optional(),
-  customerName: optionalText(120),
-  reason: optionalText(500),
-  items: z
-    .array(
-      z.object({
-        productId: uuid,
-        qty: z.string().regex(/^\d{1,9}(?:\.\d{1,3})?$/, 'expected qty up to 3dp'),
-      }),
+export const createSalesReturnAction = safeAction(Input, async (input, { user, tx }) => {
+  // Lock the source document to serialize concurrent partial returns.
+  const [original] = await tx
+    .select()
+    .from(sales)
+    .where(
+      and(
+        eq(sales.businessId, user.businessId),
+        input.originalSaleId
+          ? eq(sales.id, input.originalSaleId)
+          : eq(sales.billNo, input.originalBillNo!),
+      ),
     )
-    .min(1, 'add at least one item to return'),
-});
-
-interface CreateSalesReturnResult {
-  id: string;
-  returnNo: string;
-  total: string;
-}
-
-export const createSalesReturnAction = safeAction(
-  CreateSalesReturnInput,
-  async (input, { user, tx }) => {
-    // 1. Snapshot product rows for returned items.
-    const productRows = await tx
-      .select({
-        id: products.id,
-        name: products.name,
-        unitSymbol: products.unitSymbol,
-        price: products.price,
-        costPrice: products.costPrice,
-        hsnCode: products.hsnCode,
-        gstRate: products.gstRate,
-        active: products.active,
-      })
-      .from(products)
-      .where(eq(products.businessId, user.businessId));
-
-    const byId = new Map(productRows.map((p) => [p.id, p]));
-
-    for (const item of input.items) {
-      const p = byId.get(item.productId);
-      if (!p) throw new Error(`product ${item.productId} not found`);
-      if (!p.active) throw new Error(`product "${p.name}" is deleted`);
+    .for('update');
+  if (!original) throw new Error('original bill not found');
+  await requirePermission(user, 'create_sale', { storeId: original.storeId });
+  if (original.customerId) await requirePermission(user, 'create_sale');
+  if (original.paymentMethod === 'finance_emi')
+    throw new Error('close or adjust the finance agreement before returning an EMI bill');
+  if (original.billType === 'estimate') throw new Error('estimates cannot be returned');
+  if (original.status !== 'completed') throw new Error('only completed sales can be returned');
+  if (original.paymentMethod === 'credit' && !original.customerId)
+    throw new Error('credit return requires the original customer and debt reconciliation');
+  if (original.paymentMethod === 'credit' && original.customerId) {
+    // Same party lock as settlement: the check and debt reduction must serialize.
+    const [customer] = await tx
+      .select()
+      .from(customers)
+      .where(and(eq(customers.id, original.customerId), eq(customers.businessId, user.businessId)))
+      .for('update');
+    const [settlement] = await tx
+      .select({ id: salesSettlements.id })
+      .from(salesSettlements)
+      .where(
+        and(
+          eq(salesSettlements.customerId, original.customerId),
+          eq(salesSettlements.businessId, user.businessId),
+        ),
+      )
+      .limit(1);
+    if (!customer || settlement || original.paymentStatus !== 'due') {
+      throw new Error(
+        'credit return requires payment allocation reconciliation before adjusting debt',
+      );
     }
-
-    // 2. Compute line totals (qty × unitPrice, no GST recalc for returns).
-    type LineCalc = {
-      productId: string;
-      qty: string;
-      product: (typeof productRows)[number];
-      lineTotal: string;
-    };
-
-    const lines: LineCalc[] = input.items.map((item) => {
-      const p = byId.get(item.productId);
-      if (!p) throw new Error('unreachable');
-      const lineTotal = (Number(item.qty) * Number(p.price)).toFixed(2);
-      return { productId: item.productId, qty: item.qty, product: p, lineTotal };
-    });
-
-    const subtotal = lines.reduce((acc, l) => acc + Number(l.lineTotal), 0);
-    const total = subtotal; // No GST recalc for returns; taxTotal = 0.
-
-    // 3. Generate return number via bill_series (atomic, FY-aware).
-    const now = new Date();
-    const fy = financialYear(now);
-    const [seriesRow] = await tx
-      .insert(billSeries)
-      .values({
-        businessId: user.businessId,
-        docType: 'return',
-        financialYear: fy,
-        prefix: 'RET',
-        lastSeq: 1,
-      })
-      .onConflictDoUpdate({
-        target: [billSeries.businessId, billSeries.docType, billSeries.financialYear],
-        set: { lastSeq: sql`${billSeries.lastSeq} + 1` },
-      })
-      .returning({ lastSeq: billSeries.lastSeq, prefix: billSeries.prefix });
-    if (!seriesRow) throw new Error('bill series assignment failed');
-    const returnNo = formatBillNo(seriesRow.prefix, fy, seriesRow.lastSeq);
-
-    // 4. Insert salesReturns row.
-    const [returnRow] = await tx
-      .insert(salesReturns)
-      .values({
-        businessId: user.businessId,
-        originalSaleId: input.originalSaleId ?? null,
-        customerId: input.customerId ?? null,
-        customerName: input.customerName,
-        returnNo,
-        reason: input.reason,
-        subtotal: subtotal.toFixed(2),
-        taxTotal: '0.00',
-        total: total.toFixed(2),
-        status: 'completed',
-      })
-      .returning({ id: salesReturns.id });
-    if (!returnRow) throw new Error('sales return insert failed');
-
-    // 5. Insert returnItems + restock inventory for each line.
-    for (const line of lines) {
-      await tx.insert(returnItems).values({
-        returnId: returnRow.id,
-        productId: line.productId,
-        productName: line.product.name,
-        qty: line.qty,
-        unitSymbol: line.product.unitSymbol,
-        unitPrice: line.product.price,
-        hsnCode: line.product.hsnCode,
-        gstRate: line.product.gstRate,
-        gstAmount: '0.00',
-        lineTotal: line.lineTotal,
-        costPriceAtSale: line.product.costPrice,
-      });
-
-      // 6. Restock inventory (increment — no floor check needed on returns).
-      await tx
-        .update(products)
-        .set({ inventory: sql`${products.inventory} + ${line.qty}` })
-        .where(
-          and(eq(products.id, line.productId), eq(products.businessId, user.businessId)),
-        );
-    }
-
-    // 7. If customerId provided: credit customer's outstanding balance (refund).
-    if (input.customerId) {
-      await tx
-        .update(customers)
-        .set({
-          outstandingBalance: sql`GREATEST(0, ${customers.outstandingBalance} - ${total.toFixed(2)})`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(customers.id, input.customerId),
-            eq(customers.businessId, user.businessId),
-          ),
-        );
-    }
-
-    // 8. Audit log.
-    await tx.insert(auditLogs).values({
+  }
+  if (input.customerId && input.customerId !== original.customerId)
+    throw new Error('customer does not match original bill');
+  const sourceItems = await tx.select().from(saleItems).where(eq(saleItems.saleId, original.id));
+  const previous = await tx
+    .select({
+      productId: returnItems.productId,
+      qty: returnItems.qty,
+      lineTotal: returnItems.lineTotal,
+      gstAmount: returnItems.gstAmount,
+    })
+    .from(returnItems)
+    .innerJoin(salesReturns, eq(salesReturns.id, returnItems.returnId))
+    .where(
+      and(
+        eq(salesReturns.originalSaleId, original.id),
+        eq(salesReturns.businessId, user.businessId),
+        eq(salesReturns.status, 'completed'),
+      ),
+    );
+  const lines = calculateReturnLines(sourceItems, previous, input.items);
+  for (const line of lines) {
+    const costs = new Set(
+      sourceItems
+        .filter((item) => item.productId === line.productId)
+        .map((item) => item.costPriceAtSale),
+    );
+    if (costs.size > 1) throw new Error('return requires original-line cost reconciliation');
+  }
+  const total = round2(lines.reduce((n, line) => n + Number(line.lineTotal), 0));
+  const taxTotal = round2(lines.reduce((n, line) => n + Number(line.gstAmount), 0));
+  const fy = financialYear(new Date());
+  const [series] = await tx
+    .insert(billSeries)
+    .values({
       businessId: user.businessId,
-      actorId: user.id,
-      action: 'return.create',
-      entity: 'salesReturn',
-      entityId: returnRow.id,
-      after: { returnNo, total: total.toFixed(2) },
-    });
-
-    // 9. Revalidate affected paths.
-    revalidatePath('/returns');
-    revalidatePath('/sales');
-    revalidatePath('/products');
-
-    return {
-      id: returnRow.id,
+      docType: 'return',
+      financialYear: fy,
+      prefix: 'RET',
+      lastSeq: 1,
+    })
+    .onConflictDoUpdate({
+      target: [billSeries.businessId, billSeries.docType, billSeries.financialYear],
+      set: { lastSeq: sql`${billSeries.lastSeq} + 1` },
+    })
+    .returning({ lastSeq: billSeries.lastSeq, prefix: billSeries.prefix });
+  if (!series) throw new Error('return number assignment failed');
+  const returnNo = formatBillNo(series.prefix, fy, series.lastSeq);
+  const [row] = await tx
+    .insert(salesReturns)
+    .values({
+      businessId: user.businessId,
+      originalSaleId: original.id,
+      customerId: original.customerId,
+      customerName: original.customerName,
       returnNo,
+      reason: input.reason || null,
+      subtotal: round2(total - taxTotal).toFixed(2),
+      taxTotal: taxTotal.toFixed(2),
       total: total.toFixed(2),
-    } satisfies CreateSalesReturnResult;
-  },
-);
+      status: 'completed',
+    })
+    .returning({ id: salesReturns.id });
+  if (!row) throw new Error('return insert failed');
+  for (const line of lines) {
+    const source = sourceItems.find((item) => item.productId === line.productId)!;
+    await tx.insert(returnItems).values({
+      returnId: row.id,
+      productId: line.productId,
+      productName: source.productName,
+      qty: line.qty,
+      unitSymbol: source.unitSymbol,
+      unitPrice: source.unitPrice,
+      hsnCode: source.hsnCode,
+      gstRate: source.gstRate,
+      gstAmount: line.gstAmount,
+      lineTotal: line.lineTotal,
+      costPriceAtSale: source.costPriceAtSale,
+    });
+    const changed = await tx
+      .update(products)
+      .set({ inventory: sql`${products.inventory} + ${line.qty}::numeric` })
+      .where(and(eq(products.id, line.productId), eq(products.businessId, user.businessId)))
+      .returning({ id: products.id });
+    if (!changed.length) throw new Error('returned product no longer exists');
+  }
+  // Paid bills must not reduce debt from unrelated invoices.
+  if (original.paymentMethod === 'credit' && original.customerId) {
+    const adjusted = await tx
+      .update(customers)
+      .set({
+        outstandingBalance: sql`${customers.outstandingBalance} - ${total.toFixed(2)}::numeric`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(customers.id, original.customerId),
+          eq(customers.businessId, user.businessId),
+          gte(customers.outstandingBalance, total.toFixed(2)),
+        ),
+      )
+      .returning({ id: customers.id });
+    if (!adjusted.length)
+      throw new Error('credit return exceeds recorded debt; reconcile the balance');
+  }
+  await tx.insert(auditLogs).values({
+    businessId: user.businessId,
+    actorId: user.id,
+    action: 'return.create',
+    entity: 'salesReturn',
+    entityId: row.id,
+    after: { returnNo, originalBillNo: original.billNo, total: total.toFixed(2) },
+  });
+  revalidatePath('/returns');
+  revalidatePath('/sales');
+  revalidatePath('/products');
+  revalidatePath('/customers');
+  return { id: row.id, returnNo, total: total.toFixed(2) };
+});

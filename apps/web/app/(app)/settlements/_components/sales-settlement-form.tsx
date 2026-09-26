@@ -101,12 +101,7 @@ export function SalesSettlementForm({ customers }: Props) {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="customerId">Customer</Label>
-            <Select
-              id="customerId"
-              name="customerId"
-              required
-              onChange={handleCustomerChange}
-            >
+            <Select id="customerId" name="customerId" required onChange={handleCustomerChange}>
               <option value="">Select a customer…</option>
               {sorted.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -153,17 +148,10 @@ export function SalesSettlementForm({ customers }: Props) {
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (optional)</Label>
-            <Textarea
-              id="notes"
-              name="notes"
-              maxLength={500}
-              placeholder="Any additional notes"
-            />
+            <Textarea id="notes" name="notes" maxLength={500} placeholder="Any additional notes" />
           </div>
 
-          {error && (
-            <p className="text-sm font-medium text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm font-medium text-destructive">{error}</p>}
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={pending}>

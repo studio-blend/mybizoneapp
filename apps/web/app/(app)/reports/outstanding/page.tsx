@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { customers, suppliers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -11,11 +12,13 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { tab?: string };
+  searchParams: Promise<{ tab?: string }>;
 }
 
-export default async function OutstandingPage({ searchParams }: PageProps) {
+export default async function OutstandingPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
+  await requirePermission(user, 'view_reports');
   const tab = searchParams.tab === 'suppliers' ? 'suppliers' : 'customers';
 
   const { customerRows, supplierRows } = await withTenant(db, user.businessId, async (tx) => {
@@ -28,9 +31,7 @@ export default async function OutstandingPage({ searchParams }: PageProps) {
         outstandingBalance: customers.outstandingBalance,
       })
       .from(customers)
-      .where(
-        eq(customers.businessId, user.businessId),
-      )
+      .where(eq(customers.businessId, user.businessId))
       .orderBy(desc(customers.outstandingBalance));
 
     const supplierRows = await tx
@@ -42,9 +43,7 @@ export default async function OutstandingPage({ searchParams }: PageProps) {
         outstandingBalance: suppliers.outstandingBalance,
       })
       .from(suppliers)
-      .where(
-        eq(suppliers.businessId, user.businessId),
-      )
+      .where(eq(suppliers.businessId, user.businessId))
       .orderBy(desc(suppliers.outstandingBalance));
 
     return { customerRows, supplierRows };
@@ -54,14 +53,8 @@ export default async function OutstandingPage({ searchParams }: PageProps) {
   const dueCustomers = customerRows.filter((c) => Number(c.outstandingBalance) > 0);
   const dueSuppliers = supplierRows.filter((s) => Number(s.outstandingBalance) > 0);
 
-  const customerTotal = dueCustomers.reduce(
-    (acc, c) => acc + Number(c.outstandingBalance),
-    0,
-  );
-  const supplierTotal = dueSuppliers.reduce(
-    (acc, s) => acc + Number(s.outstandingBalance),
-    0,
-  );
+  const customerTotal = dueCustomers.reduce((acc, c) => acc + Number(c.outstandingBalance), 0);
+  const supplierTotal = dueSuppliers.reduce((acc, s) => acc + Number(s.outstandingBalance), 0);
 
   return (
     <div className="space-y-6">
@@ -125,10 +118,7 @@ export default async function OutstandingPage({ searchParams }: PageProps) {
               <TableBody>
                 {dueCustomers.length === 0 ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center text-sm text-muted-foreground"
-                    >
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                       No outstanding balances.
                     </TableCell>
                   </TableRow>
@@ -137,15 +127,11 @@ export default async function OutstandingPage({ searchParams }: PageProps) {
                     const outstanding = Number(c.outstandingBalance);
                     const creditLimit = Number(c.creditLimit ?? 0);
                     const utilisation =
-                      creditLimit > 0
-                        ? ((outstanding / creditLimit) * 100).toFixed(1)
-                        : null;
+                      creditLimit > 0 ? ((outstanding / creditLimit) * 100).toFixed(1) : null;
                     return (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {c.phone ?? '—'}
-                        </TableCell>
+                        <TableCell className="text-muted-foreground">{c.phone ?? '—'}</TableCell>
                         <TableCell className="text-right">
                           {creditLimit > 0 ? creditLimit.toFixed(2) : '—'}
                         </TableCell>
@@ -186,10 +172,7 @@ export default async function OutstandingPage({ searchParams }: PageProps) {
               <TableBody>
                 {dueSuppliers.length === 0 ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={4}
-                      className="text-center text-sm text-muted-foreground"
-                    >
+                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
                       No outstanding balances.
                     </TableCell>
                   </TableRow>
@@ -197,9 +180,7 @@ export default async function OutstandingPage({ searchParams }: PageProps) {
                   dueSuppliers.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">{s.name}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {s.phone ?? '—'}
-                      </TableCell>
+                      <TableCell className="text-muted-foreground">{s.phone ?? '—'}</TableCell>
                       <TableCell className="text-muted-foreground font-mono text-xs">
                         {s.gstin ?? '—'}
                       </TableCell>

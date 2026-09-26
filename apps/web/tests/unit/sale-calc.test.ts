@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { SaleCalcError, calculateSaleTotals } from '@mybizone/domain/sale';
+import { describe, expect, it } from 'vitest';
 
 describe('calculateSaleTotals — no GST', () => {
   it('single line, no discount', () => {
@@ -76,7 +76,7 @@ describe('calculateSaleTotals — with GST (intrastate)', () => {
       gstEnabled: true,
       lines: [
         { qty: 1, unitPrice: 1000, gstRate: 18 }, // 180 GST
-        { qty: 2, unitPrice: 500, gstRate: 12 },  // 120 GST
+        { qty: 2, unitPrice: 500, gstRate: 12 }, // 120 GST
       ],
     });
     expect(r.subtotal).toBe(2000);
@@ -102,13 +102,15 @@ describe('calculateSaleTotals — with GST (intrastate)', () => {
 
 describe('calculateSaleTotals — error cases', () => {
   it('throws on empty lines', () => {
-    expect(() => calculateSaleTotals({ gstEnabled: false, lines: [] }))
-      .toThrow(SaleCalcError);
+    expect(() => calculateSaleTotals({ gstEnabled: false, lines: [] })).toThrow(SaleCalcError);
   });
 
   it('throws on negative qty', () => {
     expect(() =>
-      calculateSaleTotals({ gstEnabled: false, lines: [{ qty: -1, unitPrice: 100, gstRate: null }] })
+      calculateSaleTotals({
+        gstEnabled: false,
+        lines: [{ qty: -1, unitPrice: 100, gstRate: null }],
+      }),
     ).toThrow(SaleCalcError);
   });
 
@@ -118,7 +120,7 @@ describe('calculateSaleTotals — error cases', () => {
         gstEnabled: false,
         discount: 999,
         lines: [{ qty: 1, unitPrice: 100, gstRate: null }],
-      })
+      }),
     ).toThrow(SaleCalcError);
   });
 });

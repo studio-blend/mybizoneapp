@@ -1,11 +1,11 @@
 'use server';
 
+import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { auditLogs, damageLogs, products } from '@mybizone/db';
-import { financialYear } from '@mybizone/domain/bill-series';
 import { and, eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const optionalText = (max: number) =>
@@ -14,7 +14,10 @@ const optionalText = (max: number) =>
     .max(max)
     .optional()
     .transform((v) => v?.trim() || null);
-const qtyText = z.string().regex(/^\d{1,9}(?:\.\d{1,3})?$/, 'expected qty up to 3dp');
+const qtyText = z
+  .string()
+  .regex(/^\d{1,9}(?:\.\d{1,3})?$/, 'expected qty up to 3dp')
+  .refine((value) => Number(value) > 0, 'Quantity must be positive');
 
 const DAMAGE_REASONS = ['damaged', 'theft', 'spillage', 'expired', 'other'] as const;
 
@@ -28,6 +31,7 @@ const CreateDamageLogInput = z.object({
 export const createDamageLogAction = safeAction(
   CreateDamageLogInput,
   async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_inventory');
     // 1. Snapshot product name + unitSymbol + costPrice
     const [product] = await tx
       .select({
@@ -45,8 +49,7 @@ export const createDamageLogAction = safeAction(
     // 2. Compute totalValue = qty × costPerUnit (if costPrice exists)
     const qty = Number(input.qty);
     const costPerUnit = product.costPrice ? product.costPrice : null;
-    const totalValue =
-      costPerUnit != null ? (qty * Number(costPerUnit)).toFixed(2) : null;
+    const totalValue = costPerUnit != null ? (qty * Number(costPerUnit)).toFixed(2) : null;
 
     // 3. Insert into damageLogs with snapshot
     const [logRow] = await tx
@@ -66,11 +69,19 @@ export const createDamageLogAction = safeAction(
       .returning({ id: damageLogs.id });
     if (!logRow) throw new Error('damage log insert failed');
 
-    // 4. Decrement product inventory (no floor check — damage can push below 0)
-    await tx
+    // 4. Atomically guard stock; throwing rolls back the damage record too.
+    const [updated] = await tx
       .update(products)
       .set({ inventory: sql`${products.inventory} - ${input.qty}`, updatedAt: new Date() })
-      .where(and(eq(products.id, input.productId), eq(products.businessId, user.businessId)));
+      .where(
+        and(
+          eq(products.id, input.productId),
+          eq(products.businessId, user.businessId),
+          sql`${products.inventory} >= ${input.qty}`,
+        ),
+      )
+      .returning({ id: products.id });
+    if (!updated) throw new Error('Damage exceeds available stock');
 
     // 5. Audit log
     await tx.insert(auditLogs).values({

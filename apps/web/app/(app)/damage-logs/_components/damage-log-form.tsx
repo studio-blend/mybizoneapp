@@ -106,9 +106,7 @@ export function DamageLogForm({ products }: Props) {
               onChange={(e) => setQty(e.target.value)}
             />
             {estimatedLoss !== null && (
-              <p className="text-sm text-muted-foreground">
-                Estimated loss: ₹{estimatedLoss}
-              </p>
+              <p className="text-sm text-muted-foreground">Estimated loss: ₹{estimatedLoss}</p>
             )}
           </div>
 

@@ -16,7 +16,9 @@ export const suppliers = pgTable(
     address: text('address'),
     // outstandingBalance tracks what the business owes this supplier.
     // Increases on purchase bills, decreases on purchase settlements.
-    outstandingBalance: numeric('outstanding_balance', { precision: 12, scale: 2 }).notNull().default('0'),
+    outstandingBalance: numeric('outstanding_balance', { precision: 12, scale: 2 })
+      .notNull()
+      .default('0'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

@@ -62,7 +62,7 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
   const [lines, setLines] = useState<LineItem[]>([newLine()]);
 
   const productById = new Map(products.map((p) => [p.id, p]));
-  const selectedSupplier = suppliers.find((s) => s.id === supplierId) ?? null;
+  const _selectedSupplier = suppliers.find((s) => s.id === supplierId) ?? null;
 
   function handleSupplierChange(id: string) {
     setSupplierId(id);
@@ -90,8 +90,8 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
   }
 
   const runningTotal = lines.reduce((acc, l) => {
-    const qty = parseFloat(l.qty);
-    const price = parseFloat(l.unitPrice);
+    const qty = Number.parseFloat(l.qty);
+    const price = Number.parseFloat(l.unitPrice);
     if (!Number.isNaN(qty) && !Number.isNaN(price)) return acc + qty * price;
     return acc;
   }, 0);
@@ -172,12 +172,7 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="purchaseDate">Purchase date</Label>
-              <Input
-                id="purchaseDate"
-                name="purchaseDate"
-                type="date"
-                defaultValue={todayIso()}
-              />
+              <Input id="purchaseDate" name="purchaseDate" type="date" defaultValue={todayIso()} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="paymentMethod">Payment method</Label>
@@ -197,7 +192,7 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
             {lines.map((line) => {
               const lineTotal =
                 line.qty && line.unitPrice
-                  ? (parseFloat(line.qty) * parseFloat(line.unitPrice)).toFixed(2)
+                  ? (Number.parseFloat(line.qty) * Number.parseFloat(line.unitPrice)).toFixed(2)
                   : '—';
               const selectedProduct = productById.get(line.productId);
               return (

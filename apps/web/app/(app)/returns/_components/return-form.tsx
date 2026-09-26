@@ -15,7 +15,7 @@ import { Select } from '@mybizone/ui/select';
 import { Textarea } from '@mybizone/ui/textarea';
 import { useToast } from '@mybizone/ui/use-toast';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createSalesReturnAction } from '../actions';
 
 interface Props {
@@ -35,6 +35,7 @@ interface Props {
 }
 
 interface ItemRow {
+  rowKey: number;
   productId: string;
   qty: string;
 }
@@ -53,20 +54,20 @@ export function ReturnForm({ products, customers, originalSale }: Props) {
   const [reason, setReason] = useState('');
 
   // Step 2 — item rows
-  const [items, setItems] = useState<ItemRow[]>([{ productId: '', qty: '' }]);
+  const nextRowKey = useRef(1);
+  const [items, setItems] = useState<ItemRow[]>([{ productId: '', qty: '', rowKey: 0 }]);
 
   function addItemRow() {
-    setItems((prev) => [...prev, { productId: '', qty: '' }]);
+    const rowKey = nextRowKey.current++;
+    setItems((prev) => [...prev, { productId: '', qty: '', rowKey }]);
   }
 
   function removeItemRow(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function updateItem(index: number, field: keyof ItemRow, value: string) {
-    setItems((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
-    );
+  function updateItem(index: number, field: 'productId' | 'qty', value: string) {
+    setItems((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -83,6 +84,7 @@ export function ReturnForm({ products, customers, originalSale }: Props) {
     setPending(true);
 
     const result = await createSalesReturnAction({
+      originalBillNo,
       originalSaleId: originalSale?.id ?? undefined,
       customerId: customerId || undefined,
       customerName: customerName || undefined,
@@ -112,14 +114,15 @@ export function ReturnForm({ products, customers, originalSale }: Props) {
         <CardHeader>
           <CardTitle>Return details</CardTitle>
           <CardDescription>
-            Optionally link to an original bill and provide customer and reason.
+            Link to an original bill and provide customer and reason.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="originalBillNo">Original bill number (optional)</Label>
+            <Label htmlFor="originalBillNo">Original bill number</Label>
             <Input
               id="originalBillNo"
+              required
               name="originalBillNo"
               maxLength={40}
               placeholder="GST-2526-0001"
@@ -188,7 +191,7 @@ export function ReturnForm({ products, customers, originalSale }: Props) {
         </CardHeader>
         <CardContent className="space-y-4">
           {items.map((row, idx) => (
-            <div key={idx} className="flex gap-2 items-end">
+            <div key={row.rowKey} className="flex gap-2 items-end">
               <div className="flex-1 space-y-1">
                 <Label htmlFor={`product-${idx}`}>Product</Label>
                 <Select

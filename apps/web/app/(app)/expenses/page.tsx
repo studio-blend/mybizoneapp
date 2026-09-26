@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { expenseEntries } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -29,50 +30,47 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 export default async function ExpensesPage() {
   const user = await requireUser();
+  await requirePermission(user, 'manage_expenses');
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const { rows, incomeTotal, expenseTotal } = await withTenant(
-    db,
-    user.businessId,
-    async (tx) => {
-      const rows = await tx
-        .select({
-          id: expenseEntries.id,
-          type: expenseEntries.type,
-          category: expenseEntries.category,
-          description: expenseEntries.description,
-          amount: expenseEntries.amount,
-          paymentMethod: expenseEntries.paymentMethod,
-          referenceNo: expenseEntries.referenceNo,
-          entryDate: expenseEntries.entryDate,
-        })
-        .from(expenseEntries)
-        .where(eq(expenseEntries.businessId, user.businessId))
-        .orderBy(desc(expenseEntries.entryDate))
-        .limit(100);
+  const { rows, incomeTotal, expenseTotal } = await withTenant(db, user.businessId, async (tx) => {
+    const rows = await tx
+      .select({
+        id: expenseEntries.id,
+        type: expenseEntries.type,
+        category: expenseEntries.category,
+        description: expenseEntries.description,
+        amount: expenseEntries.amount,
+        paymentMethod: expenseEntries.paymentMethod,
+        referenceNo: expenseEntries.referenceNo,
+        entryDate: expenseEntries.entryDate,
+      })
+      .from(expenseEntries)
+      .where(eq(expenseEntries.businessId, user.businessId))
+      .orderBy(desc(expenseEntries.entryDate))
+      .limit(100);
 
-      const [summary] = await tx
-        .select({
-          incomeTotal: sql<string>`COALESCE(SUM(CASE WHEN ${expenseEntries.type} = 'income' THEN ${expenseEntries.amount} ELSE 0 END), 0)`,
-          expenseTotal: sql<string>`COALESCE(SUM(CASE WHEN ${expenseEntries.type} = 'expense' THEN ${expenseEntries.amount} ELSE 0 END), 0)`,
-        })
-        .from(expenseEntries)
-        .where(
-          and(
-            eq(expenseEntries.businessId, user.businessId),
-            gte(expenseEntries.entryDate, monthStart),
-          ),
-        );
+    const [summary] = await tx
+      .select({
+        incomeTotal: sql<string>`COALESCE(SUM(CASE WHEN ${expenseEntries.type} = 'income' THEN ${expenseEntries.amount} ELSE 0 END), 0)`,
+        expenseTotal: sql<string>`COALESCE(SUM(CASE WHEN ${expenseEntries.type} = 'expense' THEN ${expenseEntries.amount} ELSE 0 END), 0)`,
+      })
+      .from(expenseEntries)
+      .where(
+        and(
+          eq(expenseEntries.businessId, user.businessId),
+          gte(expenseEntries.entryDate, monthStart),
+        ),
+      );
 
-      return {
-        rows,
-        incomeTotal: summary?.incomeTotal ?? '0',
-        expenseTotal: summary?.expenseTotal ?? '0',
-      };
-    },
-  );
+    return {
+      rows,
+      incomeTotal: summary?.incomeTotal ?? '0',
+      expenseTotal: summary?.expenseTotal ?? '0',
+    };
+  });
 
   const net = Number(incomeTotal) - Number(expenseTotal);
   const netPositive = net >= 0;
@@ -153,10 +151,7 @@ export default async function ExpensesPage() {
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="text-center text-sm text-muted-foreground"
-                  >
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                     No entries yet. Add your first entry above.
                   </TableCell>
                 </TableRow>

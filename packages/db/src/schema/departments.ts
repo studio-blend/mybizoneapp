@@ -4,7 +4,9 @@ import { stores } from './stores';
 
 export const departments = pgTable('departments', {
   id: uuid('id').primaryKey().defaultRandom(),
-  businessId: uuid('business_id').notNull().references(() => businesses.id, { onDelete: 'cascade' }),
+  businessId: uuid('business_id')
+    .notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
   storeId: uuid('store_id').references(() => stores.id, { onDelete: 'set null' }),
   name: text('name').notNull(),
   description: text('description'),

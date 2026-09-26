@@ -1,18 +1,25 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { getUserRoles } from '@/lib/get-user-roles';
+import { requirePermission } from '@/lib/require-permission';
 import { type ActionResult, safeAction } from '@/lib/server-action';
 import { requireUser } from '@/lib/session';
 import { uploadFile } from '@/lib/storage';
-import { auditLogs, bumpUsage, businesses, products } from '@mybizone/db';
+import {
+  auditLogs,
+  brands,
+  bumpUsage,
+  businesses,
+  categories,
+  products,
+  stores,
+} from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { isValidUnit } from '@mybizone/domain/catalog';
-import { hasPermission } from '@mybizone/domain';
 import { type Plan, checkLimit, isValidPlan } from '@mybizone/domain/plans';
 import { and, count, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const uuid = z.string().uuid();
 const optionalUuid = z.union([uuid, z.literal('')]).transform((v) => (v === '' ? null : v));
@@ -40,16 +47,28 @@ const ProductBase = z.object({
   unitType: z.string().min(1).max(20),
   unitSymbol: z.string().min(1).max(20),
   price: numericText(10, 2),
-  costPrice: z
-    .union([z.literal(''), numericText(10, 2)])
+  costPrice: z.union([z.literal(''), numericText(10, 2)]).transform((v) => (v === '' ? null : v)),
+  mrp: z
+    .union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)])
     .transform((v) => (v === '' ? null : v)),
-  mrp: z.union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)]).transform((v) => v === '' ? null : v),
-  wholesalePrice: z.union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)]).transform((v) => v === '' ? null : v),
-  rate1: z.union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)]).transform((v) => v === '' ? null : v),
-  rate2: z.union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)]).transform((v) => v === '' ? null : v),
-  rate3: z.union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)]).transform((v) => v === '' ? null : v),
-  rate4: z.union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)]).transform((v) => v === '' ? null : v),
-  minStock: z.union([z.literal(''), z.string().regex(/^\d{1,9}(?:\.\d{1,3})?$/)]).transform((v) => v === '' ? null : v),
+  wholesalePrice: z
+    .union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)])
+    .transform((v) => (v === '' ? null : v)),
+  rate1: z
+    .union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)])
+    .transform((v) => (v === '' ? null : v)),
+  rate2: z
+    .union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)])
+    .transform((v) => (v === '' ? null : v)),
+  rate3: z
+    .union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)])
+    .transform((v) => (v === '' ? null : v)),
+  rate4: z
+    .union([z.literal(''), z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)])
+    .transform((v) => (v === '' ? null : v)),
+  minStock: z
+    .union([z.literal(''), z.string().regex(/^\d{1,9}(?:\.\d{1,3})?$/)])
+    .transform((v) => (v === '' ? null : v)),
   inventory: numericText(12, 3),
   hsnCode: optionalText(20),
   gstRate: z.union([z.literal(''), numericText(5, 2)]).transform((v) => (v === '' ? null : v)),
@@ -60,9 +79,12 @@ const ProductBase = z.object({
       if (!v) return {};
       try {
         const parsed = JSON.parse(v);
-        if (typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, string>;
+        if (typeof parsed === 'object' && !Array.isArray(parsed))
+          return parsed as Record<string, string>;
         return {};
-      } catch { return {}; }
+      } catch {
+        return {};
+      }
     }),
 });
 
@@ -76,10 +98,26 @@ const unitErrorPath = { path: ['unitSymbol'], message: 'unit symbol does not mat
 const ProductInput = ProductBase.refine(unitMatches, unitErrorPath);
 
 export const createProductAction = safeAction(ProductInput, async (input, { user, tx }) => {
-  // Permission gate: super_admin always passes; others need manage_products
-  const myRoles = await getUserRoles(user);
-  if (!hasPermission(myRoles, 'manage_products')) {
-    throw new Error('Permission denied — you do not have access to create products');
+  await requirePermission(user, 'manage_products', { storeId: input.storeId });
+  const [store] = await tx
+    .select({ id: stores.id })
+    .from(stores)
+    .where(and(eq(stores.id, input.storeId), eq(stores.businessId, user.businessId)));
+  if (!store) throw new Error('store not found');
+  if (input.categoryId) {
+    const [category] = await tx
+      .select({ id: categories.id, storeId: categories.storeId })
+      .from(categories)
+      .where(and(eq(categories.id, input.categoryId), eq(categories.businessId, user.businessId)));
+    if (!category || (category.storeId && category.storeId !== input.storeId))
+      throw new Error('category not found in selected store');
+  }
+  if (input.brandId) {
+    const [brand] = await tx
+      .select({ id: brands.id })
+      .from(brands)
+      .where(and(eq(brands.id, input.brandId), eq(brands.businessId, user.businessId)));
+    if (!brand) throw new Error('brand not found');
   }
 
   const [bizRows, countRows] = await Promise.all([
@@ -92,9 +130,7 @@ export const createProductAction = safeAction(ProductInput, async (input, { user
   const plan: Plan = isValidPlan(bizRows[0]?.plan) ? (bizRows[0].plan as Plan) : 'free';
   const gate = checkLimit(plan, 'products', countRows[0]?.n ?? 0);
   if (!gate.allowed) {
-    throw new Error(
-      `upgrade required: product limit of ${gate.limit} reached on the free plan`,
-    );
+    throw new Error(`upgrade required: product limit of ${gate.limit} reached on the free plan`);
   }
 
   const [row] = await tx
@@ -146,17 +182,39 @@ export const createProductAction = safeAction(ProductInput, async (input, { user
 const UpdateProductInput = ProductBase.extend({ id: uuid }).refine(unitMatches, unitErrorPath);
 
 export const updateProductAction = safeAction(UpdateProductInput, async (input, { user, tx }) => {
-  // Permission gate: super_admin always passes; others need manage_products
-  const myRoles = await getUserRoles(user);
-  if (!hasPermission(myRoles, 'manage_products')) {
-    throw new Error('Permission denied — you do not have access to update products');
-  }
-
   const [before] = await tx
-    .select({ name: products.name, price: products.price })
+    .select({
+      name: products.name,
+      price: products.price,
+      inventory: products.inventory,
+      storeId: products.storeId,
+    })
     .from(products)
-    .where(and(eq(products.id, input.id), eq(products.businessId, user.businessId)));
+    .where(and(eq(products.id, input.id), eq(products.businessId, user.businessId)))
+    .for('update');
   if (!before) throw new Error('not found');
+  await requirePermission(user, 'manage_products', { storeId: before.storeId });
+  await requirePermission(user, 'manage_products', { storeId: input.storeId });
+  const [store] = await tx
+    .select({ id: stores.id })
+    .from(stores)
+    .where(and(eq(stores.id, input.storeId), eq(stores.businessId, user.businessId)));
+  if (!store) throw new Error('store not found');
+  if (input.categoryId) {
+    const [category] = await tx
+      .select({ id: categories.id, storeId: categories.storeId })
+      .from(categories)
+      .where(and(eq(categories.id, input.categoryId), eq(categories.businessId, user.businessId)));
+    if (!category || (category.storeId && category.storeId !== input.storeId))
+      throw new Error('category not found in selected store');
+  }
+  if (input.brandId) {
+    const [brand] = await tx
+      .select({ id: brands.id })
+      .from(brands)
+      .where(and(eq(brands.id, input.brandId), eq(brands.businessId, user.businessId)));
+    if (!brand) throw new Error('brand not found');
+  }
 
   const [row] = await tx
     .update(products)
@@ -208,7 +266,7 @@ export const updateProductAction = safeAction(UpdateProductInput, async (input, 
     entity: 'product',
     entityId: row.id,
     before,
-    after: { name: row.name, price: input.price },
+    after: { name: row.name, price: input.price, inventory: input.inventory },
   });
 
   revalidatePath('/products');
@@ -220,10 +278,12 @@ const DeleteProductInput = z.object({ id: uuid });
 
 export const deleteProductAction = safeAction(DeleteProductInput, async (input, { user, tx }) => {
   const [before] = await tx
-    .select({ name: products.name, active: products.active })
+    .select({ name: products.name, active: products.active, storeId: products.storeId })
     .from(products)
     .where(and(eq(products.id, input.id), eq(products.businessId, user.businessId)));
   if (!before) throw new Error('not found');
+  await requirePermission(user, 'manage_products', { storeId: before.storeId });
+  if (!before.active) return { ok: true };
 
   // Soft-delete via active=false so historical sale_items can still join.
   await tx
@@ -265,6 +325,20 @@ export async function uploadProductImageAction(
   }
   if (!(fileValue instanceof Blob) || fileValue.size === 0) {
     return { ok: false, error: 'no file selected' };
+  }
+
+  const product = await withTenant(db, user.businessId, async (tx) => {
+    const [row] = await tx
+      .select({ storeId: products.storeId })
+      .from(products)
+      .where(and(eq(products.id, idValue), eq(products.businessId, user.businessId)));
+    return row;
+  });
+  if (!product) return { ok: false, error: 'product not found' };
+  try {
+    await requirePermission(user, 'manage_products', { storeId: product.storeId });
+  } catch {
+    return { ok: false, error: 'Permission denied' };
   }
 
   const buf = Buffer.from(await fileValue.arrayBuffer());

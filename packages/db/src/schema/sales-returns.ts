@@ -26,7 +26,10 @@ export const salesReturns = pgTable(
   (t) => ({
     businessIdx: index('sales_returns_business_id_idx').on(t.businessId),
     originalSaleIdx: index('sales_returns_original_sale_id_idx').on(t.originalSaleId),
-    businessCreatedIdx: index('sales_returns_business_created_at_idx').on(t.businessId, t.createdAt),
+    businessCreatedIdx: index('sales_returns_business_created_at_idx').on(
+      t.businessId,
+      t.createdAt,
+    ),
   }),
 );
 
