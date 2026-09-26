@@ -30,7 +30,7 @@ jobs:
         with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Reuse .env.example for the env-file expected by dotenv-cli scripts.
@@ -60,7 +60,7 @@ jobs:
         with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Write .env from CI secrets
@@ -82,10 +82,10 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: mybizone
-          POSTGRES_PASSWORD: mybizone
-          POSTGRES_DB: mybizone
-        ports: ['5432:5432']
+          POSTGRES_USER: postgres
+          POSTGRES_DB: mybizone_release_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['55432:5432']
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
@@ -97,22 +97,16 @@ jobs:
         with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Write .env from CI secrets
-        run: |
-          cat > .env <<EOF
-          DATABASE_URL=$DATABASE_URL
-          BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
-          BETTER_AUTH_URL=$BETTER_AUTH_URL
-          NODE_ENV=production
-          EOF
-      - run: pnpm db:migrate
+      # The helper pins the disposable service, LAN mode and disabled providers
+      # identically for build and browser execution; no dotenv fallback/skip.
+      - run: node scripts/release-check.mjs migrate
       - run: pnpm exec playwright install --with-deps chromium
         working-directory: apps/web
-      - run: pnpm build
-      - run: pnpm test:e2e
+      - run: node scripts/release-check.mjs build
+      - run: node scripts/release-check.mjs e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
