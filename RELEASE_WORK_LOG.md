@@ -228,3 +228,24 @@ Remaining limits: provider account ownership/configuration, endpoint availabilit
 - Preserved the saved application tree; grouped final file versions by dependency/runtime, security, transactions, billing, customer guidance, delivery, acceptance and provider work. Did not reconstruct intermediate snapshots or claim each commit independently passes release gates.
 - Initial index was empty; Git diff checks passed before staging and for each staged group. Credential-pattern/file inventory checks excluded environment files, ignored databases/caches, private signing keys and generated outputs. No application edits or new test executions were needed for this bookkeeping task.
 - Added the release evidence, phase plans, supported limitations and session logs to version control. Actual provider acceptance, desktop/cloud acceptance and seller setup remain pending. No push, deployment or publication performed.
+
+## Hosted performance optimization — 15 October 2026
+
+Owner authorized optimization, Git push and hosted testing with the saved Pro account.
+Pushed code commit `b01c3fbbbf8c10a8be52e5baed7e251a34abb273`; Vercel deployment
+`dpl_2hMD2qbof8B5p3XjTivm49bP3LZq` reached READY at the requested public alias.
+Moved functions from Virginia (`iad1`) to Singapore (`sin1`), matching the existing
+Neon database. Reduced dashboard data SELECTs from 15 to 10, combined tenant
+context setup, joined current roles, bounded catalog lists to 50 rows and deferred
+analytics. No hosted schema migration or unrelated account change was made.
+
+Validation: 133 isolated web tests + 17 DB tests passed; scoped Biome, TypeScript,
+isolated production build and local production owner smoke passed. Hosted owner,
+Pro/unlimited capacity, two stores, seven performance routes and pagination passed.
+Three-load hosted medians: dashboard 12,686→552 ms, products 4,965→269 ms,
+customers 5,252→517 ms, suppliers 4,795→510 ms, sales 6,455→506 ms,
+new sale 7,682→531 ms, reports 6,491→544 ms. Dashboard median improved 95.6%.
+The new-sale run included one 3,116 ms outlier; this is small-sample acceptance
+measurement, not a production percentile or load-test claim. Compiled initial
+JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
+[PERFORMANCE_OPTIMIZATION.md](docs/PERFORMANCE_OPTIMIZATION.md). Credentials stay private.

@@ -57,16 +57,27 @@ production percentiles or a load test.
 
 | Page | Baseline median | Deployed median |
 | --- | ---: | ---: |
-| Dashboard | 12,686 ms | Pending deployment |
-| Products | 4,965 ms | Pending deployment |
-| Customers | 5,252 ms | Pending deployment |
-| Suppliers | 4,795 ms | Pending deployment |
-| Sales | 6,455 ms | Pending deployment |
-| New sale | 7,682 ms | Pending deployment |
-| Reports | 6,491 ms | Pending deployment |
+| Dashboard | 12,686 ms | **552 ms** |
+| Products | 4,965 ms | **269 ms** |
+| Customers | 5,252 ms | **517 ms** |
+| Suppliers | 4,795 ms | **510 ms** |
+| Sales | 6,455 ms | **506 ms** |
+| New sale | 7,682 ms | **531 ms** |
+| Reports | 6,491 ms | **544 ms** |
 
 Baseline deployment: `3b21be5301bc5f37af1f537b52fc7cc93e9d20c0`, region `iad1`.
-Private local evidence: `.cache/performance-hosted-before.json`, compiled bundle
+Optimized deployment: `b01c3fbbbf8c10a8be52e5baed7e251a34abb273`,
+`dpl_2hMD2qbof8B5p3XjTivm49bP3LZq`, confirmed READY with the public alias
+and region `sin1` on 15 October 2026. Dashboard median improved by **95.6%**.
+
+All seven routes returned HTTP 200 and rendered application content using the
+saved Pro account. The streamed page-2 pagination control rendered and returned
+successfully to page 1. Separate hosted checks passed for login, Pro/unlimited
+capacity, both test stores and dashboard/products/employees/team/reports access.
+One of three New Sale samples took 3,116 ms; its median was 531 ms. These results
+do not establish that every request will be subsecond.
+Private local evidence: `.cache/performance-hosted-before.json`,
+`.cache/performance-hosted-after.json`, `.cache/hosted-pro-verification.json`, compiled bundle
 manifests, `.cache/performance-tests-final.log`, `.cache/performance-db-tests.log`.
 Credentials, cookies and sessions are excluded from the report and Git.
 
