@@ -1,4 +1,6 @@
+import { ListPagination } from '@/components/list-pagination';
 import { db } from '@/lib/db';
+import { PAGE_SIZE, parsePage } from '@/lib/pagination';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { customerTags, customers } from '@mybizone/db';
@@ -6,7 +8,7 @@ import { withTenant } from '@mybizone/db/tenant';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
-import { asc, eq, inArray, sum } from 'drizzle-orm';
+import { and, asc, eq, inArray, sum } from 'drizzle-orm';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { DeleteCustomerButton } from './_components/delete-button';
@@ -15,23 +17,27 @@ import { TagFilter } from './_components/tag-filter';
 export const dynamic = 'force-dynamic';
 
 export default async function CustomersPage(props: {
-  searchParams: Promise<{ tag?: string }>;
+  searchParams: Promise<{ tag?: string; page?: string }>;
 }) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
   await requirePermission(user, 'manage_customers');
   const activeTag = searchParams.tag ?? null;
+  const page = parsePage(searchParams.page);
 
-  const [rows, totals] = await withTenant(db, user.businessId, async (tx) => {
-    // If filtering by tag, get customer IDs with that tag first
-    let filteredIds: string[] | null = null;
-    if (activeTag) {
-      const tagRows = await tx
-        .select({ customerId: customerTags.customerId })
-        .from(customerTags)
-        .where(eq(customerTags.tag, activeTag));
-      filteredIds = tagRows.map((r) => r.customerId);
-    }
+  const [pageRows, totals] = await withTenant(db, user.businessId, async (tx) => {
+    // Keep tag membership in SQL instead of transferring every matching ID.
+    const tagCondition = activeTag
+      ? inArray(
+          customers.id,
+          tx
+            .select({ customerId: customerTags.customerId })
+            .from(customerTags)
+            .where(
+              and(eq(customerTags.businessId, user.businessId), eq(customerTags.tag, activeTag)),
+            ),
+        )
+      : undefined;
 
     const query = tx
       .select({
@@ -43,14 +49,10 @@ export default async function CustomersPage(props: {
         outstandingBalance: customers.outstandingBalance,
       })
       .from(customers)
-      .where(
-        filteredIds !== null
-          ? filteredIds.length > 0
-            ? inArray(customers.id, filteredIds)
-            : eq(customers.id, '00000000-0000-0000-0000-000000000000') // empty result
-          : eq(customers.businessId, user.businessId),
-      )
-      .orderBy(asc(customers.name));
+      .where(and(eq(customers.businessId, user.businessId), tagCondition))
+      .orderBy(asc(customers.name), asc(customers.id))
+      .limit(PAGE_SIZE + 1)
+      .offset((page - 1) * PAGE_SIZE);
 
     const list = await query;
 
@@ -64,6 +66,8 @@ export default async function CustomersPage(props: {
     return [list, agg] as const;
   });
 
+  const rows = pageRows.slice(0, PAGE_SIZE);
+  const hasNext = pageRows.length > PAGE_SIZE;
   const totalOutstanding = totals?.totalOutstanding ?? '0';
 
   return (
@@ -94,16 +98,22 @@ export default async function CustomersPage(props: {
         <Card>
           <CardHeader>
             <CardTitle>
-              {activeTag ? `No customers tagged "${activeTag}"` : 'No customers yet'}
+              {page > 1
+                ? 'No more customers'
+                : activeTag
+                  ? `No customers tagged "${activeTag}"`
+                  : 'No customers yet'}
             </CardTitle>
             <CardDescription>
-              {activeTag
-                ? 'Try a different tag filter or clear the filter to see all customers.'
-                : 'Add customers to track credit limits and outstanding balances.'}
+              {page > 1
+                ? 'Use Previous to return to your customers.'
+                : activeTag
+                  ? 'Try a different tag filter or clear the filter to see all customers.'
+                  : 'Add customers to track credit limits and outstanding balances.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {!activeTag && (
+            {!activeTag && page === 1 && (
               <Button asChild>
                 <Link href="/customers/new">Create customer</Link>
               </Button>
@@ -128,7 +138,11 @@ export default async function CustomersPage(props: {
                 {rows.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">
-                      <Link href={`/customers/${c.id}`} className="hover:underline">
+                      <Link
+                        href={`/customers/${c.id}`}
+                        prefetch={false}
+                        className="hover:underline"
+                      >
                         {c.name}
                       </Link>
                     </TableCell>
@@ -151,7 +165,9 @@ export default async function CustomersPage(props: {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/customers/${c.id}/edit`}>Edit</Link>
+                          <Link href={`/customers/${c.id}/edit`} prefetch={false}>
+                            Edit
+                          </Link>
                         </Button>
                         <DeleteCustomerButton id={c.id} name={c.name} />
                       </div>
@@ -163,6 +179,7 @@ export default async function CustomersPage(props: {
           </CardContent>
         </Card>
       )}
+      <ListPagination path="/customers" filters={searchParams} page={page} hasNext={hasNext} />
     </div>
   );
 }

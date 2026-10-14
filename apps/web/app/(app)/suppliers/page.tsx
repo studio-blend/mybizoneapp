@@ -1,4 +1,6 @@
+import { ListPagination } from '@/components/list-pagination';
 import { db } from '@/lib/db';
+import { PAGE_SIZE, parsePage } from '@/lib/pagination';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { suppliers } from '@mybizone/db';
@@ -6,17 +8,19 @@ import { withTenant } from '@mybizone/db/tenant';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
-import { asc, sum } from 'drizzle-orm';
+import { asc, eq, sum } from 'drizzle-orm';
 import Link from 'next/link';
 import { DeleteSupplierButton } from './_components/delete-button';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SuppliersPage() {
+export default async function SuppliersPage(props: { searchParams: Promise<{ page?: string }> }) {
+  const searchParams = await props.searchParams;
+  const page = parsePage(searchParams.page);
   const user = await requireUser();
   await requirePermission(user, 'manage_suppliers');
 
-  const { rows, totalOutstanding } = await withTenant(db, user.businessId, async (tx) => {
+  const { pageRows, totalOutstanding } = await withTenant(db, user.businessId, async (tx) => {
     const rows = await tx
       .select({
         id: suppliers.id,
@@ -26,12 +30,20 @@ export default async function SuppliersPage() {
         outstandingBalance: suppliers.outstandingBalance,
       })
       .from(suppliers)
-      .orderBy(asc(suppliers.name));
+      .where(eq(suppliers.businessId, user.businessId))
+      .orderBy(asc(suppliers.name), asc(suppliers.id))
+      .limit(PAGE_SIZE + 1)
+      .offset((page - 1) * PAGE_SIZE);
 
-    const [agg] = await tx.select({ total: sum(suppliers.outstandingBalance) }).from(suppliers);
+    const [agg] = await tx
+      .select({ total: sum(suppliers.outstandingBalance) })
+      .from(suppliers)
+      .where(eq(suppliers.businessId, user.businessId));
 
-    return { rows, totalOutstanding: agg?.total ?? '0' };
+    return { pageRows: rows, totalOutstanding: agg?.total ?? '0' };
   });
+  const rows = pageRows.slice(0, PAGE_SIZE);
+  const hasNext = pageRows.length > PAGE_SIZE;
 
   return (
     <div className="space-y-6">
@@ -55,9 +67,11 @@ export default async function SuppliersPage() {
       {rows.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>No suppliers yet</CardTitle>
+            <CardTitle>{page > 1 ? 'No more suppliers' : 'No suppliers yet'}</CardTitle>
             <CardDescription>
-              Add your first supplier to start tracking purchase bills and outstanding balances.
+              {page > 1
+                ? 'Use Previous to return to your suppliers.'
+                : 'Add your first supplier to start tracking purchase bills and outstanding balances.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -93,7 +107,9 @@ export default async function SuppliersPage() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/suppliers/${s.id}/edit`}>Edit</Link>
+                          <Link href={`/suppliers/${s.id}/edit`} prefetch={false}>
+                            Edit
+                          </Link>
                         </Button>
                         <DeleteSupplierButton id={s.id} name={s.name} />
                       </div>
@@ -105,6 +121,7 @@ export default async function SuppliersPage() {
           </CardContent>
         </Card>
       )}
+      <ListPagination path="/suppliers" filters={searchParams} page={page} hasNext={hasNext} />
     </div>
   );
 }

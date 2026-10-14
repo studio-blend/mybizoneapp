@@ -3,10 +3,13 @@ import { withSentryConfig } from '@sentry/nextjs';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Allow verification builds to run alongside the development server.
+  distDir: process.env.MYBIZONE_BUILD_DIR || '.next',
   reactStrictMode: true,
   poweredByHeader: false,
   // standalone bundles server.js + only-used node_modules for portable/Docker deploys
-  output: 'standalone',
+  // Verification builds use next start and avoid Windows symlink packaging.
+  output: process.env.MYBIZONE_BUILD_DIR ? undefined : 'standalone',
   // Keep PDF JSX and its React 18 renderer together in Node, outside RSC's React runtime.
   serverExternalPackages: ['@mybizone/pdf'],
   webpack(config, { isServer }) {

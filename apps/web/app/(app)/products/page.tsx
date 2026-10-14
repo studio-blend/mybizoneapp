@@ -1,6 +1,7 @@
+import { ListPagination } from '@/components/list-pagination';
 import { db } from '@/lib/db';
 import { getUserRoles } from '@/lib/get-user-roles';
-import { requirePermission } from '@/lib/require-permission';
+import { PAGE_SIZE, parsePage } from '@/lib/pagination';
 import { requireUser } from '@/lib/session';
 import { brands, categories, products, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -21,22 +22,33 @@ function collectDescendants(
   allCats: { id: string; parentId: string | null }[],
   rootId: string,
 ): string[] {
-  const result: string[] = [rootId];
-  const queue = [rootId];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    for (const c of allCats) {
-      if (c.parentId === current) {
-        result.push(c.id);
-        queue.push(c.id);
-      }
-    }
+  const children = new Map<string, string[]>();
+  for (const category of allCats) {
+    if (!category.parentId) continue;
+    const siblings = children.get(category.parentId) ?? [];
+    siblings.push(category.id);
+    children.set(category.parentId, siblings);
   }
-  return result;
+  const seen = new Set<string>();
+  const queue = [rootId];
+  for (let i = 0; i < queue.length; i++) {
+    const current = queue[i];
+    if (!current) continue;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    queue.push(...(children.get(current) ?? []));
+  }
+  return [...seen];
 }
 
 interface Props {
-  searchParams: Promise<{ q?: string; categoryId?: string; storeId?: string; brandId?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    categoryId?: string;
+    storeId?: string;
+    brandId?: string;
+    page?: string;
+  }>;
 }
 
 export default async function ProductsPage(props: Props) {
@@ -44,6 +56,7 @@ export default async function ProductsPage(props: Props) {
   const user = await requireUser();
   const roles = await getUserRoles(user);
   const { q, categoryId, storeId, brandId } = searchParams;
+  const page = parsePage(searchParams.page);
 
   const data = await withTenant(db, user.businessId, async (tx) => {
     // Load filter options in parallel — rows query depends on allCats so runs after
@@ -65,7 +78,8 @@ export default async function ProductsPage(props: Props) {
     );
     if (!allStores.length && !hasPermission(roles, 'manage_products'))
       throw new Error('Permission denied');
-    if (storeId) await requirePermission(user, 'manage_products', { storeId });
+    if (storeId && !hasPermission(roles, 'manage_products', { storeId }))
+      throw new Error('Permission denied');
     const allowedIds = allStores.map((store) => store.id);
     const allCats = categoryRows.filter(
       (category) => !category.storeId || allowedIds.includes(category.storeId),
@@ -112,9 +126,17 @@ export default async function ProductsPage(props: Props) {
       .leftJoin(categories, eq(categories.id, products.categoryId))
       .leftJoin(brands, eq(brands.id, products.brandId))
       .where(and(...conditions))
-      .orderBy(desc(products.active), desc(products.updatedAt));
+      .orderBy(desc(products.active), desc(products.updatedAt), desc(products.id))
+      .limit(PAGE_SIZE + 1)
+      .offset((page - 1) * PAGE_SIZE);
 
-    return { rows, allCats, allStores, allBrands };
+    return {
+      rows: rows.slice(0, PAGE_SIZE),
+      hasNext: rows.length > PAGE_SIZE,
+      allCats,
+      allStores,
+      allBrands,
+    };
   });
 
   const isFiltered = !!(q || categoryId || storeId || brandId);
@@ -136,14 +158,18 @@ export default async function ProductsPage(props: Props) {
       {data.rows.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>{isFiltered ? 'No products match' : 'No products yet'}</CardTitle>
+            <CardTitle>
+              {page > 1 ? 'No more products' : isFiltered ? 'No products match' : 'No products yet'}
+            </CardTitle>
             <CardDescription>
-              {isFiltered
-                ? 'Try adjusting the search or filters.'
-                : 'Add your first product. Inventory is tracked per store, so make sure a store exists first.'}
+              {page > 1
+                ? 'Use Previous to return to your products.'
+                : isFiltered
+                  ? 'Try adjusting the search or filters.'
+                  : 'Add your first product. Inventory is tracked per store, so make sure a store exists first.'}
             </CardDescription>
           </CardHeader>
-          {!isFiltered && (
+          {!isFiltered && page === 1 && (
             <CardContent>
               <Button asChild>
                 <Link href="/products/new">Create product</Link>
@@ -155,7 +181,7 @@ export default async function ProductsPage(props: Props) {
         <Card>
           <CardContent className="p-0">
             <div className="px-4 py-2 border-b text-xs text-muted-foreground">
-              {data.rows.length} product{data.rows.length !== 1 ? 's' : ''}
+              {data.rows.length} product{data.rows.length !== 1 ? 's' : ''} on this page
               {isFiltered ? ' (filtered)' : ''}
             </div>
             <Table>
@@ -179,6 +205,10 @@ export default async function ProductsPage(props: Props) {
                         <img
                           src={`/api/files/${p.imageKey}`}
                           alt=""
+                          loading="lazy"
+                          decoding="async"
+                          width={40}
+                          height={40}
                           className="h-10 w-10 rounded object-cover"
                         />
                       ) : (
@@ -199,7 +229,9 @@ export default async function ProductsPage(props: Props) {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/products/${p.id}/edit`}>Edit</Link>
+                          <Link href={`/products/${p.id}/edit`} prefetch={false}>
+                            Edit
+                          </Link>
                         </Button>
                         {p.active && <DeleteProductButton id={p.id} name={p.name} />}
                       </div>
@@ -211,6 +243,7 @@ export default async function ProductsPage(props: Props) {
           </CardContent>
         </Card>
       )}
+      <ListPagination path="/products" filters={searchParams} page={page} hasNext={data.hasNext} />
     </div>
   );
 }

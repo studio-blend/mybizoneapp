@@ -23,23 +23,42 @@ export async function getUserRoles(user: {
   storeId?: string | null;
 }): Promise<UserRoleRow[]> {
   return withTenant(db, user.businessId, async (tx) => {
-    const [current] = await tx
-      .select()
+    // Read current access state and grants together; never cache grants across
+    // requests, so locks and revocations still take effect immediately.
+    const accessRows = await tx
+      .select({
+        active: userTable.active,
+        lockedAt: userTable.lockedAt,
+        mustChangePassword: userTable.mustChangePassword,
+        role: userTable.role,
+        storeId: userTable.storeId,
+        grantRole: userRoles.role,
+        grantStoreId: userRoles.storeId,
+        grantDepartmentId: userRoles.departmentId,
+      })
       .from(userTable)
+      .leftJoin(
+        userRoles,
+        and(eq(userRoles.userId, userTable.id), eq(userRoles.businessId, userTable.businessId)),
+      )
       .where(and(eq(userTable.id, user.id), eq(userTable.businessId, user.businessId)));
+    const current = accessRows[0];
     if (!current || !current.active || current.lockedAt || current.mustChangePassword) return [];
     // Ownership changes only via the ownership-transfer workflow. Older backfills
     // mapped legacy owners to sales; those rows must not lock the owner out.
     if (['owner', 'super_admin'].includes(current.role))
       return [{ role: 'super_admin', storeId: current.storeId, departmentId: null }];
-    const rows = await tx
-      .select({
-        role: userRoles.role,
-        storeId: userRoles.storeId,
-        departmentId: userRoles.departmentId,
-      })
-      .from(userRoles)
-      .where(and(eq(userRoles.userId, user.id), eq(userRoles.businessId, user.businessId)));
+    const rows: UserRoleRow[] = accessRows.flatMap((row) =>
+      row.grantRole
+        ? [
+            {
+              role: row.grantRole as AppRole,
+              storeId: row.grantStoreId,
+              departmentId: row.grantDepartmentId,
+            },
+          ]
+        : [],
+    );
     if (rows.length === 0 && current.role !== 'custom') {
       // Legacy fallback: map old role strings to new AppRole equivalents
       const legacyRole =

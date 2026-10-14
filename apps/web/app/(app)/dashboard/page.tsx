@@ -1,22 +1,13 @@
+import { loadDashboardData } from '@/lib/dashboard-data';
 import { db } from '@/lib/db';
 import { getUserRoles } from '@/lib/get-user-roles';
 import { requireUser } from '@/lib/session';
-import {
-  categories,
-  customers,
-  expenseEntries,
-  products,
-  saleItems,
-  sales,
-  stores,
-  suppliers,
-} from '@mybizone/db';
+import { stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { hasPermission } from '@mybizone/domain';
 import { round2 } from '@mybizone/domain/money';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
-import { and, count, desc, eq, gte, lt, ne, sql, sum } from 'drizzle-orm';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { GuidedTour } from './_components/GuidedTour';
@@ -28,13 +19,6 @@ import {
 } from './_components/dashboard-charts';
 
 export const dynamic = 'force-dynamic';
-
-function monthStart(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-function prevMonthStart(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth() - 1, 1);
-}
 
 function pct(curr: number, prev: number): number | null {
   if (prev === 0) return null;
@@ -78,237 +62,7 @@ export default async function DashboardPage() {
   if (setupCheck.length === 0) redirect('/onboarding');
 
   const now = new Date();
-  const thisMonthStart = monthStart(now);
-  const prevMthStart = prevMonthStart(now);
-  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-  const data = await withTenant(db, user.businessId, async (tx) => {
-    const [
-      [revThis],
-      [revPrev],
-      [unitsSold],
-      [expThis],
-      [expPrev],
-      [cogsThis],
-      [custTotal],
-      [custNew],
-      [recv],
-      [payable],
-      monthlyRevRaw,
-      top5Raw,
-      catRaw,
-      pmtRaw,
-      [productAgg],
-    ] = await Promise.all([
-      // Revenue this month
-      tx
-        .select({ total: sum(sales.total) })
-        .from(sales)
-        .where(
-          and(
-            eq(sales.businessId, user.businessId),
-            ne(sales.billType, 'estimate'),
-            eq(sales.status, 'completed'),
-            gte(sales.createdAt, thisMonthStart),
-            lt(sales.createdAt, nextMonthStart),
-          ),
-        ),
-      // Revenue last month
-      tx
-        .select({ total: sum(sales.total) })
-        .from(sales)
-        .where(
-          and(
-            eq(sales.businessId, user.businessId),
-            ne(sales.billType, 'estimate'),
-            eq(sales.status, 'completed'),
-            gte(sales.createdAt, prevMthStart),
-            lt(sales.createdAt, thisMonthStart),
-          ),
-        ),
-      // Units sold this month
-      tx
-        .select({ qty: sql<string>`COALESCE(SUM(${saleItems.qty}::numeric),0)` })
-        .from(saleItems)
-        .innerJoin(sales, eq(sales.id, saleItems.saleId))
-        .where(
-          and(
-            eq(saleItems.businessId, user.businessId),
-            ne(sales.billType, 'estimate'),
-            eq(sales.status, 'completed'),
-            gte(sales.createdAt, thisMonthStart),
-            lt(sales.createdAt, nextMonthStart),
-          ),
-        ),
-      // Expenses this month
-      tx
-        .select({ total: sum(expenseEntries.amount) })
-        .from(expenseEntries)
-        .where(
-          and(
-            eq(expenseEntries.businessId, user.businessId),
-            eq(expenseEntries.type, 'expense'),
-            gte(expenseEntries.entryDate, thisMonthStart),
-            lt(expenseEntries.entryDate, nextMonthStart),
-          ),
-        ),
-      // Expenses last month
-      tx
-        .select({ total: sum(expenseEntries.amount) })
-        .from(expenseEntries)
-        .where(
-          and(
-            eq(expenseEntries.businessId, user.businessId),
-            eq(expenseEntries.type, 'expense'),
-            gte(expenseEntries.entryDate, prevMthStart),
-            lt(expenseEntries.entryDate, thisMonthStart),
-          ),
-        ),
-      // COGS this month
-      tx
-        .select({
-          cogs: sql<string>`COALESCE(SUM(${saleItems.qty}::numeric * ${saleItems.costPriceAtSale}::numeric),0)`,
-        })
-        .from(saleItems)
-        .innerJoin(sales, eq(sales.id, saleItems.saleId))
-        .where(
-          and(
-            eq(saleItems.businessId, user.businessId),
-            ne(sales.billType, 'estimate'),
-            eq(sales.status, 'completed'),
-            eq(saleItems.isFreeItem, false),
-            gte(sales.createdAt, thisMonthStart),
-            lt(sales.createdAt, nextMonthStart),
-          ),
-        ),
-      // Total customers
-      tx
-        .select({ cnt: count(customers.id) })
-        .from(customers)
-        .where(eq(customers.businessId, user.businessId)),
-      // New customers this month
-      tx
-        .select({ cnt: count(customers.id) })
-        .from(customers)
-        .where(
-          and(
-            eq(customers.businessId, user.businessId),
-            gte(customers.createdAt, thisMonthStart),
-            lt(customers.createdAt, nextMonthStart),
-          ),
-        ),
-      // Receivables
-      tx
-        .select({ total: sql<string>`COALESCE(SUM(${customers.outstandingBalance}::numeric),0)` })
-        .from(customers)
-        .where(
-          and(
-            eq(customers.businessId, user.businessId),
-            sql`${customers.outstandingBalance}::numeric > 0`,
-          ),
-        ),
-      // Payables
-      tx
-        .select({ total: sql<string>`COALESCE(SUM(${suppliers.outstandingBalance}::numeric),0)` })
-        .from(suppliers)
-        .where(
-          and(
-            eq(suppliers.businessId, user.businessId),
-            sql`${suppliers.outstandingBalance}::numeric > 0`,
-          ),
-        ),
-      // 12-month revenue trend
-      tx
-        .select({
-          month: sql<string>`TO_CHAR(DATE_TRUNC('month', ${sales.createdAt}), 'YYYY-MM-DD')`,
-          revenue: sum(sales.total),
-        })
-        .from(sales)
-        .where(
-          and(
-            eq(sales.businessId, user.businessId),
-            ne(sales.billType, 'estimate'),
-            eq(sales.status, 'completed'),
-            sql`${sales.createdAt} >= DATE_TRUNC('month', NOW()) - INTERVAL '11 months'`,
-          ),
-        )
-        .groupBy(sql`DATE_TRUNC('month', ${sales.createdAt})`)
-        .orderBy(sql`DATE_TRUNC('month', ${sales.createdAt})`),
-      // Top 5 products this month
-      tx
-        .select({ name: saleItems.productName, revenue: sum(saleItems.lineTotal) })
-        .from(saleItems)
-        .innerJoin(sales, eq(sales.id, saleItems.saleId))
-        .where(
-          and(
-            eq(saleItems.businessId, user.businessId),
-            ne(sales.billType, 'estimate'),
-            eq(sales.status, 'completed'),
-            gte(sales.createdAt, thisMonthStart),
-            lt(sales.createdAt, nextMonthStart),
-          ),
-        )
-        .groupBy(saleItems.productName)
-        .orderBy(desc(sum(saleItems.lineTotal)))
-        .limit(5),
-      // Sales by category this month
-      tx
-        .select({ category: categories.name, revenue: sum(saleItems.lineTotal) })
-        .from(saleItems)
-        .innerJoin(sales, eq(sales.id, saleItems.saleId))
-        .innerJoin(products, eq(products.id, saleItems.productId))
-        .innerJoin(categories, eq(categories.id, products.categoryId))
-        .where(
-          and(
-            eq(saleItems.businessId, user.businessId),
-            ne(sales.billType, 'estimate'),
-            eq(sales.status, 'completed'),
-            gte(sales.createdAt, thisMonthStart),
-            lt(sales.createdAt, nextMonthStart),
-          ),
-        )
-        .groupBy(categories.name)
-        .orderBy(desc(sum(saleItems.lineTotal))),
-      // Payment method split this month
-      tx
-        .select({ method: sales.paymentMethod, total: sum(sales.total) })
-        .from(sales)
-        .where(
-          and(
-            eq(sales.businessId, user.businessId),
-            ne(sales.billType, 'estimate'),
-            eq(sales.status, 'completed'),
-            gte(sales.createdAt, thisMonthStart),
-            lt(sales.createdAt, nextMonthStart),
-          ),
-        )
-        .groupBy(sales.paymentMethod)
-        .orderBy(desc(sum(sales.total))),
-      // Product count (tour)
-      tx
-        .select({ total: count(products.id) })
-        .from(products)
-        .where(and(eq(products.businessId, user.businessId), eq(products.active, true))),
-    ]);
-
-    return {
-      revThis: Number(revThis?.total ?? 0),
-      revPrev: Number(revPrev?.total ?? 0),
-      expThis: Number(expThis?.total ?? 0),
-      expPrev: Number(expPrev?.total ?? 0),
-      cogsThis: Number(cogsThis?.cogs ?? 0),
-      unitsSold: Number(unitsSold?.qty ?? 0),
-      custTotal: Number(custTotal?.cnt ?? 0),
-      custNew: Number(custNew?.cnt ?? 0),
-      receivables: Number(recv?.total ?? 0),
-      payables: Number(payable?.total ?? 0),
-      monthlyRevRaw,
-      top5Raw,
-      catRaw,
-      pmtRaw,
-      productCount: Number(productAgg?.total ?? 0),
-    };
-  });
+  const data = await loadDashboardData(db, user.businessId, now);
 
   const grossProfit = round2(data.revThis - data.cogsThis);
   const revDelta = pct(data.revThis, data.revPrev);

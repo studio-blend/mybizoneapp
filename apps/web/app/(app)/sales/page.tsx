@@ -1,6 +1,5 @@
 import { db } from '@/lib/db';
 import { getUserRoles } from '@/lib/get-user-roles';
-import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -34,11 +33,8 @@ export default async function SalesPage(props: PageProps) {
     searchParams.storeId && searchParams.storeId.length === 36
       ? searchParams.storeId
       : defaultStoreId;
-  await requirePermission(
-    user,
-    'view_sales',
-    filterStoreId ? { storeId: filterStoreId } : undefined,
-  );
+  if (!hasPermission(roles, 'view_sales', filterStoreId ? { storeId: filterStoreId } : undefined))
+    throw new Error('Permission denied');
   const fromDate = parseDate(searchParams.from);
   const toDate = parseDate(searchParams.to);
 
