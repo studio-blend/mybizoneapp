@@ -4,6 +4,7 @@ import {
   DashboardAccessError,
   type DashboardSelection,
 } from '@/lib/dashboard-policy';
+import { dashboardUrl } from '@/lib/dashboard-queries';
 import { db } from '@/lib/db';
 import { getUserRoles } from '@/lib/get-user-roles';
 import { permittedNavigation } from '@/lib/navigation';
@@ -94,13 +95,18 @@ function metrics(data: WorkspaceDashboard) {
     change === null
       ? 'No prior-period comparison'
       : `${change > 0 ? '+' : ''}${change.toFixed(1)}% ${data.period.comparisonLabel}`;
-  const revenue = { label: 'Net sales', value: money(sales.revenue), detail: delta, accent: true };
+  const revenue = {
+    label: 'Net billed sales',
+    value: money(sales.revenue),
+    detail: delta,
+    accent: true,
+  };
   const profit = {
     label: 'Gross profit',
-    value: money(sales.revenue - sales.cogs),
+    value: sales.missingCosts ? '—' : money(sales.revenue - sales.tax - sales.cogs),
     detail: sales.missingCosts
       ? `${sales.missingCosts} line items have no recorded cost`
-      : 'After returns and recorded product costs',
+      : 'After returns and product costs; excludes GST and expenses',
   };
   const orders = {
     label: 'Sales bills',
@@ -375,6 +381,14 @@ export default async function DashboardPage({
           )}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
+          {access.view !== 'marketing' && (
+            <Link
+              href={dashboardUrl(activeSelection, true)}
+              className="rounded-lg border bg-card px-4 py-2 text-sm font-medium hover:bg-muted"
+            >
+              Operating analysis
+            </Link>
+          )}
           {actions.slice(0, 2).map((action, index) => (
             <Link
               key={action.href}
@@ -490,7 +504,7 @@ export default async function DashboardPage({
                     here.
                   </Empty>
                 ) : (
-                  <ActivityChart data={data.trend} />
+                  <ActivityChart data={data.trend} showProfit={access.financial} />
                 )}
               </Panel>
               <Panel title="Needs attention" description="Priorities within your selected scope.">

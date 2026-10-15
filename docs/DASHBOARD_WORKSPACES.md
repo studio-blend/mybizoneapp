@@ -59,8 +59,10 @@ as well. The owner's navigation remains fully available.
 
 Responsive metric grids, period/scope filters, quick actions, an attention queue,
 bounded recent-activity lists, store comparison and an accessible daily chart.
-Filter forms use ordinary GET navigation and work without JavaScript. With
-JavaScript, changing a selector submits the form and shows progress. Dedicated
+Filter forms use ordinary GET navigation. Changing a selector submits the form
+and shows progress. The existing streamed loading boundary requires JavaScript
+to finish displaying authenticated pages; JavaScript-disabled rendering is not
+supported by this boundary. Dedicated
 loading and retry states preserve the selected URL. Chart data is also available
 as an expandable table. All values come from the user's data; there are no targets
 or performance percentages invented by the UI.

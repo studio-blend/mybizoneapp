@@ -4,9 +4,10 @@
 
 1. **Profiles and core owner decisions**: business defaults, independent per-store
    overrides, separate selling model, product profitability, slow-stock review,
-   stock-cover estimates and store comparisons. This implementation covers phase 1.
+   stock-cover estimates and store comparisons. Phase 1 is live.
 2. **Daily operating analysis**: gross-profit trends, day/hour sales heatmaps,
    customer collection priorities, returns/discount/damage analysis and drill-downs.
+   Implemented in [Operating analysis](OPERATING_ANALYSIS.md).
    Keep the initial dashboard focused and place secondary analysis behind details
    or dedicated reports. Add invoice allocation and cashbook records before
    promising invoice ageing or available-cash figures.
@@ -40,12 +41,12 @@ are phase 3; no nonfunctional capability switches are exposed.
 ## Calculations and boundaries
 
 - Product profitability: completed non-estimate sale-line revenue less returned
-  line revenue, minus recorded cost snapshots net of return costs. Free-item
+  line revenue, excluding GST, minus recorded cost snapshots net of return costs. Free-item
   quantities contribute cost. Up to six products ranked by gross profit; products
   with missing sale **or return** cost snapshots show unavailable profit/margin
   and sort after complete records. Gross profit excludes operating expenses.
 - Store comparison: net sales and bill count, equal-length previous-period sales,
-  gross profit and margin for financial roles. Zero previous sales is labelled
+  gross profit and margin excluding GST for financial roles. Zero previous sales is labelled
   no baseline; non-positive net sales has no margin percentage. Returns-only
   stores and stores with zero activity remain visible. Current department
   attribution follows the same policy as the existing dashboard.
@@ -78,8 +79,11 @@ Migration 0022 was also prepared on Neon temporary branch `br-shy-smoke-aogxemq6
 Before/after checks preserved all 26 sales (total 370300), 34 products (1172.250
 stock units), customer/supplier balances, 34 role grants and existing store counts.
 All 14 businesses received general-retail/retail defaults, all eight stores
-inherit, and all four database constraints were present. Hosted application of
-the migration and publication are pending explicit migration-tool approval.
+inherit, and all four database constraints were present. The owner subsequently
+approved applying migration 0022 and publishing Phase 1. Final deployment
+`94323c055af1ff817a7257bb25e46feafc215dae` passed all 28 hosted browser checks.
+The migration is recorded and its temporary branch was removed. Full evidence
+is in the release work log.
 
 Private/cache evidence: `.cache/business-profiles-tests.log`,
 `.cache/business-profiles-build.log`, `.cache/business-profiles-typecheck.log`,

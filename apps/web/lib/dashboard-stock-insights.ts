@@ -49,13 +49,13 @@ export async function loadDashboardStockInsights(
   const [profit, stock] = await Promise.all([
     financial
       ? tx.execute<ProductProfit>(sql`WITH movements AS (
-      SELECT si.product_id,si.product_name,si.line_total AS revenue,si.qty*si.cost_price_at_sale AS cost,si.cost_price_at_sale IS NULL AS missing
+      SELECT si.product_id,si.product_name,si.line_total-si.gst_amount AS revenue,si.qty*si.cost_price_at_sale AS cost,si.cost_price_at_sale IS NULL AS missing
       FROM sales s JOIN sale_items si ON si.sale_id=s.id AND si.business_id=s.business_id
       LEFT JOIN products p ON p.id=si.product_id AND p.business_id=s.business_id
       WHERE s.business_id=${businessId}::uuid AND s.status='completed' AND s.bill_type<>'estimate'
         AND s.created_at>=${start}::timestamptz AND s.created_at<${end}::timestamptz AND ${lineScope}
       UNION ALL
-      SELECT ri.product_id,ri.product_name,-ri.line_total,-ri.qty*ri.cost_price_at_sale,ri.cost_price_at_sale IS NULL
+      SELECT ri.product_id,ri.product_name,-(ri.line_total-ri.gst_amount),-ri.qty*ri.cost_price_at_sale,ri.cost_price_at_sale IS NULL
       FROM sales_returns sr JOIN return_items ri ON ri.return_id=sr.id
       JOIN sales s ON s.id=sr.original_sale_id AND s.business_id=sr.business_id
       LEFT JOIN products p ON p.id=ri.product_id AND p.business_id=sr.business_id

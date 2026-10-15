@@ -13,7 +13,7 @@ import { SalesSettlementForm } from './_components/sales-settlement-form';
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; customerId?: string }>;
 }
 
 function formatDate(d: Date | string | null) {
@@ -135,7 +135,14 @@ export default async function SettlementsPage(props: PageProps) {
       {tab === 'sales' ? (
         <div className="space-y-6">
           {/* Sales settlement form */}
-          <SalesSettlementForm customers={customerList} />
+          <SalesSettlementForm
+            customers={customerList}
+            initialCustomerId={
+              customerList.some((customer) => customer.id === searchParams.customerId)
+                ? searchParams.customerId
+                : undefined
+            }
+          />
 
           {/* Recent sales settlements table */}
           {salesRows.length === 0 ? (

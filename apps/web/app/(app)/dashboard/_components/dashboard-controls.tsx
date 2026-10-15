@@ -13,11 +13,13 @@ export function DashboardControls({
   stores,
   departments,
   selection,
+  action = '/dashboard',
 }: {
   views: DashboardView[];
   stores: ScopeStore[];
   departments: ScopeDepartment[];
   selection: DashboardSelection;
+  action?: '/dashboard' | '/dashboard/analysis';
 }) {
   const [pending, setPending] = useState(false);
   function change(select: HTMLSelectElement, resetScope = false) {
@@ -32,7 +34,7 @@ export function DashboardControls({
     'mt-1 w-full min-w-0 rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60';
   return (
     <form
-      action="/dashboard"
+      action={action}
       method="get"
       onSubmit={() => setPending(true)}
       aria-label="Dashboard filters"

@@ -28,8 +28,8 @@ export function OwnerInsights({
       <section className={panel} key="profit">
         <h2 className="text-base font-semibold tracking-tight">Product profitability</h2>
         <p className={subtitle}>
-          Top six by gross profit in this period, after returns and free-item costs. Missing costs
-          are not estimated.
+          Top six by gross profit in this period, excluding GST, after returns and free-item costs.
+          Missing costs are not estimated.
         </p>
         {insights.profit.length ? (
           <ul className="mt-4 divide-y">
@@ -164,8 +164,8 @@ export function StoreComparison({ data }: { data: WorkspaceDashboard }) {
     <section className={panel}>
       <h2 className="text-base font-semibold tracking-tight">Store comparison</h2>
       <p className={subtitle}>
-        Net sales after returns, with equal-length previous-period comparisons. Margins help compare
-        stores of different sizes. Up to twenty stores.
+        Net billed sales after returns, with equal-length previous-period comparisons. Gross profit
+        and margins exclude GST. Up to twenty stores.
       </p>
       <ul className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
         {data.performance.map((row) => (
@@ -195,7 +195,7 @@ export function StoreComparison({ data }: { data: WorkspaceDashboard }) {
               <p className="mt-1 text-xs text-muted-foreground">
                 {row.profit === null
                   ? 'Gross profit unavailable: cost snapshots missing'
-                  : `Gross profit ${money(row.profit)}${row.revenue > 0 ? ` · ${((row.profit / row.revenue) * 100).toFixed(1)}% margin` : ''}`}
+                  : `Gross profit ${money(row.profit)}${row.revenue - row.tax > 0 ? ` · ${((row.profit / (row.revenue - row.tax)) * 100).toFixed(1)}% margin` : ''}`}
               </p>
             )}
           </li>

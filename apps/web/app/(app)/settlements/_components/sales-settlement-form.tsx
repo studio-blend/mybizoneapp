@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { createSalesSettlementAction } from '../actions';
 
 interface Props {
+  initialCustomerId?: string;
   customers: {
     id: string;
     name: string;
@@ -34,11 +35,17 @@ const PAYMENT_METHODS = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-export function SalesSettlementForm({ customers }: Props) {
+export function SalesSettlementForm({ customers, initialCustomerId }: Props) {
   const { toast } = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [amount, setAmount] = useState('');
+  const initialCustomer = customers.find((customer) => customer.id === initialCustomerId);
+  const [customerId, setCustomerId] = useState(initialCustomer?.id ?? '');
+  const [amount, setAmount] = useState(
+    initialCustomer && Number(initialCustomer.outstandingBalance) > 0
+      ? initialCustomer.outstandingBalance
+      : '',
+  );
 
   // Sort customers by outstandingBalance descending
   const sorted = [...customers].sort(
@@ -46,6 +53,7 @@ export function SalesSettlementForm({ customers }: Props) {
   );
 
   function handleCustomerChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setCustomerId(e.target.value);
     const selected = customers.find((c) => c.id === e.target.value);
     if (selected) {
       setAmount(Number(selected.outstandingBalance) > 0 ? selected.outstandingBalance : '');
@@ -85,6 +93,7 @@ export function SalesSettlementForm({ customers }: Props) {
 
     // Reset form
     setAmount('');
+    setCustomerId('');
     setError(null);
     (e.target as HTMLFormElement).reset();
   }
@@ -101,7 +110,13 @@ export function SalesSettlementForm({ customers }: Props) {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="customerId">Customer</Label>
-            <Select id="customerId" name="customerId" required onChange={handleCustomerChange}>
+            <Select
+              id="customerId"
+              name="customerId"
+              required
+              value={customerId}
+              onChange={handleCustomerChange}
+            >
               <option value="">Select a customer…</option>
               {sorted.map((c) => (
                 <option key={c.id} value={c.id}>

@@ -1,14 +1,9 @@
-import { type Database, businesses, departments, stores } from '@mybizone/db';
+import type { Database } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
-import { asc, eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { BUSINESS_PROFILES, effectiveProfile } from './business-profile';
-import {
-  type DashboardGrant,
-  type DashboardScope,
-  type DashboardSelection,
-  dashboardPeriod,
-  resolveDashboardScope,
-} from './dashboard-policy';
+import type { DashboardGrant, DashboardSelection } from './dashboard-policy';
+import { dashboardSalesQueries, loadDashboardContext, scopeCondition } from './dashboard-queries';
 import { loadDashboardStockInsights } from './dashboard-stock-insights';
 
 export interface SalesSummary {
@@ -19,6 +14,7 @@ export interface SalesSummary {
   units: number;
   customers: number;
   cogs: number;
+  tax: number;
   unsettled: number;
   overdue: number;
   missingCosts: number;
@@ -57,6 +53,7 @@ export interface PerformanceRow extends Record<string, unknown> {
   previousRevenue: number;
   profit: number | null;
   missingCosts: number;
+  tax: number;
 }
 export interface LedgerSummary {
   receivables: number;
@@ -82,16 +79,6 @@ export interface StockMovement extends Record<string, unknown> {
   date: string;
 }
 
-function scopeCondition(scopes: DashboardScope[], storeColumn: string, departmentColumn: string) {
-  if (!scopes.length) return sql`FALSE`;
-  return sql`(${sql.join(
-    scopes.map(
-      (scope) =>
-        sql`(${scope.storeId ? sql`${sql.raw(storeColumn)} = ${scope.storeId}::uuid` : sql`TRUE`} AND ${scope.departmentId ? sql`${sql.raw(departmentColumn)} = ${scope.departmentId}::uuid` : sql`TRUE`})`,
-    ),
-    sql` OR `,
-  )})`;
-}
 const emptySales: SalesSummary = {
   revenue: 0,
   previousRevenue: 0,
@@ -100,6 +87,7 @@ const emptySales: SalesSummary = {
   units: 0,
   customers: 0,
   cogs: 0,
+  tax: 0,
   unsettled: 0,
   overdue: 0,
   missingCosts: 0,
@@ -114,30 +102,13 @@ export async function loadWorkspaceDashboard(
   now = new Date(),
 ) {
   return withTenant(db, businessId, async (tx) => {
-    const [storeRows, departmentRows, businessRows] = await Promise.all([
-      tx
-        .select({
-          id: stores.id,
-          name: stores.name,
-          businessProfile: stores.businessProfile,
-          sellingModel: stores.sellingModel,
-        })
-        .from(stores)
-        .orderBy(asc(stores.name)),
-      tx
-        .select({ id: departments.id, name: departments.name, storeId: departments.storeId })
-        .from(departments)
-        .orderBy(asc(departments.name)),
-      tx
-        .select({
-          businessProfile: businesses.businessProfile,
-          sellingModel: businesses.sellingModel,
-        })
-        .from(businesses)
-        .where(eq(businesses.id, businessId)),
-    ]);
-    const access = resolveDashboardScope(roles, storeRows, departmentRows, selection);
-    const period = dashboardPeriod(access.range, now);
+    const { storeRows, businessRows, access, period } = await loadDashboardContext(
+      tx,
+      businessId,
+      roles,
+      selection,
+      now,
+    );
     const start = period.start.toISOString();
     const end = period.end.toISOString();
     const previousStart = period.previousStart.toISOString();
@@ -170,31 +141,7 @@ export async function loadWorkspaceDashboard(
           sql`, `,
         )
       : sql`NULL::uuid`;
-    // Scope line items before aggregation. Mixed-department bills never expose the
-    // other department's revenue or product cost to a floor manager.
-    const sold = sql`SELECT s.id,s.store_id,s.created_at,s.customer_id,s.payment_method,s.payment_status,s.due_date,
-      SUM(si.line_total)::numeric AS revenue,SUM(si.qty)::numeric AS units,
-      ${access.financial ? sql`SUM(si.qty * COALESCE(si.cost_price_at_sale,0))` : sql`0`}::numeric AS cogs,
-      ${access.financial ? sql`COUNT(*) FILTER(WHERE si.cost_price_at_sale IS NULL)` : sql`0`}::int AS missing_costs
-      FROM sales s JOIN sale_items si ON si.sale_id=s.id AND si.business_id=s.business_id
-      LEFT JOIN products p ON p.id=si.product_id AND p.business_id=s.business_id
-      WHERE s.business_id=${businessId}::uuid AND s.status='completed' AND s.bill_type<>'estimate'
-        AND s.created_at>=${previousStart}::timestamptz AND s.created_at<${end}::timestamptz AND ${lineScope}
-      GROUP BY s.id`;
-    const unsettled = sql`SELECT DISTINCT s.id,s.due_date FROM sales s
-      JOIN sale_items si ON si.sale_id=s.id AND si.business_id=s.business_id
-      LEFT JOIN products p ON p.id=si.product_id AND p.business_id=s.business_id
-      WHERE s.business_id=${businessId}::uuid AND s.status='completed' AND s.bill_type<>'estimate'
-        AND s.payment_status IN ('due','partial','overdue') AND ${lineScope}`;
-    const returned = sql`SELECT sr.created_at,s.store_id,SUM(ri.line_total)::numeric AS revenue,
-      ${access.financial ? sql`SUM(ri.qty * COALESCE(ri.cost_price_at_sale,0))` : sql`0`}::numeric AS cogs,
-      ${access.financial ? sql`COUNT(*) FILTER(WHERE ri.cost_price_at_sale IS NULL)` : sql`0`}::int AS missing_costs
-      FROM sales_returns sr JOIN return_items ri ON ri.return_id=sr.id
-      JOIN sales s ON s.id=sr.original_sale_id AND s.business_id=sr.business_id
-      LEFT JOIN products p ON p.id=ri.product_id AND p.business_id=sr.business_id
-      WHERE sr.business_id=${businessId}::uuid AND sr.status='completed'
-        AND sr.created_at>=${previousStart}::timestamptz AND sr.created_at<${end}::timestamptz AND ${lineScope}
-      GROUP BY sr.id,s.store_id`;
+    const { sold, returned, unsettled } = dashboardSalesQueries(businessId, access, period);
     const [
       summaryRows,
       inventoryRows,
@@ -221,6 +168,7 @@ export async function loadWorkspaceDashboard(
           'units',COALESCE((SELECT SUM(units) FROM sold WHERE created_at>=${start}::timestamptz),0),
           'customers',(SELECT COUNT(DISTINCT customer_id) FROM sold WHERE created_at>=${start}::timestamptz),
           'cogs',COALESCE((SELECT SUM(cogs) FROM sold WHERE created_at>=${start}::timestamptz),0)-COALESCE((SELECT SUM(cogs) FROM returned WHERE created_at>=${start}::timestamptz),0),
+          'tax',COALESCE((SELECT SUM(tax) FROM sold WHERE created_at>=${start}::timestamptz),0)-COALESCE((SELECT SUM(tax) FROM returned WHERE created_at>=${start}::timestamptz),0),
           'unsettled',(SELECT COUNT(*) FROM unsettled),
           'overdue',(SELECT COUNT(*) FROM unsettled WHERE due_date<${period.today}::date),
           'missingCosts',COALESCE((SELECT SUM(missing_costs) FROM sold WHERE created_at>=${start}::timestamptz),0)+COALESCE((SELECT SUM(missing_costs) FROM returned WHERE created_at>=${start}::timestamptz),0)
@@ -262,14 +210,15 @@ export async function loadWorkspaceDashboard(
       hasSales && ['overview', 'operations'].includes(access.view)
         ? tx.execute<PerformanceRow>(sql`WITH sold AS (${sold}), returned AS (${returned})
         , activity AS (
-          SELECT store_id,created_at,revenue,cogs,missing_costs,1 AS orders FROM sold
-          UNION ALL SELECT store_id,created_at,-revenue,-cogs,missing_costs,0 FROM returned
+          SELECT store_id,created_at,revenue,cogs,tax,missing_costs,1 AS orders FROM sold
+          UNION ALL SELECT store_id,created_at,-revenue,-cogs,-tax,missing_costs,0 FROM returned
         )
         SELECT st.id,st.name,
           COALESCE(SUM(a.revenue) FILTER(WHERE a.created_at>=${start}::timestamptz),0)::float8 AS revenue,
           COALESCE(SUM(a.revenue) FILTER(WHERE a.created_at<${start}::timestamptz),0)::float8 AS "previousRevenue",
           COALESCE(SUM(a.orders) FILTER(WHERE a.created_at>=${start}::timestamptz),0)::int AS orders,
-          ${access.financial ? sql`CASE WHEN COALESCE(SUM(a.missing_costs) FILTER(WHERE a.created_at>=${start}::timestamptz),0)>0 THEN NULL ELSE COALESCE(SUM(a.revenue-a.cogs) FILTER(WHERE a.created_at>=${start}::timestamptz),0)::float8 END` : sql`NULL::float8`} AS profit,
+          COALESCE(SUM(a.tax) FILTER(WHERE a.created_at>=${start}::timestamptz),0)::float8 AS tax,
+          ${access.financial ? sql`CASE WHEN COALESCE(SUM(a.missing_costs) FILTER(WHERE a.created_at>=${start}::timestamptz),0)>0 THEN NULL ELSE COALESCE(SUM(a.revenue-a.tax-a.cogs) FILTER(WHERE a.created_at>=${start}::timestamptz),0)::float8 END` : sql`NULL::float8`} AS profit,
           COALESCE(SUM(a.missing_costs) FILTER(WHERE a.created_at>=${start}::timestamptz),0)::int AS "missingCosts"
         FROM stores st LEFT JOIN activity a ON a.store_id=st.id
         WHERE st.business_id=${businessId}::uuid AND st.id IN (${storeIds})
@@ -279,9 +228,11 @@ export async function loadWorkspaceDashboard(
         ? tx.execute<{
             date: string;
             revenue: number;
+            profit: number | null;
           }>(sql`WITH sold AS (${sold}), returned AS (${returned}), movements AS (
-          SELECT created_at,revenue FROM sold UNION ALL SELECT created_at,-revenue FROM returned)
-        SELECT (created_at AT TIME ZONE 'Asia/Kolkata')::date::text AS date,SUM(revenue)::float8 AS revenue
+          SELECT created_at,revenue,cogs,tax,missing_costs FROM sold UNION ALL SELECT created_at,-revenue,-cogs,-tax,missing_costs FROM returned)
+        SELECT (created_at AT TIME ZONE 'Asia/Kolkata')::date::text AS date,SUM(revenue)::float8 AS revenue,
+          ${access.financial ? sql`CASE WHEN SUM(missing_costs)>0 THEN NULL ELSE SUM(revenue-tax-cogs)::float8 END` : sql`NULL::float8`} AS profit
         FROM movements WHERE created_at>=${start}::timestamptz GROUP BY 1 ORDER BY 1`)
         : Promise.resolve([]),
       hasSales
@@ -335,8 +286,8 @@ export async function loadWorkspaceDashboard(
         })),
       }),
     ]);
-    const activity = new Map(Array.from(trend).map((row) => [row.date, row.revenue]));
-    const dailyTrend: { date: string; revenue: number }[] = [];
+    const activity = new Map(Array.from(trend).map((row) => [row.date, row]));
+    const dailyTrend: { date: string; revenue: number; profit?: number | null }[] = [];
     if (hasSales) {
       const formatter = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Kolkata',
@@ -346,7 +297,12 @@ export async function loadWorkspaceDashboard(
       });
       for (let day = period.start.getTime(); day < period.end.getTime(); day += 86400000) {
         const date = formatter.format(new Date(day));
-        dailyTrend.push({ date, revenue: activity.get(date) ?? 0 });
+        const dayData = activity.get(date);
+        dailyTrend.push({
+          date,
+          revenue: dayData?.revenue ?? 0,
+          ...(access.financial ? { profit: dayData ? dayData.profit : 0 } : {}),
+        });
       }
     }
     return {
