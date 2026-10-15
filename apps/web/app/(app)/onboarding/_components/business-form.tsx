@@ -1,5 +1,6 @@
 'use client';
 
+import { BusinessProfileFields } from '@/components/business-profile-fields';
 import { Button } from '@mybizone/ui/button';
 import {
   Card,
@@ -17,7 +18,7 @@ import { type FormEvent, useState } from 'react';
 import { updateBusinessSetupAction } from '../actions';
 
 interface Props {
-  initial: { gstEnabled: boolean; gstin: string };
+  initial: { gstEnabled: boolean; gstin: string; businessProfile?: string; sellingModel?: string };
 }
 
 export function OnboardingBusinessForm({ initial }: Props) {
@@ -35,6 +36,8 @@ export function OnboardingBusinessForm({ initial }: Props) {
     const result = await updateBusinessSetupAction({
       gstEnabled: gstEnabled ? 'on' : 'off',
       gstin: fd.get('gstin') ?? '',
+      businessProfile: fd.get('businessProfile'),
+      sellingModel: fd.get('sellingModel'),
     });
     setPending(false);
     if (!result.ok) {
@@ -57,6 +60,10 @@ export function OnboardingBusinessForm({ initial }: Props) {
       </CardHeader>
       <form onSubmit={onSubmit}>
         <CardContent className="space-y-4">
+          <BusinessProfileFields
+            initialProfile={initial.businessProfile}
+            initialModel={initial.sellingModel}
+          />
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

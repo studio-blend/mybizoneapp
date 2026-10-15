@@ -1,19 +1,22 @@
+import { BUSINESS_PROFILES, SELLING_MODELS, effectiveProfile } from '@/lib/business-profile';
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
-import { stores } from '@mybizone/db';
+import { businesses, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 
 export default async function StoresPage() {
   const user = await requireUser();
   await requirePermission(user, 'manage_stores');
-  const rows = await withTenant(db, user.businessId, (tx) =>
-    tx.select().from(stores).orderBy(desc(stores.createdAt)),
-  );
+  const { rows, business } = await withTenant(db, user.businessId, async (tx) => {
+    const rows = await tx.select().from(stores).orderBy(desc(stores.createdAt));
+    const [business] = await tx.select().from(businesses).where(eq(businesses.id, user.businessId));
+    return { rows, business };
+  });
 
   return (
     <div className="space-y-6">
@@ -44,11 +47,22 @@ export default async function StoresPage() {
                 <CardTitle>{s.name}</CardTitle>
                 {s.address && <CardDescription>{s.address}</CardDescription>}
               </CardHeader>
-              {s.phone && (
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{s.phone}</p>
-                </CardContent>
-              )}
+              <CardContent>
+                {s.phone && <p className="text-sm text-muted-foreground">{s.phone}</p>}
+                <p className="mt-2 text-sm font-medium">
+                  {BUSINESS_PROFILES[effectiveProfile(business ?? {}, s).businessProfile].label}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {SELLING_MODELS[effectiveProfile(business ?? {}, s).sellingModel]}
+                  {!s.businessProfile ? ' · Inherited profile' : ''}
+                </p>
+                <Link
+                  href={`/stores/${s.id}/profile`}
+                  className="mt-4 inline-block text-sm underline underline-offset-4"
+                >
+                  Configure profile
+                </Link>
+              </CardContent>
             </Card>
           ))}
         </div>

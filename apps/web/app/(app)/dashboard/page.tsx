@@ -1,3 +1,4 @@
+import { BUSINESS_PROFILES, SELLING_MODELS } from '@/lib/business-profile';
 import {
   DASHBOARD_VIEWS,
   DashboardAccessError,
@@ -16,6 +17,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ActivityChart } from './_components/activity-chart';
 import { DashboardControls } from './_components/dashboard-controls';
+import { OwnerInsights, StoreComparison } from './_components/owner-insights';
 
 export const dynamic = 'force-dynamic';
 const money = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -299,6 +301,11 @@ export default async function DashboardPage({
     );
   }
   const { access, period } = data;
+  const priority = data.profile.mixed
+    ? null
+    : data.profile.sellingModel !== 'retail'
+      ? 'collections'
+      : BUSINESS_PROFILES[data.profile.businessProfile].priority;
   const links = permittedNavigation(roles).flatMap((group) => group.items);
   const allowed = (path: string) => links.some((link) => link.href === path);
   const preferences: Record<string, string[]> = {
@@ -310,7 +317,11 @@ export default async function DashboardPage({
     accounts: ['/settlements', '/expenses', '/reports/pl', '/reports/due-bills'],
     marketing: ['/customers', '/cms'],
   };
-  const actions = (preferences[access.view] ?? []).flatMap((href) =>
+  const actionPreferences =
+    priority === 'collections' && ['overview', 'accounts', 'operations'].includes(access.view)
+      ? ['/settlements', '/reports/due-bills', ...(preferences[access.view] ?? [])]
+      : (preferences[access.view] ?? []);
+  const actions = [...new Set(actionPreferences)].flatMap((href) =>
     links.filter((link) => link.href === href),
   );
   const selectedStore = access.stores.find((store) => store.id === selection.storeId);
@@ -350,6 +361,18 @@ export default async function DashboardPage({
           <p className="mt-3 text-xs text-muted-foreground">
             {user.name} <span aria-hidden="true">·</span> {scopeLabel || 'Your assigned scope'}
           </p>
+          {access.view !== 'marketing' && (
+            <p className="mt-2 text-xs text-muted-foreground" data-business-profile>
+              {data.profile.mixed
+                ? 'Mixed store profiles · Each store uses its own stock review period'
+                : `${BUSINESS_PROFILES[data.profile.businessProfile].label} · ${SELLING_MODELS[data.profile.sellingModel]} · Slow-stock review: ${BUSINESS_PROFILES[data.profile.businessProfile].slowDays} days`}
+            </p>
+          )}
+          {!data.profile.mixed && ['overview', 'operations'].includes(access.view) && (
+            <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
+              {BUSINESS_PROFILES[data.profile.businessProfile].focus}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {actions.slice(0, 2).map((action, index) => (
@@ -488,6 +511,20 @@ export default async function DashboardPage({
                       </a>
                     </li>
                   )}
+                  {data.insights.slow.length > 0 && (
+                    <li className="rounded-lg border p-4">
+                      <p className="text-sm font-medium">Slow stock to review</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Available products have passed their store’s no-sale review period.
+                      </p>
+                      <a
+                        href="#slow-stock"
+                        className="mt-3 inline-block text-xs font-medium underline underline-offset-4"
+                      >
+                        Review slow stock
+                      </a>
+                    </li>
+                  )}
                   {data.sales.unsettled > 0 && (
                     <li className="rounded-lg border p-4">
                       <p className="text-sm font-medium">
@@ -528,6 +565,7 @@ export default async function DashboardPage({
                 </ul>
                 {data.inventory.low + data.inventory.out === 0 &&
                   data.sales.unsettled === 0 &&
+                  data.insights.slow.length === 0 &&
                   !data.ledger?.emiOverdue && (
                     <Empty title="No alerts in this view">
                       Stock and bill checks found no items needing attention in the selected scope.
@@ -628,41 +666,10 @@ export default async function DashboardPage({
           )}
 
           {['overview', 'operations'].includes(access.view) && data.performance.length > 1 && (
-            <Panel
-              title="Store comparison"
-              description="Net sales after returns for the selected period. Showing up to twenty stores."
-            >
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <caption className="sr-only">Store sales comparison</caption>
-                  <thead>
-                    <tr className="border-b text-xs text-muted-foreground">
-                      <th className="pb-3 text-left font-medium">Store</th>
-                      <th className="pb-3 text-right font-medium">Bills</th>
-                      <th className="pb-3 pl-4 text-right font-medium">Net sales</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.performance.map((store) => (
-                      <tr key={store.id} className="border-b last:border-0">
-                        <td className="py-4 pr-4">
-                          <Link
-                            href={`/dashboard?view=${access.view}&range=${access.range}&storeId=${store.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {store.name}
-                          </Link>
-                        </td>
-                        <td className="py-4 text-right tabular-nums">{number(store.orders)}</td>
-                        <td className="whitespace-nowrap py-4 pl-4 text-right font-medium tabular-nums">
-                          {money(store.revenue)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
+            <StoreComparison data={data} />
+          )}
+          {['overview', 'operations', 'accounts', 'inventory'].includes(access.view) && (
+            <OwnerInsights data={data} canOpenProducts={allowed('/products')} />
           )}
 
           {access.view !== 'inventory' && (

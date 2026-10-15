@@ -38,8 +38,10 @@ import {
   toggleLockAction,
   updateEmployeeAction,
 } from '../../app/(app)/employees/actions';
+import { updateBusinessProfileAction } from '../../app/(app)/settings/business/actions';
 import { acceptOwnershipTransferAction } from '../../app/(app)/settings/transfer/accept/actions';
 import { initiateOwnershipTransferAction } from '../../app/(app)/settings/transfer/actions';
+import { updateStoreProfileAction } from '../../app/(app)/stores/actions';
 import { grantRoleAction, revokeRoleAction } from '../../app/(app)/team/actions';
 
 const fixtureBusinesses: string[] = [];
@@ -79,6 +81,82 @@ async function currentUser() {
   return { ...current, businessId: current.businessId };
 }
 describe.skipIf(!enabled)('authentication and authorization on isolated PostgreSQL', () => {
+  it('saves independent profiles only for authorized tenants and preserves store overrides', async () => {
+    const a = await fixture();
+    const b = await fixture();
+    const owner = await member(a.businessId, 'owner');
+    const staff = await member(a.businessId, 'employee', a.storeId);
+    state.cookie = owner.cookie;
+    expect(
+      (await updateBusinessProfileAction({ businessProfile: 'grocery', sellingModel: 'both' })).ok,
+    ).toBe(true);
+    expect(
+      (
+        await updateStoreProfileAction({
+          storeId: a.storeId,
+          businessProfile: 'furniture',
+          sellingModel: null,
+        })
+      ).ok,
+    ).toBe(true);
+    expect(
+      (
+        await updateStoreProfileAction({
+          storeId: b.storeId,
+          businessProfile: 'electronics',
+          sellingModel: 'retail',
+        })
+      ).ok,
+    ).toBe(false);
+    expect(
+      (
+        await updateBusinessProfileAction({
+          businessProfile: 'food_service',
+          sellingModel: 'made-up',
+        })
+      ).ok,
+    ).toBe(false);
+    expect(
+      (
+        await updateBusinessProfileAction({
+          businessProfile: 'electronics',
+          sellingModel: 'wholesale',
+        })
+      ).ok,
+    ).toBe(true);
+    const [store] = await db.select().from(stores).where(eq(stores.id, a.storeId));
+    expect(store).toMatchObject({
+      businessProfile: 'furniture',
+      sellingModel: null,
+      name: 'S3 store',
+    });
+    const [business] = await db.select().from(businesses).where(eq(businesses.id, a.businessId));
+    expect(business).toMatchObject({ businessProfile: 'electronics', sellingModel: 'wholesale' });
+    state.cookie = staff.cookie;
+    expect(
+      (await updateBusinessProfileAction({ businessProfile: 'grocery', sellingModel: 'retail' }))
+        .ok,
+    ).toBe(false);
+    expect(
+      (
+        await updateStoreProfileAction({
+          storeId: a.storeId,
+          businessProfile: null,
+          sellingModel: null,
+        })
+      ).ok,
+    ).toBe(false);
+    state.cookie = owner.cookie;
+    expect(
+      (
+        await updateStoreProfileAction({
+          storeId: a.storeId,
+          businessProfile: null,
+          sellingModel: null,
+        })
+      ).ok,
+    ).toBe(true);
+  });
   afterAll(async () => {
     try {
       for (const id of fixtureBusinesses) {

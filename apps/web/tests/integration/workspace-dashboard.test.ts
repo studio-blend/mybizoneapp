@@ -34,6 +34,8 @@ describe.skipIf(!enabled)('workspace dashboard on isolated PostgreSQL', () => {
     await db.$client.begin(async (tx) => {
       await tx`INSERT INTO businesses(id,name,plan) VALUES (${ids.business},'Dashboard scope regression','pro'),(${ids.bait},'Dashboard unrelated business','pro')`;
       await tx`INSERT INTO stores(id,business_id,name) VALUES (${ids.a},${ids.business},'Central'),(${ids.b},${ids.business},'North'),(${ids.baitStore},${ids.bait},'Unrelated')`;
+      await tx`UPDATE businesses SET business_profile='electronics',selling_model='both' WHERE id=${ids.business}`;
+      await tx`UPDATE stores SET business_profile='furniture' WHERE id=${ids.a}`;
       await tx`INSERT INTO departments(id,business_id,store_id,name) VALUES (${ids.a1},${ids.business},${ids.a},'Living'),(${ids.a2},${ids.business},${ids.a},'Bedroom'),(${ids.b1},${ids.business},${ids.b},'Office')`;
       await tx`INSERT INTO products(id,business_id,store_id,department_id,name,unit_type,unit_symbol,price,cost_price,inventory,min_stock) VALUES
         (${ids.p1},${ids.business},${ids.a},${ids.a1},'Department A product','piece','pc',100,50,10,12),
@@ -81,6 +83,21 @@ describe.skipIf(!enabled)('workspace dashboard on isolated PostgreSQL', () => {
       now,
     );
     expect(result.sales).toMatchObject({ revenue: 1100, orders: 2, cogs: 730, returns: 100 });
+    expect(result.insights.profit.find((row) => row.id === ids.p1)).toMatchObject({
+      revenue: 0,
+      profit: -50,
+    });
+    expect(result.insights.profit.find((row) => row.id === ids.p2)).toMatchObject({
+      revenue: 900,
+      profit: 300,
+    });
+    expect(result.insights.profit.reduce((sum, row) => sum + (row.profit ?? 0), 0)).toBe(370);
+    expect(result.performance.find((row) => row.id === ids.a)).toMatchObject({
+      revenue: 900,
+      profit: 250,
+      previousRevenue: 0,
+    });
+    expect(result.profile.mixed).toBe(true);
     expect(result.inventory.products).toBe(3);
     expect(result.ledger?.receivables).toBe(777);
     expect(result.performance.reduce((sum, store) => sum + store.revenue, 0)).toBe(1100);
@@ -102,6 +119,11 @@ describe.skipIf(!enabled)('workspace dashboard on isolated PostgreSQL', () => {
     expect(result.inventory.products).toBe(2);
     expect(result.ledger).toBeNull();
     expect(result.access.stores.map((store) => store.id)).toEqual([ids.a]);
+    expect(result.profile).toMatchObject({
+      businessProfile: 'furniture',
+      sellingModel: 'both',
+      mixed: false,
+    });
     expect(JSON.stringify(result)).not.toContain('Other store product');
   });
   it('limits mixed bills to department lines without exposing costs, customer names or full-bill links', async () => {
@@ -123,6 +145,8 @@ describe.skipIf(!enabled)('workspace dashboard on isolated PostgreSQL', () => {
     expect(serialized).not.toContain('Hidden department product');
     expect(serialized).not.toContain('Private customer');
     expect(result.ledger).toBeNull();
+    expect(result.insights.profit).toEqual([]);
+    expect(result.insights.slow.every((row) => row.value === null)).toBe(true);
   });
   it('does not fetch financial or sales payloads for an inventory-only user', async () => {
     const result = await loadWorkspaceDashboard(
@@ -170,5 +194,64 @@ describe.skipIf(!enabled)('workspace dashboard on isolated PostgreSQL', () => {
     expect(result.sales.orders).toBe(0);
     expect(result.sales.unsettled).toBe(1);
     expect(result.sales.overdue).toBe(1);
+  });
+  it('uses per-store slow-stock thresholds and excludes newly created products', async () => {
+    const durable = randomUUID();
+    const electronics = randomUUID();
+    const fresh = randomUUID();
+    await db.$client`INSERT INTO products(id,business_id,store_id,name,unit_type,unit_symbol,price,cost_price,inventory,created_at) VALUES
+      (${durable},${ids.business},${ids.a},'Durable no sales','piece','pc',100,50,5,'2026-08-01T00:00:00+05:30'),
+      (${electronics},${ids.business},${ids.b},'Older electronics no sales','piece','pc',100,50,5,'2026-08-01T00:00:00+05:30'),
+      (${fresh},${ids.business},${ids.b},'New electronics','piece','pc',100,50,5,'2026-10-14T00:00:00+05:30')`;
+    const result = await loadWorkspaceDashboard(
+      db,
+      ids.business,
+      [{ role: 'super_admin' }],
+      { range: 'today' },
+      now,
+    );
+    expect(result.insights.slow.map((row) => row.id)).toEqual([electronics]);
+    expect(result.insights.slow[0]).toMatchObject({ value: 250, slowDays: 60, lastSale: null });
+    const restricted = await loadWorkspaceDashboard(
+      db,
+      ids.business,
+      [{ role: 'inventory', storeId: ids.b }],
+      {},
+      now,
+    );
+    expect(restricted.insights.slow[0]).toMatchObject({ id: electronics, value: null });
+    expect(JSON.stringify(restricted)).not.toContain('Durable no sales');
+  });
+  it('requires sufficient history for stock cover and includes free quantities', async () => {
+    await db.$client`UPDATE products SET created_at='2026-09-01T00:00:00+05:30' WHERE id IN (${ids.p1},${ids.p2},${ids.p3})`;
+    const result = await loadWorkspaceDashboard(
+      db,
+      ids.business,
+      [{ role: 'super_admin' }],
+      {},
+      now,
+    );
+    expect(result.insights.cover.find((row) => row.id === ids.p1)?.daysRemaining).toBe(150);
+    expect(result.insights.cover.find((row) => row.id === ids.p3)?.daysRemaining).toBe(900);
+  });
+  it('withholds profit when a return cost snapshot is missing', async () => {
+    await db.$client`UPDATE return_items SET cost_price_at_sale=NULL WHERE return_id=${ids.ret}`;
+    try {
+      const result = await loadWorkspaceDashboard(
+        db,
+        ids.business,
+        [{ role: 'super_admin' }],
+        {},
+        now,
+      );
+      expect(result.insights.profit.find((row) => row.id === ids.p1)).toMatchObject({
+        profit: null,
+        missingCosts: 1,
+      });
+      expect(result.performance.find((row) => row.id === ids.a)?.profit).toBeNull();
+      expect(result.sales.missingCosts).toBe(1);
+    } finally {
+      await db.$client`UPDATE return_items SET cost_price_at_sale=50 WHERE return_id=${ids.ret}`;
+    }
   });
 });

@@ -1,5 +1,6 @@
 'use server';
 
+import { BusinessProfileSchema, SellingModelSchema } from '@/lib/business-profile-schema';
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { auditLogs, businesses } from '@mybizone/db';
@@ -10,6 +11,8 @@ import { z } from 'zod/v3';
 
 const Schema = z
   .object({
+    businessProfile: BusinessProfileSchema.default('general_retail'),
+    sellingModel: SellingModelSchema.default('retail'),
     gstEnabled: z.union([z.literal('on'), z.literal('off')]).transform((v) => v === 'on'),
     gstin: z
       .string()
@@ -26,7 +29,12 @@ const Schema = z
 export const updateBusinessSetupAction = safeAction(Schema, async (input, { user, tx }) => {
   await requirePermission(user, 'manage_settings');
   const [before] = await tx
-    .select({ gstEnabled: businesses.gstEnabled, gstin: businesses.gstin })
+    .select({
+      gstEnabled: businesses.gstEnabled,
+      gstin: businesses.gstin,
+      businessProfile: businesses.businessProfile,
+      sellingModel: businesses.sellingModel,
+    })
     .from(businesses)
     .where(eq(businesses.id, user.businessId));
   if (!before) throw new Error('business not found');
@@ -35,6 +43,8 @@ export const updateBusinessSetupAction = safeAction(Schema, async (input, { user
     .update(businesses)
     .set({
       gstEnabled: input.gstEnabled,
+      businessProfile: input.businessProfile,
+      sellingModel: input.sellingModel,
       gstin: input.gstEnabled ? input.gstin : null,
       updatedAt: new Date(),
     })
@@ -47,7 +57,12 @@ export const updateBusinessSetupAction = safeAction(Schema, async (input, { user
     entity: 'business',
     entityId: user.businessId,
     before,
-    after: { gstEnabled: input.gstEnabled, gstin: input.gstEnabled ? input.gstin : null },
+    after: {
+      gstEnabled: input.gstEnabled,
+      gstin: input.gstEnabled ? input.gstin : null,
+      businessProfile: input.businessProfile,
+      sellingModel: input.sellingModel,
+    },
   });
 
   revalidatePath('/onboarding');

@@ -68,6 +68,7 @@ const definitions: { label: string; items: Entry[] }[] = [
   {
     label: 'Settings',
     items: [
+      { href: '/settings/business', label: 'Business profile', gate: 'manage_settings' },
       { href: '/stores', label: 'Stores', gate: 'manage_stores' },
       { href: '/departments', label: 'Departments', gate: 'manage_departments' },
       { href: '/team', label: 'Team', gate: 'manage_rbac' },

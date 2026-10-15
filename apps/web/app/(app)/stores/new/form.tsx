@@ -1,5 +1,6 @@
 'use client';
 
+import { BusinessProfileFields } from '@/components/business-profile-fields';
 import { UpgradeAlert } from '@/components/upgrade-alert';
 import { Button } from '@mybizone/ui/button';
 import {
@@ -32,6 +33,8 @@ export function NewStoreForm({ redirectTo = '/stores' }: { redirectTo?: string }
       name: fd.get('name'),
       address: fd.get('address') || undefined,
       phone: fd.get('phone') || undefined,
+      businessProfile: fd.get('businessProfile') || null,
+      sellingModel: fd.get('sellingModel') || null,
     });
     setPending(false);
     if (!result.ok) {
@@ -64,6 +67,7 @@ export function NewStoreForm({ redirectTo = '/stores' }: { redirectTo?: string }
             <Input id="phone" name="phone" maxLength={30} />
           </div>
           <UpgradeAlert error={error} />
+          <BusinessProfileFields inherit />
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={pending}>

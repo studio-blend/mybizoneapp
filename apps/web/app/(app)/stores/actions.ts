@@ -1,10 +1,15 @@
 'use server';
 
+import {
+  BusinessProfileSchema,
+  SellingModelSchema,
+  StoreProfileSettingsSchema,
+} from '@/lib/business-profile-schema';
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { auditLogs, bumpUsage, businesses, stores } from '@mybizone/db';
 import { type Plan, checkLimit, isValidPlan } from '@mybizone/domain/plans';
-import { count, eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod/v3';
 
@@ -12,6 +17,8 @@ const CreateStoreSchema = z.object({
   name: z.string().min(1, 'name required').max(120),
   address: z.string().max(500).optional(),
   phone: z.string().max(30).optional(),
+  businessProfile: BusinessProfileSchema.nullable().optional(),
+  sellingModel: SellingModelSchema.nullable().optional(),
 });
 
 export const createStoreAction = safeAction(CreateStoreSchema, async (input, { user, tx }) => {
@@ -33,6 +40,8 @@ export const createStoreAction = safeAction(CreateStoreSchema, async (input, { u
       name: input.name,
       address: input.address ?? null,
       phone: input.phone ?? null,
+      businessProfile: input.businessProfile ?? null,
+      sellingModel: input.sellingModel ?? null,
     })
     .returning({ id: stores.id, name: stores.name });
   if (!row) throw new Error('insert failed');
@@ -53,3 +62,35 @@ export const createStoreAction = safeAction(CreateStoreSchema, async (input, { u
   revalidatePath('/dashboard');
   return { id: row.id, name: row.name };
 });
+
+export const updateStoreProfileAction = safeAction(
+  StoreProfileSettingsSchema,
+  async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_stores');
+    const predicate = and(eq(stores.id, input.storeId), eq(stores.businessId, user.businessId));
+    const [before] = await tx
+      .select({ businessProfile: stores.businessProfile, sellingModel: stores.sellingModel })
+      .from(stores)
+      .where(predicate)
+      .for('update');
+    if (!before) throw new Error('Store not found');
+    const after = { businessProfile: input.businessProfile, sellingModel: input.sellingModel };
+    await tx
+      .update(stores)
+      .set({ ...after, updatedAt: new Date() })
+      .where(predicate);
+    await tx.insert(auditLogs).values({
+      businessId: user.businessId,
+      actorId: user.id,
+      action: 'store.profile.update',
+      entity: 'store',
+      entityId: input.storeId,
+      before,
+      after,
+    });
+    revalidatePath('/stores');
+    revalidatePath(`/stores/${input.storeId}/profile`);
+    revalidatePath('/dashboard');
+    return { ok: true };
+  },
+);

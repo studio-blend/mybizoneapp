@@ -15,7 +15,12 @@ export default async function OnboardingPage() {
   await requirePermission(user, 'manage_settings');
   const data = await withTenant(db, user.businessId, async (tx) => {
     const [biz] = await tx
-      .select({ gstEnabled: businesses.gstEnabled, gstin: businesses.gstin })
+      .select({
+        gstEnabled: businesses.gstEnabled,
+        gstin: businesses.gstin,
+        businessProfile: businesses.businessProfile,
+        sellingModel: businesses.sellingModel,
+      })
       .from(businesses)
       .where(eq(businesses.id, user.businessId));
     const storeRows = await tx.select({ id: stores.id }).from(stores).limit(1);
@@ -37,6 +42,8 @@ export default async function OnboardingPage() {
         initial={{
           gstEnabled: data.biz?.gstEnabled ?? false,
           gstin: data.biz?.gstin ?? '',
+          businessProfile: data.biz?.businessProfile,
+          sellingModel: data.biz?.sellingModel,
         }}
       />
     </div>
