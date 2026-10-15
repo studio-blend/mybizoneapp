@@ -1,82 +1,10 @@
 'use client';
 
+import type { NavGroup } from '@/lib/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { LogoutButton } from './logout-button';
-
-interface NavGroup {
-  label: string;
-  items: { href: string; label: string }[];
-}
-
-const NAV_GROUPS: NavGroup[] = [
-  {
-    label: 'Billing',
-    items: [
-      { href: '/sales/new', label: 'New Sale (POS)' },
-      { href: '/sales', label: 'Sales' },
-      { href: '/returns', label: 'Sales Returns' },
-      { href: '/quotations', label: 'Quotations' },
-      { href: '/delivery-challans', label: 'Delivery Challans' },
-      { href: '/settlements', label: 'Settlements' },
-      { href: '/emi', label: 'EMI' },
-    ],
-  },
-  {
-    label: 'Purchases',
-    items: [
-      { href: '/purchases', label: 'Purchase Bills' },
-      { href: '/purchase-returns', label: 'Purchase Returns' },
-      { href: '/expenses', label: 'Expenses' },
-    ],
-  },
-  {
-    label: 'Inventory',
-    items: [
-      { href: '/products', label: 'Products' },
-      { href: '/products/barcode', label: 'Barcodes' },
-      { href: '/categories', label: 'Categories' },
-      { href: '/brands', label: 'Brands' },
-      { href: '/catalogues', label: 'Catalogues' },
-      { href: '/damage-logs', label: 'Damage Logs' },
-    ],
-  },
-  {
-    label: 'Reports',
-    items: [
-      { href: '/reports/due-bills', label: 'Due Bills' },
-      { href: '/reports/pl', label: 'P&L' },
-      { href: '/reports/balance-sheet', label: 'Balance Sheet' },
-      { href: '/reports/gstr1', label: 'GSTR-1' },
-      { href: '/reports/gstr3b', label: 'GSTR-3B' },
-      { href: '/reports/e-invoice', label: 'E-Invoice' },
-      { href: '/reports/closing-stock', label: 'Closing Stock' },
-      { href: '/reports/inventory-valuation', label: 'Inventory Valuation' },
-      { href: '/reports/performance', label: 'Performance' },
-    ],
-  },
-  {
-    label: 'CRM',
-    items: [
-      { href: '/customers', label: 'Customers' },
-      { href: '/suppliers', label: 'Suppliers' },
-      { href: '/cms', label: 'CMS / WhatsApp' },
-    ],
-  },
-  {
-    label: 'Settings',
-    items: [
-      { href: '/stores', label: 'Stores' },
-      { href: '/departments', label: 'Departments' },
-      { href: '/team', label: 'Team' },
-      { href: '/employees', label: 'Employees' },
-      { href: '/settings/billing', label: 'Plan & Billing' },
-      { href: '/settings/system', label: 'System' },
-      { href: '/settings/transfer', label: 'Ownership Transfer' },
-    ],
-  },
-];
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -189,9 +117,10 @@ function UserMenu({ email }: { email: string }) {
 
 interface NavHeaderProps {
   email: string;
+  groups: NavGroup[];
 }
 
-export function NavHeader({ email }: NavHeaderProps) {
+export function NavHeader({ email, groups }: NavHeaderProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileOpenGroups, setMobileOpenGroups] = useState<Record<string, boolean>>({});
@@ -232,7 +161,7 @@ export function NavHeader({ email }: NavHeaderProps) {
             >
               Dashboard
             </Link>
-            {NAV_GROUPS.map((group) => (
+            {groups.map((group) => (
               <Dropdown key={group.label} group={group} />
             ))}
           </nav>
@@ -294,7 +223,7 @@ export function NavHeader({ email }: NavHeaderProps) {
               Dashboard
             </Link>
 
-            {NAV_GROUPS.map((group) => {
+            {groups.map((group) => {
               const groupOpen = !!mobileOpenGroups[group.label];
               const isActive = group.items.some((i) => pathname?.startsWith(i.href));
               return (

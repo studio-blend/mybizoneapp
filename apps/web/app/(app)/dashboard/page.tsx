@@ -1,290 +1,771 @@
-import { loadDashboardData } from '@/lib/dashboard-data';
+import {
+  DASHBOARD_VIEWS,
+  DashboardAccessError,
+  type DashboardSelection,
+} from '@/lib/dashboard-policy';
 import { db } from '@/lib/db';
 import { getUserRoles } from '@/lib/get-user-roles';
+import { permittedNavigation } from '@/lib/navigation';
 import { requireUser } from '@/lib/session';
-import { stores } from '@mybizone/db';
-import { withTenant } from '@mybizone/db/tenant';
-import { hasPermission } from '@mybizone/domain';
-import { round2 } from '@mybizone/domain/money';
-import { Button } from '@mybizone/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
-import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { GuidedTour } from './_components/GuidedTour';
 import {
-  CategoryDonutChart,
-  PaymentSplitBar,
-  RevenueTrendChart,
-  TopProductsBar,
-} from './_components/dashboard-charts';
+  type StockAttention,
+  type WorkspaceDashboard,
+  loadWorkspaceDashboard,
+} from '@/lib/workspace-dashboard';
+import Link from 'next/link';
+import type { ReactNode } from 'react';
+import { ActivityChart } from './_components/activity-chart';
+import { DashboardControls } from './_components/dashboard-controls';
 
 export const dynamic = 'force-dynamic';
+const money = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+const number = (value: number) => value.toLocaleString('en-IN', { maximumFractionDigits: 3 });
+const date = (value: string) =>
+  new Date(value).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'Asia/Kolkata',
+  });
+const paymentLabels: Record<string, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  card_debit: 'Debit card',
+  card_credit: 'Credit card',
+  finance_emi: 'EMI',
+  credit: 'Credit',
+  cheque: 'Cheque',
+  other: 'Other',
+};
 
-function pct(curr: number, prev: number): number | null {
-  if (prev === 0) return null;
-  return round2(((curr - prev) / prev) * 100);
-}
-
-function formatMon(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
-}
-
-function fmtAmount(n: number): string {
-  return n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
-}
-
-export default async function DashboardPage() {
-  const user = await requireUser();
-  const roles = await getUserRoles(user);
-  if (
-    !roles.some((role) =>
-      hasPermission([role], 'view_dashboard', {
-        storeId: role.storeId ?? undefined,
-        departmentId: role.departmentId ?? undefined,
-      }),
-    )
-  )
-    throw new Error('Permission denied');
-  // Financial aggregates span the business and require an unscoped report grant.
-  if (!hasPermission(roles, 'view_reports')) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p>Use the navigation to open the tools available to your role.</p>
-      </div>
-    );
-  }
-
-  const setupCheck = await withTenant(db, user.businessId, (tx) =>
-    tx.select({ id: stores.id }).from(stores).limit(1),
-  );
-  if (setupCheck.length === 0) redirect('/onboarding');
-
-  const now = new Date();
-  const data = await loadDashboardData(db, user.businessId, now);
-
-  const grossProfit = round2(data.revThis - data.cogsThis);
-  const revDelta = pct(data.revThis, data.revPrev);
-  const expDelta = pct(data.expThis, data.expPrev);
-
-  const monthLabel = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-
-  const monthlyRevenue = data.monthlyRevRaw.map((r) => ({
-    month: formatMon(r.month),
-    revenue: Number(r.revenue ?? 0),
-  }));
-
-  const topProducts = data.top5Raw.map((r) => ({
-    name: r.name.length > 18 ? `${r.name.slice(0, 16)}…` : r.name,
-    revenue: Number(r.revenue ?? 0),
-  }));
-
-  const categoryData = data.catRaw.map((r) => ({
-    name: r.category,
-    value: Number(r.revenue ?? 0),
-  }));
-
-  const paymentData = data.pmtRaw.map((r) => ({
-    method: r.method,
-    amount: Number(r.total ?? 0),
-  }));
-
-  const hasTour = {
-    hasProducts: data.productCount > 0,
-    hasSales: data.revThis > 0,
-    hasInvoices: false,
-  };
-
+function Panel({
+  title,
+  description,
+  children,
+  id,
+}: { title: string; description?: string; children: ReactNode; id?: string }) {
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">{monthLabel}</p>
-        </div>
-        <Button asChild>
-          <Link href="/sales/new">New sale</Link>
-        </Button>
+    <section id={id} className="min-w-0 rounded-xl border bg-card p-5 sm:p-6">
+      <div className="mb-5">
+        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+        {description && (
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+        )}
       </div>
-
-      <GuidedTour
-        hasProducts={hasTour.hasProducts}
-        hasSales={hasTour.hasSales}
-        hasInvoices={hasTour.hasInvoices}
-      />
-
-      {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <KpiCard
-          label="Revenue this month"
-          value={`₹${fmtAmount(data.revThis)}`}
-          delta={revDelta}
-          sub="vs last month"
-        />
-        <KpiCard
-          label="Gross Profit"
-          value={`₹${fmtAmount(grossProfit)}`}
-          sub={`COGS ₹${fmtAmount(data.cogsThis)}`}
-        />
-        <KpiCard
-          label="Expenses this month"
-          value={`₹${fmtAmount(data.expThis)}`}
-          delta={expDelta !== null ? -expDelta : null}
-          sub="vs last month"
-          invertDelta
-        />
-        <KpiCard
-          label="Pending Receivables"
-          value={`₹${fmtAmount(data.receivables)}`}
-          sub="Customer outstanding"
-        />
-        <KpiCard
-          label="Active Customers"
-          value={String(data.custTotal)}
-          sub={`+${data.custNew} new this month`}
-        />
-        <KpiCard
-          label="Units Sold"
-          value={Number(data.unitsSold.toFixed(0)).toLocaleString('en-IN')}
-          sub="This month"
-        />
-      </div>
-
-      {/* Charts row 1 */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>12-Month Revenue Trend</CardTitle>
-            <CardDescription>Monthly revenue (last 12 months)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {monthlyRevenue.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">No sales data yet.</p>
-            ) : (
-              <RevenueTrendChart data={monthlyRevenue} />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Top 5 Products</CardTitle>
-            <CardDescription>By revenue this month</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {topProducts.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">No sales this month.</p>
-            ) : (
-              <TopProductsBar data={topProducts} />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts row 2 */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Sales by Category</CardTitle>
-            <CardDescription>Revenue split by product category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {categoryData.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
-                No category data this month.
-              </p>
-            ) : (
-              <CategoryDonutChart data={categoryData} />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment Method Split</CardTitle>
-            <CardDescription>Revenue by payment type this month</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {paymentData.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
-                No payment data this month.
-              </p>
-            ) : (
-              <PaymentSplitBar data={paymentData} />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Receivables vs Payables */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Receivables vs Payables</CardTitle>
-          <CardDescription>Customer outstanding vs supplier outstanding</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Customer Receivables</p>
-              <p className="text-2xl font-bold text-green-600">₹{fmtAmount(data.receivables)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Supplier Payables</p>
-              <p className="text-2xl font-bold text-red-600">₹{fmtAmount(data.payables)}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {children}
+    </section>
+  );
+}
+function Empty({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="flex min-h-32 flex-col justify-center rounded-lg border border-dashed px-5 py-6">
+      <p className="text-sm font-medium">{title}</p>
+      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{children}</p>
+    </div>
+  );
+}
+function Metric({
+  label,
+  value,
+  detail,
+  accent,
+}: { label: string; value: string; detail: string; accent?: boolean }) {
+  return (
+    <div
+      className={`min-w-0 rounded-xl border p-5 ${accent ? 'border-emerald-700/20 bg-emerald-700/5' : 'bg-card'}`}
+    >
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-3 break-words text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">
+        {value}
+      </dd>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{detail}</p>
     </div>
   );
 }
 
-function KpiCard({
-  label,
-  value,
-  delta,
-  sub,
-  invertDelta = false,
-}: {
-  label: string;
-  value: string;
-  delta?: number | null;
-  sub?: string;
-  invertDelta?: boolean;
-}) {
-  const isUp = delta !== null && delta !== undefined && delta > 0;
-  const isDown = delta !== null && delta !== undefined && delta < 0;
-  const deltaColor = invertDelta
-    ? isUp
-      ? 'text-green-600'
-      : isDown
-        ? 'text-red-600'
-        : ''
-    : isUp
-      ? 'text-green-600'
-      : isDown
-        ? 'text-red-600'
-        : '';
+function metrics(data: WorkspaceDashboard) {
+  const { access, sales, inventory, ledger, customers } = data;
+  const change =
+    sales.previousRevenue === 0
+      ? null
+      : ((sales.revenue - sales.previousRevenue) / Math.abs(sales.previousRevenue)) * 100;
+  const delta =
+    change === null
+      ? 'No prior-period comparison'
+      : `${change > 0 ? '+' : ''}${change.toFixed(1)}% ${data.period.comparisonLabel}`;
+  const revenue = { label: 'Net sales', value: money(sales.revenue), detail: delta, accent: true };
+  const profit = {
+    label: 'Gross profit',
+    value: money(sales.revenue - sales.cogs),
+    detail: sales.missingCosts
+      ? `${sales.missingCosts} line items have no recorded cost`
+      : 'After returns and recorded product costs',
+  };
+  const orders = {
+    label: 'Sales bills',
+    value: number(sales.orders),
+    detail: 'Completed sales; estimates excluded',
+  };
+  const average = {
+    label: 'Average bill',
+    value: money(sales.orders ? (sales.revenue + sales.returns) / sales.orders : 0),
+    detail: 'Billed sales before returns',
+  };
+  const alerts = {
+    label: 'Stock alerts',
+    value: number(inventory.low + inventory.out),
+    detail: `${number(inventory.low)} low stock · ${number(inventory.out)} out of stock`,
+  };
+  if (access.view === 'marketing')
+    return [
+      {
+        label: 'Customers',
+        value: number(customers?.total ?? 0),
+        detail: 'Customer directory',
+        accent: true,
+      },
+      { label: 'New customers', value: number(customers?.new ?? 0), detail: data.period.label },
+      {
+        label: 'Tagged customers',
+        value: number(customers?.tagged ?? 0),
+        detail: 'Ready for customer segments',
+      },
+      {
+        label: 'Without tags',
+        value: number((customers?.total ?? 0) - (customers?.tagged ?? 0)),
+        detail: 'Customers to organize',
+      },
+    ];
+  if (access.view === 'inventory')
+    return [
+      {
+        label: 'Active products',
+        value: number(inventory.products),
+        detail: 'Within the selected scope',
+        accent: true,
+      },
+      {
+        label: 'In stock',
+        value: number(inventory.products - inventory.out),
+        detail: 'Products with available stock',
+      },
+      {
+        label: 'Low stock',
+        value: number(inventory.low),
+        detail: 'Below the configured reorder level',
+      },
+      {
+        label: 'Out of stock',
+        value: number(inventory.out),
+        detail: 'Products needing replenishment',
+      },
+    ];
+  if (access.view === 'accounts')
+    return [
+      revenue,
+      profit,
+      {
+        label: 'Expenses',
+        value: ledger ? money(ledger.expenses) : '—',
+        detail: ledger ? data.period.label : 'Select all stores for shared expenses',
+      },
+      {
+        label: 'Customer dues',
+        value: ledger ? money(ledger.receivables) : '—',
+        detail: ledger
+          ? 'Current customer ledger balance'
+          : 'Select all stores for shared balances',
+      },
+    ];
+  if (access.view === 'sales')
+    return [
+      revenue,
+      orders,
+      average,
+      {
+        label: 'Customers served',
+        value: number(sales.customers),
+        detail: 'Linked customers in this period',
+      },
+    ];
+  if (access.view === 'billing')
+    return [
+      revenue,
+      orders,
+      average,
+      {
+        label: 'Unsettled bills',
+        value: number(sales.unsettled),
+        detail: 'Due or partially paid; not a debt amount',
+      },
+    ];
+  if (access.view === 'operations')
+    return [
+      revenue,
+      access.financial
+        ? profit
+        : { label: 'Quantity sold', value: number(sales.units), detail: 'Includes free items' },
+      orders,
+      alerts,
+    ];
+  return [
+    revenue,
+    profit,
+    {
+      label: 'Customer dues',
+      value: ledger ? money(ledger.receivables) : '—',
+      detail: ledger
+        ? 'Current balance across the business'
+        : 'Shared ledger available in All stores',
+    },
+    alerts,
+  ];
+}
 
+function StockTable({
+  rows,
+  canOpenProducts,
+}: { rows: StockAttention[]; canOpenProducts: boolean }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl">{value}</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          {delta !== null && delta !== undefined && (
-            <span className={`font-medium ${deltaColor}`}>
-              {isUp ? '▲' : isDown ? '▼' : ''}
-              {Math.abs(delta).toFixed(1)}%
-            </span>
-          )}
-          {sub && <span>{sub}</span>}
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <caption className="sr-only">Product stock within your dashboard scope</caption>
+        <thead>
+          <tr className="border-b text-xs text-muted-foreground">
+            <th className="pb-3 text-left font-medium">Product</th>
+            <th className="pb-3 text-right font-medium">Available</th>
+            <th className="pb-3 pl-4 text-right font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-b last:border-0">
+              <td className="py-3 pr-4">
+                <p className="font-medium">
+                  {canOpenProducts ? (
+                    <Link
+                      href={`/products?q=${encodeURIComponent(row.name)}`}
+                      className="hover:underline"
+                    >
+                      {row.name}
+                    </Link>
+                  ) : (
+                    row.name
+                  )}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{row.department ?? row.store}</p>
+              </td>
+              <td className="whitespace-nowrap py-3 text-right tabular-nums">
+                {number(row.inventory)} {row.unit}
+                <p className="mt-1 text-xs text-muted-foreground">Min {number(row.minimum)}</p>
+              </td>
+              <td className="py-3 pl-4 text-right">
+                <span
+                  className={`whitespace-nowrap rounded-full px-2 py-1 text-xs ${row.inventory <= 0 ? 'bg-red-700/10 text-red-700 dark:text-red-300' : row.inventory < row.minimum ? 'bg-amber-700/10 text-amber-800 dark:text-amber-300' : 'bg-emerald-700/10 text-emerald-800 dark:text-emerald-300'}`}
+                >
+                  {row.inventory <= 0
+                    ? 'Out of stock'
+                    : row.inventory < row.minimum
+                      ? 'Low stock'
+                      : 'In stock'}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: { searchParams: Promise<DashboardSelection> }) {
+  const selection = await searchParams;
+  const user = await requireUser();
+  const roles = await getUserRoles(user);
+  let data: WorkspaceDashboard;
+  try {
+    data = await loadWorkspaceDashboard(db, user.businessId, roles, selection);
+  } catch (error) {
+    if (!(error instanceof DashboardAccessError)) throw error;
+    return (
+      <div className="mx-auto max-w-2xl rounded-xl border p-8">
+        <h1 className="text-xl font-semibold">Dashboard access</h1>
+        <p className="mt-3 text-muted-foreground">{error.message}</p>
+        <Link href="/dashboard" className="mt-5 inline-block rounded-lg border px-4 py-2 text-sm">
+          Return to your dashboard
+        </Link>
+      </div>
+    );
+  }
+  const { access, period } = data;
+  const links = permittedNavigation(roles).flatMap((group) => group.items);
+  const allowed = (path: string) => links.some((link) => link.href === path);
+  const preferences: Record<string, string[]> = {
+    overview: ['/sales/new', '/reports', '/stores', '/team'],
+    operations: ['/sales/new', '/sales', '/products'],
+    sales: ['/sales/new', '/sales'],
+    billing: ['/sales/new', '/sales', '/settlements'],
+    inventory: ['/products', '/purchases', '/damage-logs'],
+    accounts: ['/settlements', '/expenses', '/reports/pl', '/reports/due-bills'],
+    marketing: ['/customers', '/cms'],
+  };
+  const actions = (preferences[access.view] ?? []).flatMap((href) =>
+    links.filter((link) => link.href === href),
+  );
+  const selectedStore = access.stores.find((store) => store.id === selection.storeId);
+  const selectedDepartment = access.departments.find(
+    (department) => department.id === selection.departmentId,
+  );
+  const scopeLabel =
+    access.view === 'marketing'
+      ? 'Business customer directory'
+      : [
+          selectedDepartment?.name ??
+            (access.departmentOnly && access.departments.length === 1
+              ? access.departments[0]?.name
+              : null),
+          selectedStore?.name ??
+            (access.stores.length === 1
+              ? access.stores[0]?.name
+              : `${access.stores.length} stores`),
+        ]
+          .filter(Boolean)
+          .join(' · ');
+  const activeSelection = { ...selection, view: access.view, range: access.range };
+  const noSales = data.sales.orders === 0 && data.sales.returns === 0;
+  return (
+    <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8" data-dashboard-view={access.view}>
+      <header className="flex flex-col gap-5 border-b pb-6 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Dashboard
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+            {DASHBOARD_VIEWS[access.view].label}
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            {DASHBOARD_VIEWS[access.view].description}
+          </p>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {user.name} <span aria-hidden="true">·</span> {scopeLabel || 'Your assigned scope'}
+          </p>
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {actions.slice(0, 2).map((action, index) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-opacity hover:opacity-80 ${index === 0 ? 'bg-primary text-primary-foreground' : 'border bg-card'}`}
+            >
+              {action.label}
+            </Link>
+          ))}
+          {access.departmentOnly && (
+            <a href="#stock-on-hand" className="rounded-lg border px-4 py-2 text-sm font-medium">
+              Review department stock
+            </a>
+          )}
+        </div>
+      </header>
+      <DashboardControls
+        key={`${access.view}:${selection.storeId}:${selection.departmentId}:${access.range}`}
+        views={access.views}
+        stores={access.view === 'marketing' ? [] : access.stores}
+        departments={access.view === 'marketing' ? [] : access.departments}
+        selection={activeSelection}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <p>
+          {period.label} <span aria-hidden="true">·</span> {date(period.start.toISOString())} –{' '}
+          {date(new Date(period.end.getTime() - 1).toISOString())}
+        </p>
+        <p>Dates in India time · Stock and balances are current</p>
+      </div>
+      <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics(data).map((metric) => (
+          <Metric key={metric.label} {...metric} />
+        ))}
+      </dl>
+
+      {access.view === 'marketing' ? (
+        <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
+          <Panel
+            title="Customer segments"
+            description="Customers can belong to more than one segment."
+          >
+            {data.customers?.segments.length ? (
+              <ul className="divide-y">
+                {data.customers.segments.map((segment) => (
+                  <li key={segment.name} className="flex items-center justify-between py-4">
+                    <span className="text-sm font-medium">{segment.name}</span>
+                    <span className="rounded-full bg-muted px-3 py-1 text-sm tabular-nums">
+                      {number(segment.count)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty title="Organize your customer directory">
+                Add tags to customers to build useful segments for follow-ups.
+              </Empty>
+            )}
+          </Panel>
+          <Panel
+            title="Latest follow-ups"
+            description="Most recent notes across your customer directory."
+          >
+            {data.customers?.notes.length ? (
+              <ul className="divide-y">
+                {data.customers.notes.map((note, index) => (
+                  <li key={`${note.name}:${note.date}:${index}`} className="py-3">
+                    <p className="text-sm font-medium">{note.name}</p>
+                    <p className="mt-1 break-words text-sm text-muted-foreground">{note.note}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{date(note.date)}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty title="No follow-up notes yet">
+                Record a note on a customer to keep the next conversation informed.
+              </Empty>
+            )}
+          </Panel>
+          <div className="lg:col-span-2">
+            <Panel title="Recent customers" description="Latest additions, across all dates.">
+              {data.customers?.recent.length ? (
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {data.customers.recent.map((customer) => (
+                    <li key={customer.id} className="rounded-lg border p-4">
+                      <p className="text-sm font-medium">{customer.name}</p>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {customer.tier} · Added {date(customer.date)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Empty title="Start with your first customer">
+                  The customer directory will appear here once records are added.
+                </Empty>
+              )}
+            </Panel>
+          </div>
+        </div>
+      ) : (
+        <>
+          {access.view !== 'inventory' && (
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+              <Panel
+                title="Sales activity"
+                description={`Daily net sales after returns · ${period.label.toLowerCase()}. Estimates are excluded.`}
+              >
+                {noSales ? (
+                  <Empty title="No sales in this period">
+                    Choose a longer period
+                    {allowed('/sales/new') ? ' or record your first sale' : ''} to see activity
+                    here.
+                  </Empty>
+                ) : (
+                  <ActivityChart data={data.trend} />
+                )}
+              </Panel>
+              <Panel title="Needs attention" description="Priorities within your selected scope.">
+                <ul className="space-y-3">
+                  {data.inventory.low + data.inventory.out > 0 && (
+                    <li className="rounded-lg border p-4">
+                      <p className="text-sm font-medium">
+                        {number(data.inventory.low + data.inventory.out)} stock alerts
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Review stock availability before the next sale.
+                      </p>
+                      <a
+                        href="#stock-attention"
+                        className="mt-3 inline-block text-xs font-medium underline underline-offset-4"
+                      >
+                        Review stock
+                      </a>
+                    </li>
+                  )}
+                  {data.sales.unsettled > 0 && (
+                    <li className="rounded-lg border p-4">
+                      <p className="text-sm font-medium">
+                        {number(data.sales.unsettled)} unsettled bills
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {number(data.sales.overdue)} past their due date, across all dates.
+                        Collections are recorded in customer ledgers.
+                      </p>
+                      {allowed('/reports/due-bills') && (
+                        <Link
+                          href="/reports/due-bills"
+                          className="mt-3 inline-block text-xs font-medium underline underline-offset-4"
+                        >
+                          Review due bills
+                        </Link>
+                      )}
+                    </li>
+                  )}
+                  {data.ledger && data.ledger.emiOverdue > 0 && (
+                    <li className="rounded-lg border p-4">
+                      <p className="text-sm font-medium">
+                        {number(data.ledger.emiOverdue)} overdue instalments
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Unpaid EMI instalments due before today, across all dates.
+                      </p>
+                      {allowed('/emi') && (
+                        <Link
+                          href="/emi"
+                          className="mt-3 inline-block text-xs font-medium underline underline-offset-4"
+                        >
+                          Open EMI schedules
+                        </Link>
+                      )}
+                    </li>
+                  )}
+                </ul>
+                {data.inventory.low + data.inventory.out === 0 &&
+                  data.sales.unsettled === 0 &&
+                  !data.ledger?.emiOverdue && (
+                    <Empty title="No alerts in this view">
+                      Stock and bill checks found no items needing attention in the selected scope.
+                    </Empty>
+                  )}
+              </Panel>
+            </div>
+          )}
+
+          {data.ledger && (
+            <Panel
+              title="Business ledger"
+              description="Customer and supplier balances are shared across the business. Payment totals use the selected period."
+            >
+              <dl className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ['Customer receivables', data.ledger.receivables],
+                  ['Supplier payables', data.ledger.payables],
+                  ['Customer collections', data.ledger.collections],
+                  ['Supplier payments', data.ledger.supplierPayments],
+                ].map(([label, value]) => (
+                  <div key={String(label)}>
+                    <dt className="text-xs text-muted-foreground">{label}</dt>
+                    <dd className="mt-2 text-xl font-semibold tabular-nums">
+                      {money(Number(value))}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              {actions.length > 2 && (
+                <div className="mt-6 flex flex-wrap gap-3 border-t pt-4">
+                  {actions.slice(2).map((action) => (
+                    <Link
+                      key={action.href}
+                      href={action.href}
+                      className="text-xs font-medium underline underline-offset-4"
+                    >
+                      {action.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Panel>
+          )}
+          {access.financial && !data.ledger && ['overview', 'accounts'].includes(access.view) && (
+            <p className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+              Store and department filters show their sales performance. Choose All stores to view
+              shared customer balances, supplier balances and expenses.
+            </p>
+          )}
+
+          {(access.view === 'inventory' || access.departmentOnly) && (
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+              <Panel
+                id="stock-on-hand"
+                title="Stock on hand"
+                description="Current quantities in your scope, with shortages first. Showing up to eight products."
+              >
+                {data.stock.length ? (
+                  <StockTable rows={data.stock} canOpenProducts={allowed('/products')} />
+                ) : (
+                  <Empty title="No products in this scope">
+                    Products assigned to your store or department will appear here.
+                  </Empty>
+                )}
+              </Panel>
+              <Panel
+                title="Inventory movements"
+                description={`${period.label} · Latest receipts and damage entries.`}
+              >
+                {data.movements.length ? (
+                  <ul className="divide-y">
+                    {data.movements.map((movement, index) => (
+                      <li
+                        key={`${movement.name}:${movement.date}:${index}`}
+                        className="flex gap-3 py-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">{movement.name}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {movement.kind} · {date(movement.date)}
+                          </p>
+                        </div>
+                        <span className="text-sm font-medium tabular-nums">
+                          {movement.quantity > 0 ? '+' : ''}
+                          {number(movement.quantity)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Empty title="No recent stock movements">
+                    Receipts and damage entries within this scope appear here.
+                  </Empty>
+                )}
+              </Panel>
+            </div>
+          )}
+
+          {['overview', 'operations'].includes(access.view) && data.performance.length > 1 && (
+            <Panel
+              title="Store comparison"
+              description="Net sales after returns for the selected period. Showing up to twenty stores."
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <caption className="sr-only">Store sales comparison</caption>
+                  <thead>
+                    <tr className="border-b text-xs text-muted-foreground">
+                      <th className="pb-3 text-left font-medium">Store</th>
+                      <th className="pb-3 text-right font-medium">Bills</th>
+                      <th className="pb-3 pl-4 text-right font-medium">Net sales</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.performance.map((store) => (
+                      <tr key={store.id} className="border-b last:border-0">
+                        <td className="py-4 pr-4">
+                          <Link
+                            href={`/dashboard?view=${access.view}&range=${access.range}&storeId=${store.id}`}
+                            className="font-medium hover:underline"
+                          >
+                            {store.name}
+                          </Link>
+                        </td>
+                        <td className="py-4 text-right tabular-nums">{number(store.orders)}</td>
+                        <td className="whitespace-nowrap py-4 pl-4 text-right font-medium tabular-nums">
+                          {money(store.revenue)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+          )}
+
+          {access.view !== 'inventory' && (
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+              <Panel
+                title={access.departmentOnly ? 'Department sales activity' : 'Recent bills'}
+                description={
+                  access.departmentOnly
+                    ? 'Only your department’s line items are included; full mixed bills stay restricted.'
+                    : 'Latest completed sales in the selected period. Up to six bills.'
+                }
+              >
+                {data.recent.length ? (
+                  <ul className="divide-y">
+                    {data.recent.map((bill, index) => (
+                      <li key={bill.id ?? `${bill.date}:${index}`} className="flex gap-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words text-sm font-medium">
+                            {bill.id && allowed('/sales') ? (
+                              <Link href={`/sales/${bill.id}`} className="hover:underline">
+                                {bill.number}
+                              </Link>
+                            ) : (
+                              (bill.number ?? 'Department sale')
+                            )}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {date(bill.date)} · {bill.customer ?? bill.store}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-sm font-medium tabular-nums">{money(bill.total)}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {paymentLabels[bill.method] ?? bill.method} · {bill.status}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Empty
+                    title={
+                      access.view === 'accounts'
+                        ? 'Open detailed financial reports'
+                        : 'No recent bills'
+                    }
+                  >
+                    {access.view === 'accounts'
+                      ? 'Use the reports and ledger links to review transactions and balances.'
+                      : 'Bills in this period will appear here as sales are recorded.'}
+                  </Empty>
+                )}
+              </Panel>
+              <Panel
+                title="Payment method mix"
+                description="Billed amounts before returns. These are sales methods, not collected cash."
+              >
+                {data.methods.length ? (
+                  <ul className="divide-y">
+                    {data.methods.map((method) => (
+                      <li
+                        key={method.method}
+                        className="flex items-center justify-between gap-3 py-3"
+                      >
+                        <span className="text-sm">
+                          {paymentLabels[method.method] ?? method.method}
+                        </span>
+                        <span className="text-sm font-medium tabular-nums">
+                          {money(method.amount)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Empty title="No payment mix yet">
+                    Payment methods appear when there are sales in this period.
+                  </Empty>
+                )}
+              </Panel>
+            </div>
+          )}
+
+          <Panel
+            id="stock-attention"
+            title="Stock attention"
+            description="Current shortages, independent of the selected sales period."
+          >
+            {data.attention.length ? (
+              <StockTable rows={data.attention} canOpenProducts={allowed('/products')} />
+            ) : (
+              <Empty title="No stock shortages">
+                No active products in this scope are out of stock or below their reorder level.
+              </Empty>
+            )}
+            {access.financial && (
+              <p className="mt-4 border-t pt-4 text-xs text-muted-foreground">
+                Current stock value at recorded costs:{' '}
+                <span className="font-medium text-foreground">{money(data.inventory.value)}</span>
+              </p>
+            )}
+          </Panel>
+        </>
+      )}
+    </div>
   );
 }
