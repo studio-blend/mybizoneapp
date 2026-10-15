@@ -18,7 +18,13 @@ export default async function StoreProfilePage({ params }: { params: Promise<{ i
       .select()
       .from(stores)
       .where(and(eq(stores.id, id), eq(stores.businessId, user.businessId)));
-    const [business] = await tx.select().from(businesses).where(eq(businesses.id, user.businessId));
+    const [business] = await tx
+      .select({
+        businessProfile: businesses.businessProfile,
+        sellingModel: businesses.sellingModel,
+      })
+      .from(businesses)
+      .where(eq(businesses.id, user.businessId));
     return { store, business };
   });
   if (!store || !business) notFound();

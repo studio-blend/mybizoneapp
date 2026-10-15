@@ -10,7 +10,13 @@ export default async function BusinessSettingsPage() {
   const user = await requireUser();
   await requirePermission(user, 'manage_settings');
   const [business] = await withTenant(db, user.businessId, (tx) =>
-    tx.select().from(businesses).where(eq(businesses.id, user.businessId)),
+    tx
+      .select({
+        businessProfile: businesses.businessProfile,
+        sellingModel: businesses.sellingModel,
+      })
+      .from(businesses)
+      .where(eq(businesses.id, user.businessId)),
   );
   if (!business) throw new Error('Business not found');
   return (

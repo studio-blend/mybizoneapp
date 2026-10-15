@@ -14,7 +14,13 @@ export default async function StoresPage() {
   await requirePermission(user, 'manage_stores');
   const { rows, business } = await withTenant(db, user.businessId, async (tx) => {
     const rows = await tx.select().from(stores).orderBy(desc(stores.createdAt));
-    const [business] = await tx.select().from(businesses).where(eq(businesses.id, user.businessId));
+    const [business] = await tx
+      .select({
+        businessProfile: businesses.businessProfile,
+        sellingModel: businesses.sellingModel,
+      })
+      .from(businesses)
+      .where(eq(businesses.id, user.businessId));
     return { rows, business };
   });
 

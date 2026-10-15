@@ -40,6 +40,7 @@ try {
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await page.waitForURL(`${origin}/dashboard`);
   await page.goto(`${origin}/settings/business`);
+  await page.getByLabel('What do you sell?', { exact: true }).waitFor();
   assert.equal(
     await page.getByLabel('What do you sell?', { exact: true }).locator('option').count(),
     6,
