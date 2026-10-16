@@ -18,6 +18,7 @@ export default async function NewPurchasePage() {
         name: products.name,
         price: products.price,
         unitSymbol: products.unitSymbol,
+        batchTracking: products.batchTracking,
       })
       .from(products)
       .where(and(eq(products.businessId, user.businessId), eq(products.active, true)))

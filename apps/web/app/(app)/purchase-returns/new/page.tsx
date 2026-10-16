@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
+import { batchChoices } from '@/lib/stock-batches';
 import { products, suppliers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { and, asc, eq } from 'drizzle-orm';
@@ -19,6 +20,7 @@ export default async function NewPurchaseReturnPage() {
         name: products.name,
         price: products.price,
         unitSymbol: products.unitSymbol,
+        batchTracking: products.batchTracking,
       })
       .from(products)
       .where(and(eq(products.businessId, user.businessId), eq(products.active, true)))
@@ -36,6 +38,7 @@ export default async function NewPurchaseReturnPage() {
 
     return [productRows, supplierRows] as const;
   });
+  const batches = await withTenant(db, user.businessId, (tx) => batchChoices(tx, user.businessId));
 
   return (
     <div className="space-y-6">
@@ -46,7 +49,7 @@ export default async function NewPurchaseReturnPage() {
         </p>
       </div>
 
-      <PurchaseReturnForm products={prods} suppliers={supps} />
+      <PurchaseReturnForm products={prods} suppliers={supps} batches={batches} />
     </div>
   );
 }

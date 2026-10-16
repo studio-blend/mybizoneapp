@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { brands } from './brands';
@@ -46,6 +47,7 @@ export const products = pgTable(
     // minStock is the reorder level; dashboard alerts when inventory drops below this.
     minStock: numeric('min_stock', { precision: 12, scale: 3 }),
     inventory: numeric('inventory', { precision: 12, scale: 3 }).notNull().default('0'),
+    batchTracking: boolean('batch_tracking').notNull().default(false),
     hsnCode: text('hsn_code'),
     gstRate: numeric('gst_rate', { precision: 5, scale: 2 }),
     imageKey: text('image_key'),
@@ -57,6 +59,7 @@ export const products = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    idBusiness: unique('products_id_business_unique').on(t.id, t.businessId),
     businessStoreIdx: index('products_business_store_idx').on(t.businessId, t.storeId),
     categoryIdx: index('products_category_id_idx').on(t.categoryId),
     brandIdx: index('products_brand_id_idx').on(t.brandId),

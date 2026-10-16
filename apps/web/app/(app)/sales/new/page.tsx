@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { getUserRoles } from '@/lib/get-user-roles';
 import { requireUser } from '@/lib/session';
+import { sellableStockSql } from '@/lib/stock-batches';
 import { businesses, customers, products, saleItems, sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { hasPermission } from '@mybizone/domain';
@@ -41,7 +42,7 @@ export default async function NewSalePage() {
           unitSymbol: products.unitSymbol,
           price: products.price,
           gstRate: products.gstRate,
-          inventory: products.inventory,
+          inventory: sellableStockSql,
         })
         .from(products)
         .where(

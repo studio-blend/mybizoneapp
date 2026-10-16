@@ -683,7 +683,11 @@ export default async function DashboardPage({
             <StoreComparison data={data} />
           )}
           {['overview', 'operations', 'accounts', 'inventory'].includes(access.view) && (
-            <OwnerInsights data={data} canOpenProducts={allowed('/products')} />
+            <OwnerInsights
+              data={data}
+              canOpenProducts={allowed('/products')}
+              canOpenBatches={allowed('/inventory/batches')}
+            />
           )}
 
           {access.view !== 'inventory' && (

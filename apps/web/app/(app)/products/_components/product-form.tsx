@@ -59,6 +59,7 @@ interface Initial {
   rate4: string | null;
   minStock: string | null;
   inventory: string;
+  batchTracking: boolean;
   hsnCode: string | null;
   gstRate: string | null;
   imageKey: string | null;
@@ -584,9 +585,16 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                   inputMode="decimal"
                   placeholder="10.000"
                   defaultValue={initial?.inventory ?? '0'}
+                  readOnly={initial?.batchTracking}
                   aria-invalid={!!fieldErrors.inventory}
                 />
                 <FieldError msg={fieldErrors.inventory} />
+                {initial?.batchTracking && (
+                  <p className="text-xs text-muted-foreground">
+                    Batch tracking is enabled. Use purchases, returns or damage to change stock;
+                    keep this product’s store and units unchanged.
+                  </p>
+                )}
               </div>
             </div>
           </div>

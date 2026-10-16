@@ -2,6 +2,7 @@
 
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
+import { moveStockBatches } from '@/lib/stock-batches';
 import { auditLogs, billSeries, products, purchaseItems, purchases, suppliers } from '@mybizone/db';
 import { financialYear, formatBillNo } from '@mybizone/domain/bill-series';
 import { and, eq, sql } from 'drizzle-orm';
@@ -35,6 +36,8 @@ const CreatePurchaseInput = z.object({
         productId: uuid,
         qty: qtyText.refine((v) => Number(v) > 0, 'quantity must be positive'),
         unitPrice: moneyText,
+        batchCode: z.string().trim().max(80).optional(),
+        expiresOn: z.string().optional(),
       }),
     )
     .min(1, 'add at least one item'),
@@ -110,6 +113,8 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
     unitPrice: string;
     product: (typeof productRows)[number];
     lineTotal: string;
+    batchCode?: string;
+    expiresOn?: string;
   };
 
   const lines: LineCalc[] = input.items.map((item) => {
@@ -122,6 +127,8 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
       unitPrice: item.unitPrice,
       product: p,
       lineTotal,
+      batchCode: item.batchCode,
+      expiresOn: item.expiresOn,
     };
   });
 
@@ -168,6 +175,15 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
       .update(products)
       .set({ inventory: sql`${products.inventory} + ${line.qty}::numeric` })
       .where(and(eq(products.id, line.productId), eq(products.businessId, user.businessId)));
+    await moveStockBatches(tx, {
+      businessId: user.businessId,
+      productId: line.productId,
+      qty: line.qty,
+      kind: 'purchase',
+      documentId: purchaseRow.id,
+      batchCode: line.batchCode,
+      expiresOn: line.expiresOn,
+    });
   }
 
   // 8. If paymentMethod === 'credit' AND supplierId provided: increase outstanding balance.
@@ -200,6 +216,7 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
   // 10. Revalidate affected paths.
   revalidatePath('/purchases');
   revalidatePath('/products');
+  revalidatePath('/inventory/batches');
   if (input.paymentMethod === 'credit' && input.supplierId) {
     revalidatePath('/suppliers');
   }

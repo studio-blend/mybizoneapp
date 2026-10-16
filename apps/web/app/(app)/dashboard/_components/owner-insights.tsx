@@ -9,7 +9,8 @@ const subtitle = 'mt-1 text-xs leading-relaxed text-muted-foreground';
 export function OwnerInsights({
   data,
   canOpenProducts,
-}: { data: WorkspaceDashboard; canOpenProducts: boolean }) {
+  canOpenBatches,
+}: { data: WorkspaceDashboard; canOpenProducts: boolean; canOpenBatches: boolean }) {
   const { insights, access, profile } = data;
   const product = (id: string | null, name: string) =>
     id && canOpenProducts ? (
@@ -121,6 +122,59 @@ export function OwnerInsights({
   const stockFirst = priority === 'stock';
   return (
     <div className="space-y-5" data-dashboard-insights>
+      {insights.batches.length > 0 && (
+        <section className={panel}>
+          <h2 className="text-base font-semibold tracking-tight">Expiry & quarantine</h2>
+          <p className={subtitle}>
+            Current physical lots in the selected scope, independent of the sales date filter.
+            Expired and quarantined lots are blocked at checkout. Up to six lots, most urgent first.
+          </p>
+          <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
+            {[
+              ['Blocked by expiry', insights.batches[0]?.expiredLots],
+              ['Quarantined', insights.batches[0]?.quarantineLots],
+              ['Expiry in 30 days', insights.batches[0]?.soonLots],
+            ].map(([label, count]) => (
+              <div key={label} className="rounded-lg bg-muted/50 p-3">
+                <dt className="text-xs text-muted-foreground">{label}</dt>
+                <dd className="mt-1 text-xl font-semibold tabular-nums">{count}</dd>
+              </div>
+            ))}
+          </dl>
+          <ul className="mt-3 divide-y">
+            {insights.batches.map((batch) => (
+              <li key={batch.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
+                <div className="min-w-0 break-words">
+                  <p className="font-medium">{batch.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {batch.store} · {batch.code} · {batch.expiresOn ?? 'Expiry unverified'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium tabular-nums">
+                    {quantity(batch.quantity)} {batch.unit}
+                  </p>
+                  <p className="mt-1 text-xs">
+                    {batch.status === 'expired'
+                      ? 'Blocked by expiry'
+                      : batch.status === 'quarantine'
+                        ? 'Quarantined'
+                        : 'Expires soon'}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {canOpenBatches && (
+            <Link
+              className="mt-3 inline-block text-sm font-medium underline underline-offset-4"
+              href="/inventory/batches"
+            >
+              Review batches & expiry
+            </Link>
+          )}
+        </section>
+      )}
       <div className={`grid gap-5 ${access.financial ? 'lg:grid-cols-2' : ''}`}>
         {stockFirst ? [cards.stock, cards.profit] : [cards.profit, cards.stock]}
       </div>

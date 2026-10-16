@@ -38,6 +38,7 @@ export default async function EditProductPage(props: { params: Promise<{ id: str
         rate4: products.rate4,
         minStock: products.minStock,
         inventory: products.inventory,
+        batchTracking: products.batchTracking,
         hsnCode: products.hsnCode,
         gstRate: products.gstRate,
         imageKey: products.imageKey,

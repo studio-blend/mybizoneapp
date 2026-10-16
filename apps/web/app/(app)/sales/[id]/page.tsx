@@ -1,7 +1,15 @@
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
-import { invoices, saleItems, sales, stores } from '@mybizone/db';
+import {
+  invoices,
+  products,
+  saleItems,
+  sales,
+  stockBatchMovements,
+  stockBatches,
+  stores,
+} from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Card, CardContent, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
@@ -57,7 +65,27 @@ export default async function SaleDetailPage(props: { params: Promise<{ id: stri
       .select({ id: invoices.id, invoiceNo: invoices.invoiceNo, pdfKey: invoices.pdfKey })
       .from(invoices)
       .where(eq(invoices.saleId, params.id));
-    return { row, items, invoice: inv ?? null };
+    const batches = await tx
+      .select({
+        id: stockBatchMovements.id,
+        code: stockBatches.code,
+        expiresOn: stockBatches.expiresOn,
+        quantity: stockBatchMovements.quantity,
+        name: products.name,
+        unit: products.unitSymbol,
+      })
+      .from(stockBatchMovements)
+      .innerJoin(stockBatches, eq(stockBatches.id, stockBatchMovements.batchId))
+      .innerJoin(products, eq(products.id, stockBatches.productId))
+      .where(
+        and(
+          eq(stockBatchMovements.businessId, user.businessId),
+          eq(stockBatchMovements.kind, 'sale'),
+          eq(stockBatchMovements.documentId, row.id),
+        ),
+      )
+      .orderBy(asc(stockBatches.expiresOn), asc(stockBatches.code));
+    return { row, items, invoice: inv ?? null, batches };
   });
 
   if (!data) notFound();
@@ -65,6 +93,26 @@ export default async function SaleDetailPage(props: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-4">
+      {data.batches.length > 0 && (
+        <details className="rounded-xl border p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Allocated batches</summary>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Physical lots used for this bill, earliest expiry first.
+          </p>
+          <ul className="mt-2 divide-y text-sm">
+            {data.batches.map((batch) => (
+              <li key={batch.id} className="flex flex-wrap justify-between gap-2 py-2">
+                <span>
+                  {batch.name} · {batch.code} · expiry {batch.expiresOn}
+                </span>
+                <span className="tabular-nums">
+                  {batch.quantity.replace('-', '')} {batch.unit}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">

@@ -2,6 +2,7 @@
 
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
+import { moveStockBatches } from '@/lib/stock-batches';
 import {
   auditLogs,
   billSeries,
@@ -172,6 +173,13 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
       .where(and(eq(products.id, line.productId), eq(products.businessId, user.businessId)))
       .returning({ id: products.id });
     if (!changed.length) throw new Error('returned product no longer exists');
+    await moveStockBatches(tx, {
+      businessId: user.businessId,
+      productId: line.productId,
+      qty: line.qty,
+      kind: 'sales_return',
+      documentId: row.id,
+    });
   }
   // Paid bills must not reduce debt from unrelated invoices.
   if (original.paymentMethod === 'credit' && original.customerId) {
@@ -203,6 +211,7 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
   revalidatePath('/returns');
   revalidatePath('/sales');
   revalidatePath('/products');
+  revalidatePath('/inventory/batches');
   revalidatePath('/customers');
   return { id: row.id, returnNo, total: total.toFixed(2) };
 });

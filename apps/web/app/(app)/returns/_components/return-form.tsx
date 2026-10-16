@@ -186,7 +186,8 @@ export function ReturnForm({ products, customers, originalSale }: Props) {
         <CardHeader>
           <CardTitle>Items to return</CardTitle>
           <CardDescription>
-            Select each product being returned and enter the quantity.
+            Select each product being returned and enter the quantity. Batch-tracked products enter
+            quarantine until inventory staff inspect and release them.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

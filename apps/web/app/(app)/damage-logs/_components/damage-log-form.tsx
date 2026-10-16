@@ -1,5 +1,7 @@
 'use client';
 
+import { type BatchChoice, StockBatchSelect } from '@/components/stock-batch-select';
+
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Input } from '@mybizone/ui/input';
@@ -17,10 +19,12 @@ interface Product {
   unitSymbol: string;
   inventory: string | null;
   costPrice: string | null;
+  batchTracking: boolean;
 }
 
 interface Props {
   products: Product[];
+  batches: BatchChoice[];
 }
 
 const REASONS = [
@@ -31,7 +35,7 @@ const REASONS = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-export function DamageLogForm({ products }: Props) {
+export function DamageLogForm({ products, batches }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, setPending] = useState(false);
@@ -53,6 +57,7 @@ export function DamageLogForm({ products }: Props) {
     const fd = new FormData(e.currentTarget);
     const payload = {
       productId: fd.get('productId'),
+      batchId: fd.get('batchId') || undefined,
       qty: fd.get('qty'),
       reason: fd.get('reason'),
       notes: fd.get('notes'),
@@ -93,6 +98,15 @@ export function DamageLogForm({ products }: Props) {
             </Select>
           </div>
 
+          {selectedProduct?.batchTracking && (
+            <StockBatchSelect
+              key={selectedProductId}
+              id="damage-batch"
+              name="batchId"
+              batches={batches}
+              productId={selectedProductId}
+            />
+          )}
           <div className="space-y-2">
             <Label htmlFor="qty">Quantity</Label>
             <Input

@@ -22,6 +22,20 @@ export interface StockInsight extends Record<string, unknown> {
   daysRemaining: number | null;
   kind: 'slow' | 'cover';
 }
+export interface ExpiryInsight extends Record<string, unknown> {
+  id: string;
+  productId: string;
+  name: string;
+  store: string;
+  code: string;
+  quantity: number;
+  unit: string;
+  expiresOn: string | null;
+  status: 'expired' | 'quarantine' | 'soon';
+  expiredLots: number;
+  quarantineLots: number;
+  soonLots: number;
+}
 
 export async function loadDashboardStockInsights(
   tx: Transaction,
@@ -46,7 +60,7 @@ export async function loadDashboardStockInsights(
         sql` `,
       )} ELSE 30 END`
     : sql`30`;
-  const [profit, stock] = await Promise.all([
+  const [profit, stock, batches] = await Promise.all([
     financial
       ? tx.execute<ProductProfit>(sql`WITH movements AS (
       SELECT si.product_id,si.product_name,si.line_total-si.gst_amount AS revenue,si.qty*si.cost_price_at_sale AS cost,si.cost_price_at_sale IS NULL AS missing
@@ -97,10 +111,26 @@ export async function loadDashboardStockInsights(
       idle_days AS "idleDays",slow_days AS "slowDays",days_remaining AS "daysRemaining"
       FROM ranked WHERE rank<=6 ORDER BY kind,rank`)
       : Promise.resolve([]),
+    inventory
+      ? tx.execute<ExpiryInsight>(sql`WITH attention AS (
+      SELECT b.id,b.product_id AS "productId",p.name,st.name AS store,b.code,b.quantity::float8 AS quantity,
+        p.unit_symbol AS unit,b.expires_on::text AS "expiresOn",
+        CASE WHEN b.state='quarantine' THEN 'quarantine' WHEN b.expires_on<=${today}::date THEN 'expired' ELSE 'soon' END AS status
+      FROM stock_batches b JOIN products p ON p.id=b.product_id AND p.business_id=b.business_id
+      JOIN stores st ON st.id=p.store_id AND st.business_id=p.business_id
+      WHERE b.business_id=${businessId}::uuid AND p.active AND p.batch_tracking AND b.quantity>0
+        AND (b.state='quarantine' OR b.expires_on<=${today}::date+30) AND ${productScope}
+    ) SELECT *,COUNT(*) FILTER(WHERE status='expired') OVER()::int AS "expiredLots",
+      COUNT(*) FILTER(WHERE status='quarantine') OVER()::int AS "quarantineLots",
+      COUNT(*) FILTER(WHERE status='soon') OVER()::int AS "soonLots"
+      FROM attention ORDER BY CASE status WHEN 'expired' THEN 0 WHEN 'quarantine' THEN 1 ELSE 2 END,
+        "expiresOn" NULLS LAST,id LIMIT 6`)
+      : Promise.resolve([]),
   ]);
   return {
     profit: Array.from(profit),
     slow: Array.from(stock).filter((row) => row.kind === 'slow'),
     cover: Array.from(stock).filter((row) => row.kind === 'cover'),
+    batches: Array.from(batches),
   };
 }

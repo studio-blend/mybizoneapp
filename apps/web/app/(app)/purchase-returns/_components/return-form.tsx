@@ -1,5 +1,7 @@
 'use client';
 
+import { type BatchChoice, StockBatchSelect } from '@/components/stock-batch-select';
+
 import { Button } from '@mybizone/ui/button';
 import {
   Card,
@@ -24,7 +26,9 @@ interface Props {
     name: string;
     price: string;
     unitSymbol: string;
+    batchTracking: boolean;
   }[];
+  batches: BatchChoice[];
   suppliers: {
     id: string;
     name: string;
@@ -36,9 +40,10 @@ interface ItemRow {
   rowKey: number;
   productId: string;
   qty: string;
+  batchId?: string;
 }
 
-export function PurchaseReturnForm({ products, suppliers }: Props) {
+export function PurchaseReturnForm({ products, suppliers, batches }: Props) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -62,8 +67,14 @@ export function PurchaseReturnForm({ products, suppliers }: Props) {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function updateItem(index: number, field: 'productId' | 'qty', value: string) {
-    setItems((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  function updateItem(index: number, field: 'productId' | 'qty' | 'batchId', value: string) {
+    setItems((prev) =>
+      prev.map((row, i) =>
+        i === index
+          ? { ...row, [field]: value, ...(field === 'productId' ? { batchId: undefined } : {}) }
+          : row,
+      ),
+    );
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -83,7 +94,11 @@ export function PurchaseReturnForm({ products, suppliers }: Props) {
       supplierId: supplierId || undefined,
       supplierName: supplierName || undefined,
       reason: reason || undefined,
-      items: validItems.map((it) => ({ productId: it.productId, qty: it.qty })),
+      items: validItems.map((it) => ({
+        productId: it.productId,
+        qty: it.qty,
+        batchId: it.batchId,
+      })),
     });
 
     setPending(false);
@@ -187,7 +202,10 @@ export function PurchaseReturnForm({ products, suppliers }: Props) {
         </CardHeader>
         <CardContent className="space-y-4">
           {items.map((row, idx) => (
-            <div key={row.rowKey} className="flex gap-2 items-end">
+            <div
+              key={row.rowKey}
+              className="grid min-w-0 gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto]"
+            >
               <div className="flex-1 space-y-1">
                 <Label htmlFor={`product-${idx}`}>Product</Label>
                 <Select
@@ -226,6 +244,21 @@ export function PurchaseReturnForm({ products, suppliers }: Props) {
                 >
                   Remove
                 </Button>
+              )}
+              {products.find((product) => product.id === row.productId)?.batchTracking && (
+                <div className="sm:col-span-3">
+                  <StockBatchSelect
+                    id={`return-batch-${row.rowKey}`}
+                    batches={batches}
+                    productId={row.productId}
+                    value={row.batchId ?? ''}
+                    onChange={(value) => updateItem(idx, 'batchId', value)}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    For a tracked receipt, choose a lot received on the original bill. Older bills
+                    use the physical lot you select.
+                  </p>
+                </div>
               )}
             </div>
           ))}

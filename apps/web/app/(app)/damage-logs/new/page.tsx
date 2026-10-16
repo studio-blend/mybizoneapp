@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
+import { batchChoices } from '@/lib/stock-batches';
 import { products } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { and, asc, eq } from 'drizzle-orm';
@@ -19,15 +20,17 @@ export default async function NewDamageLogPage() {
         unitSymbol: products.unitSymbol,
         inventory: products.inventory,
         costPrice: products.costPrice,
+        batchTracking: products.batchTracking,
       })
       .from(products)
       .where(and(eq(products.businessId, user.businessId), eq(products.active, true)))
       .orderBy(asc(products.name)),
   );
+  const batches = await withTenant(db, user.businessId, (tx) => batchChoices(tx, user.businessId));
 
   return (
     <div className="mx-auto max-w-lg">
-      <DamageLogForm products={rows} />
+      <DamageLogForm products={rows} batches={batches} />
     </div>
   );
 }

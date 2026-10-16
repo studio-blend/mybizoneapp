@@ -188,6 +188,9 @@ export const updateProductAction = safeAction(UpdateProductInput, async (input, 
       price: products.price,
       inventory: products.inventory,
       storeId: products.storeId,
+      batchTracking: products.batchTracking,
+      unitType: products.unitType,
+      unitSymbol: products.unitSymbol,
     })
     .from(products)
     .where(and(eq(products.id, input.id), eq(products.businessId, user.businessId)))
@@ -195,6 +198,17 @@ export const updateProductAction = safeAction(UpdateProductInput, async (input, 
   if (!before) throw new Error('not found');
   await requirePermission(user, 'manage_products', { storeId: before.storeId });
   await requirePermission(user, 'manage_products', { storeId: input.storeId });
+  if (
+    before.batchTracking &&
+    (before.storeId !== input.storeId ||
+      before.unitType !== input.unitType ||
+      before.unitSymbol !== input.unitSymbol ||
+      Number(before.inventory) !== Number(input.inventory))
+  ) {
+    throw new Error(
+      'Batch-tracked stock, store and units must stay consistent. Use purchases, returns or damage to change stock.',
+    );
+  }
   const [store] = await tx
     .select({ id: stores.id })
     .from(stores)
@@ -278,12 +292,22 @@ const DeleteProductInput = z.object({ id: uuid });
 
 export const deleteProductAction = safeAction(DeleteProductInput, async (input, { user, tx }) => {
   const [before] = await tx
-    .select({ name: products.name, active: products.active, storeId: products.storeId })
+    .select({
+      name: products.name,
+      active: products.active,
+      storeId: products.storeId,
+      batchTracking: products.batchTracking,
+    })
     .from(products)
-    .where(and(eq(products.id, input.id), eq(products.businessId, user.businessId)));
+    .where(and(eq(products.id, input.id), eq(products.businessId, user.businessId)))
+    .for('update');
   if (!before) throw new Error('not found');
   await requirePermission(user, 'manage_products', { storeId: before.storeId });
   if (!before.active) return { ok: true };
+  if (before.batchTracking)
+    throw new Error(
+      'Keep batch-tracked products active so their lots and customer returns remain manageable.',
+    );
 
   // Soft-delete via active=false so historical sale_items can still join.
   await tx

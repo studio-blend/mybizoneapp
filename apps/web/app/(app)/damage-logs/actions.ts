@@ -2,6 +2,7 @@
 
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
+import { moveStockBatches } from '@/lib/stock-batches';
 import { auditLogs, damageLogs, products } from '@mybizone/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
@@ -23,6 +24,7 @@ const DAMAGE_REASONS = ['damaged', 'theft', 'spillage', 'expired', 'other'] as c
 
 const CreateDamageLogInput = z.object({
   productId: uuid,
+  batchId: uuid.optional(),
   qty: qtyText,
   reason: z.enum(DAMAGE_REASONS),
   notes: optionalText(500),
@@ -82,6 +84,14 @@ export const createDamageLogAction = safeAction(
       )
       .returning({ id: products.id });
     if (!updated) throw new Error('Damage exceeds available stock');
+    await moveStockBatches(tx, {
+      businessId: user.businessId,
+      productId: input.productId,
+      qty: input.qty,
+      kind: 'damage',
+      documentId: logRow.id,
+      batchId: input.batchId,
+    });
 
     // 5. Audit log
     await tx.insert(auditLogs).values({
@@ -101,6 +111,7 @@ export const createDamageLogAction = safeAction(
     // 6. Revalidate paths
     revalidatePath('/damage-logs');
     revalidatePath('/products');
+    revalidatePath('/inventory/batches');
 
     return { id: logRow.id };
   },

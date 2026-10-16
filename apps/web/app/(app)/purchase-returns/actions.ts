@@ -2,6 +2,7 @@
 
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
+import { moveStockBatches } from '@/lib/stock-batches';
 import {
   auditLogs,
   billSeries,
@@ -31,6 +32,7 @@ const Input = z
       .array(
         z.object({
           productId: z.string().uuid(),
+          batchId: z.string().uuid().optional(),
           qty: z
             .string()
             .regex(/^\d{1,9}(?:\.\d{1,3})?$/)
@@ -166,6 +168,15 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
       )
       .returning({ id: products.id });
     if (!changed.length) throw new Error('insufficient stock to return to supplier');
+    await moveStockBatches(tx, {
+      businessId: user.businessId,
+      productId: line.productId,
+      qty: line.qty,
+      kind: 'purchase_return',
+      documentId: row.id,
+      originalPurchaseId: original.id,
+      batchId: input.items.find((item) => item.productId === line.productId)?.batchId,
+    });
   }
   // Paid bills must not reduce debt from unrelated invoices.
   if (original.paymentMethod === 'credit' && original.supplierId) {
@@ -197,6 +208,7 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
   revalidatePath('/purchase-returns');
   revalidatePath('/purchases');
   revalidatePath('/products');
+  revalidatePath('/inventory/batches');
   revalidatePath('/suppliers');
   return { id: row.id, returnNo, total: total.toFixed(2) };
 });

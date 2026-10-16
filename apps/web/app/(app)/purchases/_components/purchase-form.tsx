@@ -16,6 +16,7 @@ interface Product {
   name: string;
   price: string;
   unitSymbol: string;
+  batchTracking: boolean;
 }
 
 interface Supplier {
@@ -35,12 +36,14 @@ interface LineItem {
   productId: string;
   qty: string;
   unitPrice: string;
+  batchCode: string;
+  expiresOn: string;
 }
 
 let lineCounter = 0;
 
 function newLine(): LineItem {
-  return { id: ++lineCounter, productId: '', qty: '', unitPrice: '' };
+  return { id: ++lineCounter, productId: '', qty: '', unitPrice: '', batchCode: '', expiresOn: '' };
 }
 
 function todayIso(): string {
@@ -79,6 +82,8 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
         if (patch.productId !== undefined) {
           const p = productById.get(patch.productId);
           updated.unitPrice = p ? p.price : '';
+          updated.batchCode = '';
+          updated.expiresOn = '';
         }
         return updated;
       }),
@@ -112,6 +117,8 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
         productId: l.productId,
         qty: l.qty,
         unitPrice: l.unitPrice,
+        batchCode: l.batchCode,
+        expiresOn: l.expiresOn,
       })),
     };
 
@@ -237,6 +244,37 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
                   >
                     ✕
                   </Button>
+                  {selectedProduct?.batchTracking && (
+                    <fieldset className="grid min-w-0 gap-2 rounded-md border p-3 sm:col-span-5 sm:grid-cols-2">
+                      <legend className="text-xs px-1">
+                        Batch details · {selectedProduct.name}
+                      </legend>
+                      <div className="space-y-1">
+                        <Label htmlFor={`receipt-batch-${line.id}`}>Batch code</Label>
+                        <Input
+                          id={`receipt-batch-${line.id}`}
+                          required
+                          maxLength={80}
+                          value={line.batchCode}
+                          onChange={(e) => updateLine(line.id, { batchCode: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor={`receipt-expiry-${line.id}`}>Expiry date</Label>
+                        <Input
+                          id={`receipt-expiry-${line.id}`}
+                          type="date"
+                          required
+                          value={line.expiresOn}
+                          onChange={(e) => updateLine(line.id, { expiresOn: e.target.value })}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground sm:col-span-2">
+                        Use separate lines for different lots. Expired receipts are recorded but
+                        blocked at checkout.
+                      </p>
+                    </fieldset>
+                  )}
                 </div>
               );
             })}

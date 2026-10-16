@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { type ActionResult, safeAction } from '@/lib/server-action';
 import { requireUser } from '@/lib/session';
+import { moveStockBatches } from '@/lib/stock-batches';
 import { uploadFile } from '@/lib/storage';
 import {
   auditLogs,
@@ -326,6 +327,13 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
     if (decrement.length === 0) {
       throw new Error(`insufficient stock for "${p.name}"`);
     }
+    await moveStockBatches(tx, {
+      businessId: user.businessId,
+      productId: p.id,
+      qty: l.qty,
+      kind: 'sale',
+      documentId: saleRow.id,
+    });
   }
 
   // Credit / finance_emi sale: increment customer outstanding balance.
@@ -412,6 +420,7 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
 
   revalidatePath('/sales');
   revalidatePath('/dashboard');
+  revalidatePath('/inventory/batches');
   if (updatesOutstanding) revalidatePath('/customers');
   if (input.paymentMethod === 'finance_emi') revalidatePath('/emi');
   if (input.paymentStatus !== 'paid') revalidatePath('/reports/due-bills');

@@ -16,6 +16,9 @@
    advance and delivery allocation; wholesale packs/credit terms/fulfilment;
    restaurant recipes, ingredient consumption, waste and kitchen tickets. Enable
    each capability only once its records, permissions, flows and tests exist.
+   Phase 3a implements optional per-product [batches and expiry](STOCK_BATCHES_AND_EXPIRY.md).
+   Migration 0023 was approved and applied on 17 October 2026. The remaining
+   capabilities are subsequent deliveries.
 
 ## Phase 1 behaviour
 
@@ -34,9 +37,10 @@ Stock-oriented profiles prioritise slow-stock review; wholesale selling prioriti
 collections. The master view combines allowed stores and labels mixed profiles.
 The owner retains every role workspace and existing scope filters.
 
-Profile selection does not claim restaurant, expiry or warranty workflows exist.
-It configures currently supported dashboard priorities. Specialised capabilities
-are phase 3; no nonfunctional capability switches are exposed.
+Profile selection configures supported dashboard priorities. Optional batch and
+expiry tracking has a separate explicit stock reconciliation workflow in Phase 3a;
+restaurant and warranty workflows are subsequent deliveries. No nonfunctional
+capability switches are exposed.
 
 ## Calculations and boundaries
 
