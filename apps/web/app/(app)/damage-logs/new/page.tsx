@@ -21,6 +21,7 @@ export default async function NewDamageLogPage() {
         inventory: products.inventory,
         costPrice: products.costPrice,
         batchTracking: products.batchTracking,
+        serialTracking: products.serialTracking,
       })
       .from(products)
       .where(and(eq(products.businessId, user.businessId), eq(products.active, true)))

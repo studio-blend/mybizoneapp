@@ -19,6 +19,7 @@ export default async function NewReturnPage() {
         name: products.name,
         unitSymbol: products.unitSymbol,
         inventory: products.inventory,
+        serialTracking: products.serialTracking,
         price: products.price,
       })
       .from(products)

@@ -1,6 +1,8 @@
 'use client';
 
+import { SerialNumbersField } from '@/components/serial-numbers-field';
 import { type BatchChoice, StockBatchSelect } from '@/components/stock-batch-select';
+import { parseSerialText } from '@/lib/serial-policy';
 
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@mybizone/ui/card';
@@ -20,6 +22,7 @@ interface Product {
   inventory: string | null;
   costPrice: string | null;
   batchTracking: boolean;
+  serialTracking: boolean;
 }
 
 interface Props {
@@ -58,6 +61,7 @@ export function DamageLogForm({ products, batches }: Props) {
     const payload = {
       productId: fd.get('productId'),
       batchId: fd.get('batchId') || undefined,
+      serialNumbers: parseSerialText(String(fd.get('serialNumbers') ?? '')),
       qty: fd.get('qty'),
       reason: fd.get('reason'),
       notes: fd.get('notes'),
@@ -106,6 +110,9 @@ export function DamageLogForm({ products, batches }: Props) {
               batches={batches}
               productId={selectedProductId}
             />
+          )}
+          {selectedProduct?.serialTracking && (
+            <SerialNumbersField key={selectedProductId} id="damage-serials" name="serialNumbers" />
           )}
           <div className="space-y-2">
             <Label htmlFor="qty">Quantity</Label>

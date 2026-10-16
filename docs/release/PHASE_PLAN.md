@@ -1,5 +1,15 @@
 # Release phases
 
+> **17 October 2026:** This document tracks commercial delivery/release gates.
+> For current application progress and the separate product feature phases, read
+> [the project status and roadmap](../PROJECT_STATUS.md). Feature Phase 3a is live;
+> this does not mark delivery Phase 3 or commercial launch complete. Older dated
+> deployment and verification statements below remain historical evidence.
+
+**15 October 2026 update:** Hosted development performance changes are deployed and verified with the saved Pro owner; 133 web + 17 DB tests, types, scoped lint and production build passed. Phase 1 remains complete within supported scope. Phase 2 retains deferred Razorpay and unverified cloud email gates. Windows installer and full cloud delivery/recovery acceptance remain pending; the working hosted development site does not complete those gates. See [current status](STATUS_AND_NEXT_TASKS.md) and [performance report](../PERFORMANCE_OPTIMIZATION.md).
+
+**14 October 2026 owner steering:** Hold Razorpay acceptance for now. Reusable Pro owner is verified locally and on `mybizoneapp.vercel.app` after Neon provisioning; saved credentials are shared across those test accounts. Provider and complete cloud delivery acceptance remain incomplete, not waived. See [Pro testing](LOCAL_PRO_TESTING.md).
+
 **Provider follow-up, 26 September:** Phase 2 remains blocked. Seller-owned Razorpay Test Mode keys/plans/webhook endpoint and Resend key/verified sender/inbox are missing. Mailer API-error handling fixed; 20 synthetic/mocked focused regressions passed, including isolated database webhook rollback/retry. Actual provider checkout and cloud email journeys remain unrun. See [setup and acceptance matrix](VERIFICATION_REPORT.md#provider-acceptance-follow-up--26-september-2026). Earlier build/browser gates predate this change. Next task remains provider acceptance after configuration; no Phase 3 advance.
 
 Requested scope: Windows desktop/local network and cloud. No seller accounts are configured yet.

@@ -1,6 +1,26 @@
 # MyBizOne — status and next tasks
 
-Updated: 26 September 2026. Scope: Windows desktop/LAN and cloud.
+> **17 October 2026:** Start with [the current project status and roadmap](../PROJECT_STATUS.md).
+> Role dashboards, business profiles, operating analysis and feature Phase 3a
+> batch/expiry tracking are now live. The latest release passed 80 focused automated
+> tests and 72 hosted browser checks. The dated entries below retain delivery and
+> commercial-release history; their older deployment/test statements are historical.
+> Product feature phases and commercial delivery phases are separate. Razorpay is
+> still on hold, and email, installer, complete cloud recovery and launch gates remain open.
+
+Updated: 15 October 2026. Scope: Windows desktop/LAN and cloud.
+
+**Testing instruction:** Reuse `pro.owner@example.com` for all testing and verification. Read [the standard account record](TEST_ACCOUNT.md) for login URLs and private credential location.
+
+## Latest status — 15 October 2026
+
+Core stabilization is complete within documented scope. The hosted development deployment and reusable Pro owner are verified. Performance commit `b01c3fb` was pushed and deployed successfully; Vercel functions now run in Singapore beside Neon. Latest performance validation passed 133 web tests, 17 database tests, scoped lint, TypeScript, isolated production build and local/hosted owner checks. Seven hosted routes and pagination passed; dashboard median decreased from 12,686 to 552 ms in three-load acceptance measurements. See [performance evidence](../PERFORMANCE_OPTIMIZATION.md).
+
+**Not sale-ready.** Razorpay acceptance is on hold by owner instruction; real cloud email acceptance, Windows installer/clean-machine acceptance, complete cloud persistence/recovery acceptance and commercial launch gates remain pending. Earlier full-suite/browser/recovery results below describe their recorded snapshots, not a final gate for the newest tree. Test-account/tunnel tooling and release-documentation changes remain uncommitted after the performance commits. Next: review/integrate remaining work, validate the candidate, then complete desktop and cloud delivery acceptance. No new test run was performed for this status review.
+
+## Local Pro testing — 14 October 2026
+
+Owner requested that Razorpay work be held and testing continue with full Pro access. Created a dedicated owner (`pro.owner@example.com`) in the verified disposable database with the highest implemented plan (`pro`), stores and sample stock. Reusable credentials are in ignored `.local/test-accounts/pro-owner.json`; no provider subscription was created. Owner privileges apply to this business only. The same account is now provisioned in the Neon database for `https://mybizoneapp.vercel.app/`; actual hosted login, Pro/unlimited indicators, two stores and five application/admin routes passed browser verification. Real payment/email and complete cloud delivery acceptance remain unverified; provider setup is deferred at the owner's request. See [Pro test report](LOCAL_PRO_TESTING.md) for current evidence and restart instructions.
 
 ## Provider acceptance follow-up — 26 September 2026
 

@@ -1,5 +1,8 @@
 'use client';
 
+import { SerialNumbersField } from '@/components/serial-numbers-field';
+import { parseSerialText } from '@/lib/serial-policy';
+
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Input } from '@mybizone/ui/input';
@@ -17,6 +20,7 @@ interface Product {
   price: string;
   unitSymbol: string;
   batchTracking: boolean;
+  serialTracking: boolean;
 }
 
 interface Supplier {
@@ -38,12 +42,21 @@ interface LineItem {
   unitPrice: string;
   batchCode: string;
   expiresOn: string;
+  serialText: string;
 }
 
 let lineCounter = 0;
 
 function newLine(): LineItem {
-  return { id: ++lineCounter, productId: '', qty: '', unitPrice: '', batchCode: '', expiresOn: '' };
+  return {
+    id: ++lineCounter,
+    productId: '',
+    qty: '',
+    unitPrice: '',
+    batchCode: '',
+    expiresOn: '',
+    serialText: '',
+  };
 }
 
 function todayIso(): string {
@@ -84,6 +97,7 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
           updated.unitPrice = p ? p.price : '';
           updated.batchCode = '';
           updated.expiresOn = '';
+          updated.serialText = '';
         }
         return updated;
       }),
@@ -119,6 +133,7 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
         unitPrice: l.unitPrice,
         batchCode: l.batchCode,
         expiresOn: l.expiresOn,
+        serialNumbers: parseSerialText(l.serialText),
       })),
     };
 
@@ -244,6 +259,15 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
                   >
                     ✕
                   </Button>
+                  {selectedProduct?.serialTracking && (
+                    <div className="min-w-0 sm:col-span-5">
+                      <SerialNumbersField
+                        id={`purchase-serial-${line.id}`}
+                        value={line.serialText}
+                        onChange={(value) => updateLine(line.id, { serialText: value })}
+                      />
+                    </div>
+                  )}
                   {selectedProduct?.batchTracking && (
                     <fieldset className="grid min-w-0 gap-2 rounded-md border p-3 sm:col-span-5 sm:grid-cols-2">
                       <legend className="text-xs px-1">

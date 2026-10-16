@@ -687,6 +687,7 @@ export default async function DashboardPage({
               data={data}
               canOpenProducts={allowed('/products')}
               canOpenBatches={allowed('/inventory/batches')}
+              canOpenSerials={allowed('/inventory/serials')}
             />
           )}
 

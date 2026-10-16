@@ -8,6 +8,8 @@ import {
   sales,
   stockBatchMovements,
   stockBatches,
+  stockSerialEvents,
+  stockSerials,
   stores,
 } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
@@ -85,7 +87,25 @@ export default async function SaleDetailPage(props: { params: Promise<{ id: stri
         ),
       )
       .orderBy(asc(stockBatches.expiresOn), asc(stockBatches.code));
-    return { row, items, invoice: inv ?? null, batches };
+    const serials = await tx
+      .select({
+        id: stockSerialEvents.id,
+        code: stockSerials.code,
+        months: stockSerialEvents.warrantyMonths,
+        endsOn: stockSerialEvents.warrantyEndsOn,
+        issuer: stockSerialEvents.warrantyIssuer,
+      })
+      .from(stockSerialEvents)
+      .innerJoin(stockSerials, eq(stockSerials.id, stockSerialEvents.serialId))
+      .where(
+        and(
+          eq(stockSerialEvents.businessId, user.businessId),
+          eq(stockSerialEvents.kind, 'sale'),
+          eq(stockSerialEvents.documentId, row.id),
+        ),
+      )
+      .orderBy(asc(stockSerials.code));
+    return { row, items, invoice: inv ?? null, batches, serials };
   });
 
   if (!data) notFound();
@@ -93,6 +113,30 @@ export default async function SaleDetailPage(props: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-4">
+      {data.serials.length > 0 && (
+        <details className="rounded-xl border p-4">
+          <summary className="cursor-pointer text-sm font-semibold">
+            Serials & recorded warranty
+          </summary>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Terms as recorded when this bill was saved. Later changes do not rewrite this record.
+            End dates are exclusive, using India time; claim eligibility still depends on the
+            issuer’s actual terms.
+          </p>
+          <ul className="mt-3 divide-y text-sm">
+            {data.serials.map((unit) => (
+              <li key={unit.id} className="space-y-1 py-3">
+                <p className="break-all font-mono font-medium">{unit.code}</p>
+                <p className="text-xs text-muted-foreground">
+                  {unit.months
+                    ? `${unit.months} months · ${unit.issuer} · end ${unit.endsOn}`
+                    : 'No warranty recorded'}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {data.batches.length > 0 && (
         <details className="rounded-xl border p-4">
           <summary className="cursor-pointer text-sm font-semibold">Allocated batches</summary>

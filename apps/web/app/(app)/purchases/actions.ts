@@ -38,6 +38,7 @@ const CreatePurchaseInput = z.object({
         unitPrice: moneyText,
         batchCode: z.string().trim().max(80).optional(),
         expiresOn: z.string().optional(),
+        serialNumbers: z.array(z.string().max(100)).max(500).optional(),
       }),
     )
     .min(1, 'add at least one item'),
@@ -115,6 +116,7 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
     lineTotal: string;
     batchCode?: string;
     expiresOn?: string;
+    serialNumbers?: string[];
   };
 
   const lines: LineCalc[] = input.items.map((item) => {
@@ -129,6 +131,7 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
       lineTotal,
       batchCode: item.batchCode,
       expiresOn: item.expiresOn,
+      serialNumbers: item.serialNumbers,
     };
   });
 
@@ -183,6 +186,7 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
       documentId: purchaseRow.id,
       batchCode: line.batchCode,
       expiresOn: line.expiresOn,
+      serialNumbers: line.serialNumbers,
     });
   }
 
@@ -217,6 +221,7 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
   revalidatePath('/purchases');
   revalidatePath('/products');
   revalidatePath('/inventory/batches');
+  revalidatePath('/inventory/serials');
   if (input.paymentMethod === 'credit' && input.supplierId) {
     revalidatePath('/suppliers');
   }

@@ -12,6 +12,7 @@ const definitions: { label: string; items: Entry[] }[] = [
     items: [
       { href: '/sales/new', label: 'New Sale (POS)', gate: 'create_sale', scoped: true },
       { href: '/sales', label: 'Sales', gate: 'view_sales', scoped: true },
+      { href: '/warranties', label: 'Warranty lookup', gate: 'view_sales', scoped: true },
       { href: '/returns', label: 'Sales Returns', gate: 'create_sale' },
       { href: '/quotations', label: 'Quotations', gate: 'create_sale' },
       { href: '/delivery-challans', label: 'Delivery Challans', gate: 'create_sale' },
@@ -32,6 +33,7 @@ const definitions: { label: string; items: Entry[] }[] = [
     items: [
       { href: '/products', label: 'Products', gate: 'manage_products', scoped: true },
       { href: '/inventory/batches', label: 'Batches & expiry', gate: 'manage_inventory' },
+      { href: '/inventory/serials', label: 'Serial inventory', gate: 'manage_inventory' },
       { href: '/products/barcode', label: 'Barcodes', gate: 'manage_products' },
       { href: '/categories', label: 'Categories', gate: 'manage_products' },
       { href: '/brands', label: 'Brands', gate: 'manage_products' },

@@ -111,7 +111,7 @@ describe('dashboard access and navigation', () => {
     const staff = permittedNavigation([{ role: 'billing', storeId: 'a' }]).flatMap((g) =>
       g.items.map((i) => i.href),
     );
-    expect(staff).toEqual(['/sales/new', '/sales']);
+    expect(staff).toEqual(['/sales/new', '/sales', '/warranties']);
     expect(
       permittedNavigation([{ role: 'floor_manager', storeId: 'a', departmentId: 'a1' }]),
     ).toEqual([]);

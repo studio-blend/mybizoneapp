@@ -33,6 +33,7 @@ export default async function BatchesPage(props: {
         inventory: products.inventory,
         unitSymbol: products.unitSymbol,
         batchTracking: products.batchTracking,
+        serialTracking: products.serialTracking,
         store: stores.name,
       })
       .from(products)
@@ -258,7 +259,9 @@ export default async function BatchesPage(props: {
           Enable batch tracking for a product
         </summary>
         <div className="mt-4 max-w-3xl">
-          <EnableBatchesForm products={data.catalog.filter((p) => !p.batchTracking)} />
+          <EnableBatchesForm
+            products={data.catalog.filter((p) => !p.batchTracking && !p.serialTracking)}
+          />
         </div>
       </details>
       <div className="flex flex-wrap gap-4 text-sm">

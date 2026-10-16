@@ -229,6 +229,65 @@ Remaining limits: provider account ownership/configuration, endpoint availabilit
 - Initial index was empty; Git diff checks passed before staging and for each staged group. Credential-pattern/file inventory checks excluded environment files, ignored databases/caches, private signing keys and generated outputs. No application edits or new test executions were needed for this bookkeeping task.
 - Added the release evidence, phase plans, supported limitations and session logs to version control. Actual provider acceptance, desktop/cloud acceptance and seller setup remain pending. No push, deployment or publication performed.
 
+## Local manual testing launch
+
+- Owner asked whether Docker is needed and requested a local launch. Confirmed Node 22.13.1, pnpm 9.12.0 and the repository's isolated PostgreSQL cluster on 127.0.0.1:55432. Docker is not installed and is not required for this native development path.
+- Production startup failed: initial sandbox socket permission denial, then approved retry reported no usable production build. No passing production-start claim.
+- Added a `dev` option to the isolated release helper and bound both dev/start to 127.0.0.1. Development mode retains pinned disposable database/storage and disabled payment/email integrations. Approved `node scripts/release-check.mjs dev` started the server for manual testing on port 3000.
+- PDF package compiled and Next reported Ready. Manual testing is local only; it does not satisfy provider, installer or cloud acceptance. Existing real business data and credentials were not used. Launch changes remain uncommitted after the earlier grouped commit handoff.
+
+## Controlled local webhook setup — 29 September 2026
+
+- User authorized an HTTPS endpoint for local testing and confirmed test keys/plans exist in root `.env`. Inspected only presence/test-prefix/matching-ID booleans, never printed credential values or loaded unrelated customer database configuration.
+- Added `webhook:dev` isolated runner on localhost:3001 and a webhook-only HMAC gateway on localhost:3300. Created ignored `.env.webhook-test` with a random secret (existing secrets are never overwritten), plus an unused ignored `.env.razorpay-test` blank template before owner clarified the actual credential file.
+- Official cloudflared downloaded into ignored cache with published checksum verification. Local Next app and gateway started; synthetic signed ignored-event roundtrip passed HTTP 200. Focused gateway regression passed after approved retry of sandbox spawn denial. Existing isolated PG restarted and data directory verified. No real provider API calls or subscription writes performed.
+- Public HTTPS setup remains incomplete: default DNS refuses api.trycloudflare.com; Cloudflare process-specific resolver retry did not fix initial API resolution. Explicit diagnostic DNS query succeeded. No system DNS/hosts/firewall changes made; no tunnel is connected and no public URL was produced.
+- Documented restart commands, secret location, tests and exact blocker in [local webhook guide](docs/release/LOCAL_WEBHOOK_TESTING.md). Phase 2 provider acceptance remains blocked. Local processes remain running for testing; application checkout/email remain disabled in this runner. Changes uncommitted.
+
+## Reusable Pro test account and acceptance — 14 October 2026
+
+- Owner requested holding Razorpay and creating the highest-access test account, then asked to preserve credentials for future tasks and enable the same account on https://mybizoneapp.vercel.app/.
+- Created `pro.owner@example.com` in the verified disposable PostgreSQL database, business MyBizOne Pro Test Shop, owner role (all tenant-level permissions), Pro plan (unlimited stores/products/users), two initial stores and sample stock. No provider subscription or production license was created. Verified seed rerun preserves the existing account/data.
+- Added guarded `scripts/seed-pro-test.mjs`, isolated `seed:pro` command and separate `e2e:pro:dev` browser scenario. Canonical reusable credentials are in ignored `.local/test-accounts/pro-owner.json`, outside disposable caches; added an explicit ignore rule. Initial ignored cache copy is retained. Passwords were not printed, committed or included in reports.
+- Full automated suite passed: 258 tests (90 domain, 17 DB, 23 storage, 126 web, 2 PDF), exit 0; `.cache/pro-full-tests.log/.exit`. This run predates concurrent performance edits and the later dashboard fix; it is not final-tree full-suite evidence.
+- First full browser run was invalidated by concurrent edits to dashboard/list pages and Next configuration. Login timed out and the server restarted; stopped only this session's identified test process tree. User agreed to pause the other task. Preserved its changes rather than reverting them.
+- Typecheck exposed an optional analytics key lost across an async closure in the concurrent PostHog change. Passed the narrowed key as an explicit string argument. Pro browser testing then exposed raw Date parameters in the new dashboard aggregates; replaced them with Drizzle typed comparison expressions. Added real isolated-DB dashboard date regression: 1 passed. Final workspace typecheck passed; scoped Biome passed.
+- Initial Pro test successfully created an extra store but failed because its text selector matched both a card and toast. Changed assertion to the store heading. Rerun passed: 1 browser scenario, zero retries, verifying login, Pro/unlimited indicators, extra-store creation and 16 application/admin routes; `.cache/pro-owner-browser-final.log/.exit`. Browser-created stores remain for manual use.
+- Identified the requested hosted site's Vercel Primary project/team. Connector metadata access succeeded, but database-secret access returned 403; same-scope CLI fallback lacked login and its waiting process was stopped. Local env files point to localhost. Asked owner to reconnect the Vercel account or privately supply development DB configuration. No hosted database/account/environment/deployment was modified. Razorpay stays on hold.
+- Updated phase/status docs and [local Pro report](docs/release/LOCAL_PRO_TESTING.md). Hosted setup and final targeted commerce results are recorded there. No commits/pushes in this session; preserve the other task's performance changes.
+
+## Test-account continuation and hosted handoff — 14 October 2026
+
+- User clarified `.env` is a testing database. Verified its connection metadata without printing credentials: localhost:5432/mybizone; connection refused. This local connection cannot identify the Vercel-hosted database. No `.env.hosted-test` connection exists.
+- Vercel reconnection succeeded, replacing the earlier 403, but its sensitive DATABASE_URL is not retrievable (no value, decrypted=false). One HTTPS test-account sign-in returned 401. Hosted account still unprovisioned; no hosted mutations/deployment made. Asked which database provider backs the site.
+- Prepared `scripts/prepare-pro-hosted.mjs` and private ignored `.local/test-accounts/pro-owner-hosted.sql` to provision the same saved credentials via the confirmed hosted development database console. It creates only the dedicated tenant/account/stores, uses a password hash, preserves matching fixtures and refuses unrelated email collisions. Validated syntax/existing-fixture behavior with rollback on isolated PostgreSQL. Scoped Biome passed after approved retry for pnpm sandbox access.
+- Previous targeted commerce run had GST success but was interrupted before non-GST completion (exit 1073807364). Resumed only non-GST acceptance. Restarted verified isolated PostgreSQL because it was offline after the interruption. Razorpay remains on hold and all provider integrations are disabled in the test helper.
+- Resumed non-GST browser acceptance completed: 1 passed, zero retries, exit 0 (3.6-minute scenario); `.cache/pro-non-gst-final.log/.exit`. Verified purchases/stock, payment-reference recording, PDF receipt persistence/access denial, bounded sales and supplier returns, and product-image persistence. Expected over-return rejection was asserted successfully. Repeated Pro fixture check confirmed active owner/Pro with four stores after capacity testing.
+- Restarted the isolated dev app on localhost:3000 for manual Pro-account use. Credentials remain in `.local/test-accounts/pro-owner.json`. Hosted access remains pending; private SQL handoff is ready and local validations passed. No live provider activity, hosted account modification, deployment or commit performed.
+- Owner identified Neon and requested plugin access. Plugin search confirms Neon installed/enabled. Used its local Neon/Postgres skill instructions; the configured MCP server failed initialization with Auth required. Neon CLI/API-key authentication is unavailable. Asked owner to reconnect Neon specifically; Vercel reconnection alone does not authenticate Neon. Hosted SQL remains unapplied. Local Pro app is running; manual login endpoint check recorded separately.
+
+## Neon reconnection follow-up — 14 October 2026
+
+- Owner confirmed Neon reconnected. Retried the configured Neon MCP connection; initialization still fails with Auth required. No Neon SQL tools are exposed in the active task. No hosted database or account mutation occurred.
+- Checked Codex MCP registration status without printing configurations/secrets: no standalone Neon registration was listed by the CLI; the enabled plugin's session connection remains the relevant path. Suggested reopening/restarting Codex to reload the plugin connection rather than asking the owner to share secrets again.
+- Hosted provisioning remains pending authentication in a fresh session. Reuse the private canonical credentials and prepared SQL from the local Pro test report. Existing passing local Pro/commerce evidence is unchanged; no unnecessary test reruns performed.
+- Owner requested another Neon retry. The configured MCP server again failed initialization with Auth required; no Neon tools became available and no hosted changes were made. Private SQL handoff remains ready for the confirmed hosted development database.
+- Owner asked for exact Neon authentication steps. Checked installed `codex mcp add/login --help` and official Codex/Neon documentation. Created docs/release/NEON_CONNECTION.md with normal-user PowerShell registration, browser OAuth, verification and connection reload instructions. No authentication token was requested or printed; no new login flow launched by the agent.
+
+## Neon access and hosted Pro account verified — 14 October 2026
+
+- Neon tools became available. `list_projects` found `mybizoneapp` (silent-scene-72840763) with ADMIN access; branch list found existing production branch br-odd-tree-aomevkex; tables and required-column metadata matched MyBizOne. These are provider labels for the website the owner explicitly designated development/testing.
+- Continued previously authorized hosted test-account setup. Verified pro.owner@example.com was absent, then applied the prepared SQL using Neon run_sql_transaction. Created only dedicated business/owner/credential/two stores/usage snapshot. SQL uses the same saved password hash and collision guards; no customer account overwrite, schema migration, deployment or Razorpay action.
+- Database verification confirmed active, email-verified owner, Pro plan and two stores. Added scripts/verify-hosted-pro.mjs for actual website acceptance with the private credentials; it does not print passwords or sessions.
+- Actual Chromium verification passed, exit 0: hosted login, Pro/three unlimited indicators, both stores and dashboard/products/employees/team/reports. Evidence .cache/hosted-pro-verification.json. Initial sandbox browser path failure was resolved by approved retry using installed browser. Scoped Biome passed after approved retry of sandbox pnpm access.
+- Updated canonical ignored .local/test-accounts/pro-owner.json with hosted URL/project/branch and verification date while preserving the password. Updated local Pro report, release status and phase plan to supersede the old authentication blockers. Test SQL/credentials remain ignored. No broad test rerun or sale-readiness claim; payment/email and full delivery acceptance remain pending.
+
+## Standard test-account instruction — 14 October 2026
+
+- Owner instructed using the existing Pro account for all testing and verification. Saved the instruction, local/hosted URLs and canonical private credential location in docs/release/TEST_ACCOUNT.md, linked from current status and Pro evidence.
+- Future authenticated product checks must reuse pro.owner@example.com and preserve its password/test data. Low-level regressions retain isolation; permission checks must not be weakened to substitute owner access for another role.
+- Corrected a stale reuse paragraph that still said hosted access was unverified. No credentials, account records or application behavior changed; documentation-only update required no test rerun.
+
 ## Hosted performance optimization — 15 October 2026
 
 Owner authorized optimization, Git push and hosted testing with the saved Pro account.
@@ -249,3 +308,401 @@ The new-sale run included one 3,116 ms outlier; this is small-sample acceptance
 measurement, not a production percentile or load-test claim. Compiled initial
 JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
 [PERFORMANCE_OPTIMIZATION.md](docs/PERFORMANCE_OPTIMIZATION.md). Credentials stay private.
+
+## Project status review — 15 October 2026
+
+- Read current phase/status documents, local/hosted Pro evidence, latest work-log entries and committed performance report. Latest code commits include b01c3fb (performance) and 4229436 (its evidence). Confirmed saved test tooling/documentation remains uncommitted.
+- Updated current status/phase-plan headlines with the deployed performance results and remaining provider, installer, complete cloud recovery and launch gates. Distinguished the verified hosted development site from complete cloud release acceptance and historical test totals from latest targeted validation.
+- No application edits, new tests, deployment or external mutations performed for this status update. Razorpay remains on hold; standard Pro testing account remains the required login.
+
+## Four-store hosted test seed — 15 October 2026
+
+- Owner requested a realistic four-store test account with two furniture stores,
+  electronics and utensils, departments, users/employees, hierarchy and products.
+  Reused the saved Pro owner and confirmed hosted tenant in Neon project
+  silent-scene-72840763, branch br-odd-tree-aomevkex. Preserved owner credentials.
+- Renamed the two confirmed empty hosted placeholders into AR Furniture - Central
+  and AR Furniture - North, preserving their IDs; added AR Electronics and
+  AR Utensils. Each has 3 departments, 6 products and 7 employees. Added global
+  admin, operations manager, accounts and marketing: 33 users including owner.
+- Added 33 explicit grants across nine role types, including one cashier with
+  billing + sales. Branch/staff grants are store-scoped; 12 floor managers have
+  department scopes. The app has no reports-to field; private manifest/CSV records
+  the sample reporting structure. Existing owner remains the application owner.
+- Added 4 brands, 16 categories including parent/child structure, 6 customers,
+  4 suppliers, prices/costs/MRP/wholesale tiers, SKUs/specs/opening stock and
+  3 low-stock examples. Non-GST and no fabricated transaction history.
+- Seed generator makes private SQL only, enforces fixture identity/collision and
+  empty-placeholder guards, persists stable IDs/individual passwords before writes,
+  and refreshes usage. Applied using one Neon transaction. Initial incorrect
+  purchase store-column check rolled back; corrected tenant guard then succeeded.
+  Reapplication succeeded with unchanged counts and no duplicate data. Database
+  scope checks found zero mismatches; usage is 4 stores / 24 products / 33 users.
+- Actual Chromium acceptance passed, exit 0: existing owner; all 32 new employee
+  logins, authenticated sessions and dashboards; 27 checks covering data visibility,
+  branch/inventory six-product store restrictions, sales/billing POS store selection
+  and global-role routes. Evidence .cache/four-store-hosted-verification.json.
+  Separate browser probe confirmed cross-store denial and the existing limitation
+  that department-only floor managers cannot open the store-scoped product page.
+  Evidence .cache/four-store-scope-probe.json. Preserved restricted grants.
+- Scoped Biome and Node syntax checks passed. Updated the older hosted owner smoke
+  to recognize expanded fixture store names. Private credentials, CSV and generated
+  SQL are Git-ignored; no passwords/sessions printed. Handover and limits:
+  docs/release/FOUR_STORE_TEST_DATA.md. Hosted data only; local fixture unchanged.
+  No application deployment, commit/push, welcome mail or payment-provider action.
+
+## Linked hosted transaction seed — 15 October 2026
+
+- Owner requested additional bills/sales and other sample data in the four-store
+  test account. Captured live stock/prices/balances and reused its fixture contacts,
+  store employees and preserved owner login. Added 20 sales with non-GST receipt
+  records, 4 estimates, 8 purchases, 4 customer collections, 4 supplier payments,
+  4 sales returns, 4 supplier returns, 8 expenses, 4 quotations, 4 delivery challans,
+  4 EMI plans/12 instalments, 4 damage logs and 6 tags/6 customer notes.
+- Used existing domain calculators for discounts/free items and EMI principal.
+  Applied record creation and corresponding stock/balance deltas in one guarded
+  Neon transaction. All documents use separate DEMO prefixes; counters unchanged.
+  Reapplied safely: counts, stock and balances unchanged. Reconciliation passed
+  for source/line totals, stock movement ledgers, customer/supplier balances, EMI,
+  and same-store product links, with no negative stock or balances.
+- Bill-detail acceptance exposed an existing hosted schema mismatch; Vercel logs
+  confirmed missing sales.gst_enabled_at_sale. Tested the existing migration 0021
+  on temporary Neon branch br-old-rice-aog40tl0. Owner explicitly approved applying
+  it and deleting the temporary branch. Applied through the migration tool, deleted
+  the temporary branch and recorded 0021 in _migrations. Seed amounts and unrelated
+  legacy transaction amounts were preserved; unknown legacy tax context stays null.
+  Migration 0020 is still pending; no unrelated provider setup performed.
+- Final hosted Chromium acceptance passed, exit 0: 22 checks of transaction lists,
+  four store bill details, settlements, EMI lists/details and financial/stock reports.
+  Scoped Biome and Node syntax checks passed. Private fixture/SQL files ignored.
+  No PDFs generated, external payments/emails, deployment or commit/push.
+  Evidence and seed details: docs/release/FOUR_STORE_TRANSACTIONS.md; private/cache
+  evidence paths recorded there. Owner and staff credentials remain unchanged.
+
+## Dashboard workspaces — 15 October 2026
+
+- Implemented seven role-aware workspaces: Master, Store operations, Sales,
+  Billing, Inventory, Accounts and Customer. Owner/admin can switch to every
+  workspace and narrow supported views to a store or department. Multiple-role
+  staff receive the relevant workspace union, with grants applied per view.
+- Added date comparisons, daily activity, priorities, inventory movements, recent
+  bills, business ledger and store comparison where permitted. Navigation follows
+  destination permissions. Department-only activity restricts mixed bills to
+  authorized lines and omits full bill identifiers/customer details and costs.
+- Validation: 21 policy, isolated PostgreSQL and role-revocation tests passed;
+  scoped Biome, TypeScript and isolated production build passed. Local browser
+  acceptance passed 21 checks before publication.
+- Published commit `8e16366be3ee98815845a9d874c78d166618b491` through the connected
+  GitHub account after the automatic approval service recovered. Its Git tree
+  exactly matches the tested local commit `5d3175f8a810f54625d969ea360c5f074e6b5a01`.
+  Local main was aligned only after verifying tree equality and an empty index;
+  unrelated workspace edits were preserved.
+- Vercel deployment `dpl_2S6gYSwnZMqTrBSr3ySTeuLPnE4W` reached READY in `sin1`
+  with `https://mybizoneapp.vercel.app` assigned. The hosted production build passed.
+- All 21 hosted Chromium acceptance checks passed: all owner workspaces, actual
+  store/department filter submission, nine staff role defaults, multi-role
+  switching, restricted navigation and rejected unauthorized URLs. Owner, floor,
+  inventory and customer layouts passed 360px overflow checks. Hosted screenshots
+  were visually inspected, including department stock and receipt movements.
+- Evidence: `.cache/dashboard-browser-hosted.json`, `.cache/dashboard-hosted-run.log`,
+  `.cache/dashboard-screenshots/`, `.cache/dashboard-tests.log`,
+  `.cache/dashboard-typecheck.log`, `.cache/dashboard-build.log`.
+  Design/data rules: `docs/DASHBOARD_WORKSPACES.md`. No additional schema change,
+  external payment, email or credential change was required.
+
+## Business profiles and owner insights — Phase 1, 16 October 2026
+
+- Added business-level industry/selling defaults and independent per-store
+  overrides, onboarding fields and audited settings forms. Existing stores
+  inherit. Profiles change dashboard priorities and stock review periods while
+  preserving product prices, customer tiers, transactions and role permissions.
+- Added top product gross-profit bars, per-store slow-stock reviews, explicitly
+  approximate stock-cover estimates and store comparisons with previous-period
+  sales, gross profit and margins. Missing cost snapshots withhold product/store
+  profit; returns and free-item costs are included. Department/inventory payloads
+  omit financial values. Roadmap: docs/BUSINESS_PROFILES_AND_INSIGHTS.md.
+- Validation passed: 28 policy/database/authenticated-action tests, scoped Biome,
+  TypeScript, isolated production build, seven profile browser checks and all
+  21 existing owner/staff workspace checks. Owner and department layouts were
+  visually inspected at 360px. The local account preserves older test stores.
+- Tested additive migration 0022 on Neon branch br-shy-smoke-aogxemq6. The owner
+  explicitly approved applying it and publishing Phase 1. Applied through the
+  Neon migration tool (b1ea920b-9a51-4406-be0d-9e382052d5f4), removed its temporary
+  branch and recorded 0022 in _migrations. Preserved 26 sales / 370300 total,
+  34 products / 1172.250 stock units, customer/supplier balances and 34 grants.
+  Migration 0020 remains unrelated and was not applied to the hosted database.
+- Published commit b1b8e2ecf52a11f736f972d16d9c650447fc2300, identical source tree
+  to tested local commit 3846cf246f70029bada767506060ae68fac1d693. Main was aligned
+  after tree/index checks. Unrelated existing workspace edits were preserved.
+- Hosted build/acceptance is in progress for deployment
+  dpl_6rVLBhB4YfxL9PCruKDb9B4UfP4i. No external payment or email was performed;
+  saved account passwords remain unchanged.
+- Hosted acceptance caught an unrelated existing-schema dependency in three new
+  profile pages: selecting all business fields included subscription columns from
+  pending migration 0020. Narrowed these pages to their two required profile fields
+  and verified the query on hosted data; TypeScript/scoped Biome passed. Published
+  fix 94323c055af1ff817a7257bb25e46feafc215dae (local source 1bc2356), with the same
+  Git tree verified. Migration 0020 remains unapplied. The browser runner now waits
+  for the streamed settings form before checking options.
+- Final deployment dpl_3gRjMDU5iLEuqQpf9S7pTJPum71a reached READY with the public
+  alias https://mybizoneapp.vercel.app and commit 94323c0. All seven new hosted
+  profile checks and all 21 existing workspace checks passed, exit 0. Browser
+  saves proved independent inheritance, preserved explicit overrides and restored
+  final demo defaults to general retail / retail. Both furniture stores now use
+  furniture profiles, electronics uses electronics and utensils general retail;
+  selling models inherit. Hosted owner/department screenshots were inspected.
+  Evidence: .cache/business-profiles-browser-hosted.json,
+  .cache/business-profiles-browser-hosted.log,
+  .cache/business-profiles-workspace-hosted-regression.log,
+  .cache/business-profile-screenshots/. Phase 2 operating analysis and Phase 3
+  specialised workflows remain planned as documented; they are not claimed shipped.
+
+## Operating analysis — Phase 2, 16 October 2026
+
+- Added /dashboard/analysis for daily sales/profit trends, normalized day/hour
+  heatmaps, bill drill-downs, current collection priorities and separate product
+  breakdowns for discounts, free items, returns and damage. Each non-marketing
+  workspace preserves its existing scope and permissions; inventory and department
+  views omit financial costs/profit/shared balances. Owners retain all role views.
+- Corrected dashboard/product/store gross profit and margins to exclude GST,
+  preserving tax-inclusive billed-sales totals. Free costs and returned costs are
+  included; missing cost snapshots yield unavailable profit and chart gaps.
+  The isolated GST fixture reconciles with the existing independent P&L report.
+- Collection actions preselect a tenant-validated customer on the existing
+  settlement form; tests never submit payments. Rankings use current shared
+  customer balances, not invented invoice ageing. Discounts/free retail values,
+  returned billed value and damage cost stay separate measures.
+- Added shared scoped query helpers; the initial dashboard query count is
+  unchanged. Detailed analytics load only on their dedicated page, with bounded
+  rows. No schema migration, dependency/provider setup, real payment or email.
+- All 39 focused policy/profile/database/auth tests passed. The eight new analysis
+  database tests were rerun after adding P&L reconciliation. TypeScript, scoped
+  Biome and final isolated production build passed. All 20 new analysis browser
+  checks and 21 existing workspace browser checks passed locally; owner, accounts,
+  inventory and department layouts were inspected at 360px.
+- Browser acceptance caught a stalled client-router time drill-down; native links
+  fixed it. An extra JavaScript-disabled check confirmed the existing streamed
+  loading boundary cannot finish rendering without JavaScript. The observation
+  is retained separately and the docs no longer claim full no-JavaScript support.
+  Mobile assertions wait for screenshot/layout stabilization after chart resizing.
+- Published commit 73a5a86d327b55be675638e6799601176f348e70 with the verified source
+  tree from local commit 81e7343f3a034480336719710175a67db5198699. Local main was
+  aligned after tree/index checks and unrelated work was preserved. Vercel build
+  dpl_Gr7hGEeqQWTqwxZHh2eJ1m7Bfxtu is in progress; hosted acceptance follows.
+- Rules and evidence: docs/OPERATING_ANALYSIS.md, .cache/operating-analysis-tests.log,
+  .cache/operating-analysis-report-tests.log, .cache/operating-analysis-build.log,
+  .cache/operating-analysis-browser-local.json,
+  .cache/operating-analysis-workspace-local.log,
+  .cache/operating-analysis-nojs-observation.json,
+  .cache/operating-analysis-screenshots/. Credentials and cookies remain private.
+- The first hosted build reached READY with the public alias and passed all 20
+  new analysis checks. Early hosted staff-login attempts hit ECONNRESET and
+  Chromium ERR_NETWORK_CHANGED. Added a test-only helper permitting two retries
+  for those specific transport errors; HTTP failures/assertions are not retried.
+  The successful 20-check hosted run needed zero retries. Its owner screenshot
+  was visually inspected. No financial entries were submitted.
+- An existing workspace mobile check measured before Recharts completed resize.
+  Added chart containment to prevent transient page overflow and standardized
+  screenshot/layout stabilization before mobile assertions in both runners.
+  Scoped Biome and TypeScript passed. Published final hardening commit
+  58508dcf08fb9801d3c5ba4eaa4261139d2135e2 (same tree as local f1bd86d). The only
+  application change in that follow-up is the chart container's overflow class;
+  calculation/permission queries are unchanged. Final build/hosted acceptance
+  follows at dpl_62uoUYQvnqA2PstBKExiEQUhWHTK.
+- Final deployment dpl_62uoUYQvnqA2PstBKExiEQUhWHTK reached READY with commit
+  58508dcf08fb9801d3c5ba4eaa4261139d2135e2 and the public alias
+  https://mybizoneapp.vercel.app. All 20 operating-analysis checks and all 21
+  existing workspace checks passed on this deployment, exit 0 and zero transport
+  retries in both successful final runs. Hosted screenshots were visually reviewed.
+  Evidence: .cache/operating-analysis-browser-hosted.json,
+  .cache/operating-analysis-browser-hosted.log,
+  .cache/operating-analysis-workspace-hosted.log,
+  .cache/operating-analysis-hosted-network-observation.log. No financial entry,
+  external payment, email, schema migration or saved-password change was made.
+  Phase 2 is complete; Phase 3 specialised workflows remain separately planned.
+
+### Phase 3a — optional batch stock, expiry and FEFO (16 October 2026)
+
+- Implemented optional per-product batch activation with exact physical-stock
+  reconciliation; existing products stay untracked. Grocery and mixed retailers
+  can opt in without changing industry profiles or inventing expiry dates.
+- Connected purchases, FEFO checkout (including free items), customer-return
+  quarantine, supplier returns and exact-lot damage. Estimates remain stock-neutral.
+  Inspection release/recall quarantine writes audit notes and preserves physical
+  quantity. Known expiry/code metadata cannot be extended to release expired lots.
+- Added Batches & expiry register, inspection forms, bill allocation trace and
+  scoped expiry/quarantine dashboard alerts. No costs are added to nonfinancial
+  alert payloads. Global inventory destination access follows the existing damage
+  permission boundary; department/store viewers retain scoped dashboard visibility.
+- Product locks serialize activation, review and stock changes. The batch helper
+  reloads tracking after the aggregate stock update and rejects drift atomically.
+  Product edits cannot change tracked units/store/quantity; tracked products stay
+  active to keep physical lots and historical return workflows manageable.
+- 80 automated tests passed across nine suites. Includes 19 batch integration and
+  three batch-policy tests, plus existing transaction, profile, workspace,
+  operating-analysis and authenticated-security regressions. Evidence:
+  .cache/stock-batches-regression-verified.log. Test cleanup was corrected for the
+  existing restrictive department/store foreign keys; all final fixture cleanup
+  passed. No hosted mutation fixtures were used.
+- Migration 0023 prepared successfully on Neon branch br-mute-shadow-aomxqost,
+  parent br-odd-tree-aomevkex, migration e9a3f3f5-5002-4040-be30-1769ef7cbd89.
+  Row digests matched across all 13 checked product, document, balance and grant
+  tables. Preserved 34 products / 1172.250 units, 26 sales / 370300.00, eight
+  purchases / 768160.00, return totals 18660.00 and 37700.00, customer balance
+  24860.00, supplier balance 346380.00, and 34 grants. Both new tables force RLS;
+  cross-tenant composite keys and sign/expiry checks exist; app_user cannot update
+  or delete movements or delete batches. All products remain disabled and the new
+  tables empty on the copied branch. Hosted application awaits explicit approval
+  required by the Neon completion tool. Prepared context is saved privately in
+  .local/test-accounts/pending-stock-batches-migration.json. Do not apply unrelated
+  pending migration 0020.
+- The first production-browser run found a stale register after successful
+  activation: the transaction saved correctly but client-router refresh retained
+  the old empty result. Native GET navigation after activation and reload after
+  review replace that transition. The runner was also corrected to follow the
+  existing POS redirect to /sales before opening the saved bill's detail page.
+  Final production/browser verification follows below.
+- Final acceptance completed 17 October 2026: 12 new production-browser checks
+  passed, plus the 20 operating-analysis and 21 workspace regressions (zero
+  transport retries). The saved fixture reconciled to 1.750 kg in product, lot
+  and movement totals and was removed after checking. Staff checks confirm global
+  admin management, store-inventory dashboard alerts without global mutation
+  navigation, and sales/department boundaries. The browser runner's initial
+  inventory-navigation expectation was corrected to respect that seeded user's
+  actual store scope; permissions were not expanded to satisfy the test.
+- Visual review caught a narrow mobile product filter despite no page overflow.
+  Replaced its phone flex layout with a full-width grid, made status cards two
+  columns and added a minimum readable filter-width assertion. The final isolated
+  production build passed, as did all 12 browser checks against that build. Owner
+  register, admin register, scoped inventory and supplier-return layouts were
+  inspected at 360px. Scoped Biome passed without errors (existing/non-null
+  assertion warnings remain). No additional calculation changes followed the
+  successful 80-test run.
+- Evidence: .cache/stock-batches-build-mobile.log,
+  .cache/stock-batches-browser-mobile-final.log,
+  .cache/stock-batches-browser-local.json,
+  .cache/stock-batches-operating-regression.log,
+  .cache/stock-batches-workspace-regression.log,
+  .cache/stock-batches-lint-complete.log,
+  .cache/stock-batches-screenshots/. Hosted schema and public deployment remain
+  unchanged until the user approves the tested migration and publication.
+- The owner subsequently approved "Apply migration and publish Phase 3a".
+  Applied prepared migration e9a3f3f5-5002-4040-be30-1769ef7cbd89 through Neon's
+  completion tool on 17 October 2026. The tool removed br-mute-shadow-aomxqost.
+  All 13 before/after row hashes matched; recorded 0023_stock_batches.sql in
+  _migrations. Both new tables force RLS, movement update/delete rights are absent,
+  existing product tracking remains disabled and migration 0020 remains pending.
+- Published commit 985ed567442eabcdadb21f45d62b7a975d7763e6 with tree
+  3ff0d12a194e50326145af87fa6e7671258cd736, verified identical to the reviewed local
+  source plus two documentation status updates. Vercel deployment
+  dpl_86UWZ6PTZsCCg3RqC6phU3r2y4S8 is building. Local main was aligned to the
+  identical remote tree with guarded update-ref; unrelated workspace changes
+  remain unstaged. Hosted acceptance follows below.
+- Final deployment dpl_86UWZ6PTZsCCg3RqC6phU3r2y4S8 reached READY, and the public
+  mybizoneapp.vercel.app alias resolves to commit
+  985ed567442eabcdadb21f45d62b7a975d7763e6. All 72 hosted browser checks passed:
+  nine live-register/form/scope checks, 21 workspace checks, 20 operating-analysis
+  checks and 22 seeded transaction/bill/report checks. All four runners exited 0;
+  the three runners with transport retry counters reported zero retries.
+- Hosted review confirmed readable 360px filters and expanded reconciliation
+  fields. No opening lot or financial form was saved. The register check opens
+  the Inventory menu explicitly before checking its management link; an earlier
+  assertion incorrectly expected a closed dropdown's link to be in the DOM (the
+  local populated dashboard also has a separate review link). No application or
+  permission change was needed. After all checks, the 13 financial/inventory/grant
+  row hashes still exactly matched the pre-migration baseline.
+- Hosted evidence: .cache/stock-batches-register-hosted-final.log,
+  .cache/stock-batches-browser-hosted.json,
+  .cache/stock-batches-workspaces-hosted.log,
+  .cache/stock-batches-analysis-hosted.log,
+  .cache/stock-batches-transactions-hosted.log,
+  .cache/stock-batches-hosted-screenshots/. Phase 3a is published and complete.
+  Subsequent specialised workflows remain separate deliveries.
+
+## 17 October 2026 — feature Phase 3b candidate: serials and recorded warranties
+
+- User approved proceeding after the project-status/documentation review. Saved
+  the consolidated status, roadmap, work log and test-data/admin notes in local
+  documentation commit 8bc6ac6a3edac197dd15740ffa295f8ce2cb409b. This commit has
+  not been published independently. Unrelated test-account/tunnel tooling remains
+  unstaged, and the hosted application is still Phase 3a commit 985ed567.
+- Implemented optional piece/pc serial reconciliation, normalized business-wide
+  serial uniqueness, exact-unit purchases/checkout, partial customer return
+  quarantine, audited hold/release, original-receipt supplier returns and damage.
+  Product and unit locks protect concurrent stock changes; count drift, wrong
+  serials and duplicate returns roll back their complete financial transaction.
+  Free units consume serials; estimates do not. Batch/serial tracking is exclusive.
+- Added serial inventory filters/history, future warranty settings, original web
+  bill snapshots, scoped warranty lookup and dashboard inspection priorities.
+  Warranty defaults are copied at sale time and do not rewrite old records.
+  Return/resale preserves separate sale histories. Historical returns may register
+  unknown serials in quarantine without inventing a past warranty. PDF serial
+  printing, claims/repairs and serial-level costing are not part of this phase.
+- 110 unique automated tests passed across 11 suites. The first regression run
+  collected 98 tests, with a stale navigation expectation failing and an older
+  mutation suite failing to import React cache. Updated the warranty navigation
+  expectation and supplied an identity cache mock in that test harness; the two
+  corrected suites passed all 21 tests (nine dashboard and 12 mutation security).
+  The other nine suites passed 89 tests, including serial policy/transactions,
+  batch stock, transaction actions, profiles and operating analysis. Production
+  permission checks were not relaxed. Evidence: .cache/stock-serials-tests.log,
+  .cache/stock-serials-regression.log,
+  .cache/stock-serials-regression-recheck.log,
+  .cache/stock-serials-automated-verification.json.
+- Migration 0024 prepared on br-super-bread-aocfknpv, parent br-odd-tree-aomevkex,
+  migration a42cb41b-3884-445d-88d1-99bdb2dfef9d. All 13 existing table hashes
+  match the parent. Existing 34 products retain tracking disabled and no warranty;
+  new tables are empty. Stock 1172.250, sales 370300.00, purchases 768160.00,
+  customer balance 24860.00, supplier balance 346380.00 and all 34 role grants
+  remain preserved. Verified tenant composite keys, state/term checks, forced RLS,
+  no unit-delete grant and no event-update/delete grant. Exact prepared context is
+  privately saved in .local/test-accounts/pending-stock-serials-migration.json;
+  evidence is .cache/stock-serials-migration-validation.json. Do not apply unrelated
+  pending migration 0020. Hosted application of 0024 requires explicit approval
+  after local acceptance, as required by Neon's migration completion tool.
+- Initial isolated production build passed. Browser preflight passed 16 serial
+  workflow/access checks, 12 batch/expiry checks, 21 workspace checks and 20
+  operating-analysis checks. The serial fixture covers receipt, two-unit sale,
+  partial return, quarantine, inspection, changed future terms, resale, supplier
+  return and damage, reconciling physical stock to zero and preserving 11 serial
+  events. Temporary fixtures were removed. Dashboard and analysis runners had
+  zero transport retries. Streamed pages and native form reloads now have explicit
+  browser waits; an unrelated disabled activation button is not a save-completion
+  signal. These were test synchronization corrections.
+- Visual preflight found cramped serial entry inside the horizontally scrolling
+  checkout table. Moved each product's serial entry to a full-width fieldset below
+  that table. The final rebuild and acceptance use a minimum readable field-width
+  assertion; preflight's earlier narrow field is not final-layout evidence.
+  Final results, local commit and hosted rollout state will be recorded below.
+- Final isolated production build passed: .cache/stock-serials-build-final.log.
+  All 16 serial workflow and access checks passed against that build, with the
+  readable full-width checkout fields and loaded unit register visually inspected
+  at 360px. The final register screenshot waits for actual unit cards, replacing
+  an early screenshot of a loading placeholder. Read-only rollout runner passed
+  ten more checks with zero transport retries; no existing product was activated.
+  Rechecked the 12 existing batch browser checks against the final shared cart.
+  Together with unchanged workspace/analysis code's 21 + 20 passed checks, local
+  browser acceptance totals 79. All temporary mutation fixtures were cleaned up.
+- Scoped Biome passed 41 changed TypeScript files with no errors/fixes and 13
+  non-null assertion warnings. Both acceptance runners passed their scoped lint.
+  Restored generated next-env.d.ts/tsconfig build-directory changes before commit.
+  Evidence: .cache/stock-serials-browser-final.log,
+  .cache/stock-serials-browser-local.json,
+  .cache/stock-serials-register-local.log,
+  .cache/stock-serials-register-local.json,
+  .cache/stock-serials-batch-regression-final.log,
+  .cache/stock-serials-workspace-regression.log,
+  .cache/stock-serials-analysis-regression.log,
+  .cache/stock-serials-lint-complete.log,
+  .cache/stock-serials-screenshots/ and register-local screenshots.
+  The feature and evidence are saved in a local candidate commit. Hosted schema,
+  migration ledger and deployment remain unchanged pending explicit approval of
+  migration 0024, temporary-branch cleanup and publication. Hosted acceptance must
+  follow publication; these local results do not claim it has already passed.
+- Owner approved "Apply migration and publish Phase 3b". Applied prepared migration
+  a42cb41b-3884-445d-88d1-99bdb2dfef9d through Neon's completion tool. The tool
+  removed br-super-bread-aocfknpv; branch listing confirms removal. All 13 fresh
+  hosted before/after row hashes match, existing tracking defaults are unchanged,
+  and both new tables retain forced RLS and narrow grants. Recorded only
+  0024_stock_serials.sql in _migrations. Unrelated migration 0020 remains pending.
+  Application publication and hosted acceptance follow.

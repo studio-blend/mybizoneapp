@@ -32,6 +32,7 @@ const Input = z
       .array(
         z.object({
           productId: z.string().uuid(),
+          serialNumbers: z.array(z.string().max(100)).max(500).optional(),
           qty: z
             .string()
             .regex(/^\d{1,9}(?:\.\d{1,3})?$/)
@@ -179,6 +180,8 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
       qty: line.qty,
       kind: 'sales_return',
       documentId: row.id,
+      originalSaleId: original.id,
+      serialNumbers: input.items.find((item) => item.productId === line.productId)?.serialNumbers,
     });
   }
   // Paid bills must not reduce debt from unrelated invoices.
@@ -212,6 +215,8 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
   revalidatePath('/sales');
   revalidatePath('/products');
   revalidatePath('/inventory/batches');
+  revalidatePath('/inventory/serials');
+  revalidatePath('/warranties');
   revalidatePath('/customers');
   return { id: row.id, returnNo, total: total.toFixed(2) };
 });

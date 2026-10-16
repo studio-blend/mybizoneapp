@@ -24,6 +24,7 @@ const DAMAGE_REASONS = ['damaged', 'theft', 'spillage', 'expired', 'other'] as c
 
 const CreateDamageLogInput = z.object({
   productId: uuid,
+  serialNumbers: z.array(z.string().max(100)).max(500).optional(),
   batchId: uuid.optional(),
   qty: qtyText,
   reason: z.enum(DAMAGE_REASONS),
@@ -91,6 +92,7 @@ export const createDamageLogAction = safeAction(
       kind: 'damage',
       documentId: logRow.id,
       batchId: input.batchId,
+      serialNumbers: input.serialNumbers,
     });
 
     // 5. Audit log
@@ -112,6 +114,7 @@ export const createDamageLogAction = safeAction(
     revalidatePath('/damage-logs');
     revalidatePath('/products');
     revalidatePath('/inventory/batches');
+    revalidatePath('/inventory/serials');
 
     return { id: logRow.id };
   },

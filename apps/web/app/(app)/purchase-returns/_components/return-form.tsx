@@ -1,6 +1,8 @@
 'use client';
 
+import { SerialNumbersField } from '@/components/serial-numbers-field';
 import { type BatchChoice, StockBatchSelect } from '@/components/stock-batch-select';
+import { parseSerialText } from '@/lib/serial-policy';
 
 import { Button } from '@mybizone/ui/button';
 import {
@@ -27,6 +29,7 @@ interface Props {
     price: string;
     unitSymbol: string;
     batchTracking: boolean;
+    serialTracking: boolean;
   }[];
   batches: BatchChoice[];
   suppliers: {
@@ -41,6 +44,7 @@ interface ItemRow {
   productId: string;
   qty: string;
   batchId?: string;
+  serialText?: string;
 }
 
 export function PurchaseReturnForm({ products, suppliers, batches }: Props) {
@@ -67,11 +71,19 @@ export function PurchaseReturnForm({ products, suppliers, batches }: Props) {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function updateItem(index: number, field: 'productId' | 'qty' | 'batchId', value: string) {
+  function updateItem(
+    index: number,
+    field: 'productId' | 'qty' | 'batchId' | 'serialText',
+    value: string,
+  ) {
     setItems((prev) =>
       prev.map((row, i) =>
         i === index
-          ? { ...row, [field]: value, ...(field === 'productId' ? { batchId: undefined } : {}) }
+          ? {
+              ...row,
+              [field]: value,
+              ...(field === 'productId' ? { batchId: undefined, serialText: '' } : {}),
+            }
           : row,
       ),
     );
@@ -98,6 +110,7 @@ export function PurchaseReturnForm({ products, suppliers, batches }: Props) {
         productId: it.productId,
         qty: it.qty,
         batchId: it.batchId,
+        serialNumbers: parseSerialText(it.serialText ?? ''),
       })),
     });
 
@@ -244,6 +257,15 @@ export function PurchaseReturnForm({ products, suppliers, batches }: Props) {
                 >
                   Remove
                 </Button>
+              )}
+              {products.find((product) => product.id === row.productId)?.serialTracking && (
+                <div className="min-w-0 sm:col-span-3">
+                  <SerialNumbersField
+                    id={`supplier-return-serials-${row.rowKey}`}
+                    value={row.serialText ?? ''}
+                    onChange={(value) => updateItem(idx, 'serialText', value)}
+                  />
+                </div>
               )}
               {products.find((product) => product.id === row.productId)?.batchTracking && (
                 <div className="sm:col-span-3">

@@ -60,6 +60,7 @@ interface Initial {
   minStock: string | null;
   inventory: string;
   batchTracking: boolean;
+  serialTracking: boolean;
   hsnCode: string | null;
   gstRate: string | null;
   imageKey: string | null;
@@ -585,13 +586,13 @@ export function ProductForm({ mode, stores, categories, brands, initial, gstEnab
                   inputMode="decimal"
                   placeholder="10.000"
                   defaultValue={initial?.inventory ?? '0'}
-                  readOnly={initial?.batchTracking}
+                  readOnly={initial?.batchTracking || initial?.serialTracking}
                   aria-invalid={!!fieldErrors.inventory}
                 />
                 <FieldError msg={fieldErrors.inventory} />
-                {initial?.batchTracking && (
+                {(initial?.batchTracking || initial?.serialTracking) && (
                   <p className="text-xs text-muted-foreground">
-                    Batch tracking is enabled. Use purchases, returns or damage to change stock;
+                    Stock tracking is enabled. Use purchases, returns or damage to change stock;
                     keep this product’s store and units unchanged.
                   </p>
                 )}

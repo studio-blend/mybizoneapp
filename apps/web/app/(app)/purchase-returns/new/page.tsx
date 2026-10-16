@@ -21,6 +21,7 @@ export default async function NewPurchaseReturnPage() {
         price: products.price,
         unitSymbol: products.unitSymbol,
         batchTracking: products.batchTracking,
+        serialTracking: products.serialTracking,
       })
       .from(products)
       .where(and(eq(products.businessId, user.businessId), eq(products.active, true)))

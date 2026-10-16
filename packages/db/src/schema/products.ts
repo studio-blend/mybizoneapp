@@ -1,6 +1,9 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -48,6 +51,10 @@ export const products = pgTable(
     minStock: numeric('min_stock', { precision: 12, scale: 3 }),
     inventory: numeric('inventory', { precision: 12, scale: 3 }).notNull().default('0'),
     batchTracking: boolean('batch_tracking').notNull().default(false),
+    serialTracking: boolean('serial_tracking').notNull().default(false),
+    serialTrackingSince: timestamp('serial_tracking_since', { withTimezone: true }),
+    warrantyMonths: integer('warranty_months').notNull().default(0),
+    warrantyIssuer: text('warranty_issuer'),
     hsnCode: text('hsn_code'),
     gstRate: numeric('gst_rate', { precision: 5, scale: 2 }),
     imageKey: text('image_key'),
@@ -59,6 +66,18 @@ export const products = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    trackingExclusive: check(
+      'products_tracking_exclusive',
+      sql`NOT (${t.batchTracking} AND ${t.serialTracking})`,
+    ),
+    serialPiece: check(
+      'products_serial_piece',
+      sql`NOT ${t.serialTracking} OR (${t.unitType}='piece' AND ${t.unitSymbol}='pc' AND ${t.serialTrackingSince} IS NOT NULL)`,
+    ),
+    warrantyTerm: check(
+      'products_warranty_term',
+      sql`${t.warrantyMonths} BETWEEN 0 AND 120 AND (${t.warrantyMonths}=0 OR (${t.serialTracking} AND ${t.warrantyIssuer} IS NOT NULL AND length(trim(${t.warrantyIssuer})) BETWEEN 1 AND 120))`,
+    ),
     idBusiness: unique('products_id_business_unique').on(t.id, t.businessId),
     businessStoreIdx: index('products_business_store_idx').on(t.businessId, t.storeId),
     categoryIdx: index('products_category_id_idx').on(t.categoryId),

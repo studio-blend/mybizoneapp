@@ -32,6 +32,7 @@ export const enableBatchTrackingAction = safeAction(
     const product = await lockedStockProduct(tx, user.businessId, input.productId);
     if (!product.active) throw new Error('Product is inactive');
     if (product.batchTracking) throw new Error('Batch tracking is already enabled');
+    if (product.serialTracking) throw new Error('A product uses either batch or serial tracking');
     if (
       input.batches.reduce((sum, item) => sum + stockUnits(item.qty), 0) !==
       stockUnits(product.inventory)

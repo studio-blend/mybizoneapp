@@ -10,7 +10,13 @@ export function OwnerInsights({
   data,
   canOpenProducts,
   canOpenBatches,
-}: { data: WorkspaceDashboard; canOpenProducts: boolean; canOpenBatches: boolean }) {
+  canOpenSerials,
+}: {
+  data: WorkspaceDashboard;
+  canOpenProducts: boolean;
+  canOpenBatches: boolean;
+  canOpenSerials: boolean;
+}) {
   const { insights, access, profile } = data;
   const product = (id: string | null, name: string) =>
     id && canOpenProducts ? (
@@ -122,6 +128,36 @@ export function OwnerInsights({
   const stockFirst = priority === 'stock';
   return (
     <div className="space-y-5" data-dashboard-insights>
+      {insights.serials.length > 0 && (
+        <section className={panel}>
+          <h2 className="text-base font-semibold tracking-tight">
+            Serial units awaiting inspection
+          </h2>
+          <p className={subtitle}>
+            Current quarantined units in your selected scope. These remain physical stock and cannot
+            be sold until inspected. Up to six products, oldest receipts first.
+          </p>
+          <ul className="mt-4 divide-y">
+            {insights.serials.map((row) => (
+              <li key={row.id} className="flex justify-between gap-4 py-3 text-sm">
+                <div className="min-w-0 break-words">
+                  <p className="font-medium">{row.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{row.store}</p>
+                </div>
+                <span className="shrink-0 tabular-nums">{row.quantity} pc</span>
+              </li>
+            ))}
+          </ul>
+          {canOpenSerials && (
+            <Link
+              className="mt-3 inline-block text-sm underline"
+              href="/inventory/serials?state=quarantine"
+            >
+              Inspect quarantined serials
+            </Link>
+          )}
+        </section>
+      )}
       {insights.batches.length > 0 && (
         <section className={panel}>
           <h2 className="text-base font-semibold tracking-tight">Expiry & quarantine</h2>

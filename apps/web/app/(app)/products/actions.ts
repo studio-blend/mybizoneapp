@@ -189,6 +189,7 @@ export const updateProductAction = safeAction(UpdateProductInput, async (input, 
       inventory: products.inventory,
       storeId: products.storeId,
       batchTracking: products.batchTracking,
+      serialTracking: products.serialTracking,
       unitType: products.unitType,
       unitSymbol: products.unitSymbol,
     })
@@ -199,14 +200,14 @@ export const updateProductAction = safeAction(UpdateProductInput, async (input, 
   await requirePermission(user, 'manage_products', { storeId: before.storeId });
   await requirePermission(user, 'manage_products', { storeId: input.storeId });
   if (
-    before.batchTracking &&
+    (before.batchTracking || before.serialTracking) &&
     (before.storeId !== input.storeId ||
       before.unitType !== input.unitType ||
       before.unitSymbol !== input.unitSymbol ||
       Number(before.inventory) !== Number(input.inventory))
   ) {
     throw new Error(
-      'Batch-tracked stock, store and units must stay consistent. Use purchases, returns or damage to change stock.',
+      'Tracked stock, store and units must stay consistent. Use purchases, returns or damage to change stock.',
     );
   }
   const [store] = await tx
@@ -297,6 +298,7 @@ export const deleteProductAction = safeAction(DeleteProductInput, async (input, 
       active: products.active,
       storeId: products.storeId,
       batchTracking: products.batchTracking,
+      serialTracking: products.serialTracking,
     })
     .from(products)
     .where(and(eq(products.id, input.id), eq(products.businessId, user.businessId)))
@@ -304,9 +306,9 @@ export const deleteProductAction = safeAction(DeleteProductInput, async (input, 
   if (!before) throw new Error('not found');
   await requirePermission(user, 'manage_products', { storeId: before.storeId });
   if (!before.active) return { ok: true };
-  if (before.batchTracking)
+  if (before.batchTracking || before.serialTracking)
     throw new Error(
-      'Keep batch-tracked products active so their lots and customer returns remain manageable.',
+      'Keep tracked products active so their units, lots and customer returns remain manageable.',
     );
 
   // Soft-delete via active=false so historical sale_items can still join.

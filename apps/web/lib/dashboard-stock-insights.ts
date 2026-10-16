@@ -37,6 +37,13 @@ export interface ExpiryInsight extends Record<string, unknown> {
   soonLots: number;
 }
 
+export interface SerialAttention extends Record<string, unknown> {
+  id: string;
+  name: string;
+  store: string;
+  quantity: number;
+}
+
 export async function loadDashboardStockInsights(
   tx: Transaction,
   options: {
@@ -60,7 +67,7 @@ export async function loadDashboardStockInsights(
         sql` `,
       )} ELSE 30 END`
     : sql`30`;
-  const [profit, stock, batches] = await Promise.all([
+  const [profit, stock, batches, serials] = await Promise.all([
     financial
       ? tx.execute<ProductProfit>(sql`WITH movements AS (
       SELECT si.product_id,si.product_name,si.line_total-si.gst_amount AS revenue,si.qty*si.cost_price_at_sale AS cost,si.cost_price_at_sale IS NULL AS missing
@@ -126,11 +133,19 @@ export async function loadDashboardStockInsights(
       FROM attention ORDER BY CASE status WHEN 'expired' THEN 0 WHEN 'quarantine' THEN 1 ELSE 2 END,
         "expiresOn" NULLS LAST,id LIMIT 6`)
       : Promise.resolve([]),
+    inventory
+      ? tx.execute<SerialAttention>(sql`SELECT p.id,p.name,st.name AS store,count(*)::int AS quantity
+      FROM stock_serials u JOIN products p ON p.id=u.product_id AND p.business_id=u.business_id
+      JOIN stores st ON st.id=p.store_id AND st.business_id=p.business_id
+      WHERE u.business_id=${businessId}::uuid AND u.state='quarantine' AND p.active AND p.serial_tracking AND ${productScope}
+      GROUP BY p.id,st.name ORDER BY min(u.created_at),p.id LIMIT 6`)
+      : Promise.resolve([]),
   ]);
   return {
     profit: Array.from(profit),
     slow: Array.from(stock).filter((row) => row.kind === 'slow'),
     cover: Array.from(stock).filter((row) => row.kind === 'cover'),
     batches: Array.from(batches),
+    serials: Array.from(serials),
   };
 }

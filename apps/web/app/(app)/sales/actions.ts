@@ -56,6 +56,7 @@ const optionalUuid = z.union([uuid, z.literal('')]).transform((v) => (v === '' ?
 
 const SaleLineInput = z.object({
   productId: uuid,
+  serialNumbers: z.array(z.string().max(100)).max(500).optional(),
   qty: qtyText,
   // M8: per-line ₹ discount and free flag.
   itemDiscount: z
@@ -333,6 +334,7 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
       qty: l.qty,
       kind: 'sale',
       documentId: saleRow.id,
+      serialNumbers: l.serialNumbers,
     });
   }
 
@@ -421,6 +423,8 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
   revalidatePath('/sales');
   revalidatePath('/dashboard');
   revalidatePath('/inventory/batches');
+  revalidatePath('/inventory/serials');
+  revalidatePath('/warranties');
   if (updatesOutstanding) revalidatePath('/customers');
   if (input.paymentMethod === 'finance_emi') revalidatePath('/emi');
   if (input.paymentStatus !== 'paid') revalidatePath('/reports/due-bills');

@@ -1,5 +1,8 @@
 'use client';
 
+import { SerialNumbersField } from '@/components/serial-numbers-field';
+import { parseSerialText } from '@/lib/serial-policy';
+
 import { allowsFractionalQty, isUnitType } from '@mybizone/domain/catalog';
 import { calculateSaleTotals } from '@mybizone/domain/sale';
 import { Button } from '@mybizone/ui/button';
@@ -25,6 +28,8 @@ interface ProductOption {
   price: string;
   gstRate: string | null;
   inventory: string;
+  serialTracking: boolean;
+  availableSerials: string[];
 }
 
 interface StoreOption {
@@ -43,6 +48,7 @@ interface CartLine {
   qty: string;
   itemDiscount: string;
   isFreeItem: boolean;
+  serialText: string;
 }
 
 type BillType = 'gst_bill' | 'non_gst_bill' | 'estimate';
@@ -171,7 +177,13 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
       }
       return [
         ...prev,
-        { productId, qty: defaultQty(productId), itemDiscount: '0', isFreeItem: false },
+        {
+          productId,
+          qty: defaultQty(productId),
+          itemDiscount: '0',
+          isFreeItem: false,
+          serialText: '',
+        },
       ];
     });
     setSearch('');
@@ -294,6 +306,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
         qty: l.qty,
         itemDiscount: l.itemDiscount || '0',
         isFreeItem: l.isFreeItem,
+        serialNumbers: parseSerialText(l.serialText),
       })),
     });
     setPending(false);
@@ -511,6 +524,35 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
                 )}
               </TableBody>
             </Table>
+            {lines.map((line) => {
+              const product = productById.get(line.productId);
+              if (!product?.serialTracking) return null;
+              return (
+                <fieldset key={product.id} className="min-w-0 space-y-3 rounded-lg border p-3">
+                  <legend className="max-w-full break-words px-1 text-sm font-medium">
+                    {product.name} · {line.qty} pc
+                  </legend>
+                  <SerialNumbersField
+                    id={`sale-serials-${product.id}`}
+                    value={line.serialText}
+                    required={billType !== 'estimate'}
+                    available={product.availableSerials}
+                    onChange={(value) =>
+                      setLines((previous) =>
+                        previous.map((item) =>
+                          item.productId === product.id ? { ...item, serialText: value } : item,
+                        ),
+                      )
+                    }
+                    hint={
+                      billType === 'estimate'
+                        ? 'Estimates do not allocate units or start a warranty.'
+                        : 'Scan the exact units being handed over. One serial for every piece, including free items.'
+                    }
+                  />
+                </fieldset>
+              );
+            })}
           </CardContent>
         </Card>
 

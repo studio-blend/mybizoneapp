@@ -1,6 +1,7 @@
 import { type Database, products, stockBatchMovements, stockBatches } from '@mybizone/db';
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import { indiaToday, stockText, stockUnits, validExpiry } from './stock-batch-policy';
+import { moveStockSerials } from './stock-serials';
 
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 type Kind = 'purchase' | 'sale' | 'sales_return' | 'purchase_return' | 'damage';
@@ -12,6 +13,10 @@ export async function lockedStockProduct(tx: Tx, businessId: string, productId: 
       storeId: products.storeId,
       inventory: products.inventory,
       batchTracking: products.batchTracking,
+      serialTracking: products.serialTracking,
+      serialTrackingSince: products.serialTrackingSince,
+      warrantyMonths: products.warrantyMonths,
+      warrantyIssuer: products.warrantyIssuer,
       name: products.name,
       active: products.active,
       unitType: products.unitType,
@@ -53,10 +58,13 @@ export async function moveStockBatches(
     batchCode?: string;
     expiresOn?: string;
     originalPurchaseId?: string;
+    originalSaleId?: string;
+    serialNumbers?: string[];
   },
 ) {
   const { businessId, productId, qty, kind, documentId } = input;
   const product = await lockedStockProduct(tx, businessId, productId);
+  if (product.serialTracking) return moveStockSerials(tx, input, product);
   if (!product.batchTracking) return;
   const units = stockUnits(qty);
   if (units <= 0) throw new Error('Batch quantity must be positive');
@@ -161,7 +169,10 @@ export async function moveStockBatches(
 
 // Keep outer references qualified: Drizzle unqualifies Column objects in a
 // single-table SELECT, which would bind them to the subquery's batch instead.
-export const sellableStockSql = sql<string>`CASE WHEN "products".batch_tracking THEN
+export const sellableStockSql = sql<string>`CASE WHEN "products".serial_tracking THEN
+  (SELECT count(*)::text FROM stock_serials u WHERE u.product_id="products".id
+    AND u.business_id="products".business_id AND u.state='available')
+  WHEN "products".batch_tracking THEN
   COALESCE((SELECT sum(b.quantity) FROM stock_batches b WHERE b.product_id = "products".id
     AND b.business_id = "products".business_id AND b.state = 'available'
     AND b.expires_on > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date), 0)::text

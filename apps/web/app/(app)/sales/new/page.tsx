@@ -43,6 +43,10 @@ export default async function NewSalePage() {
           price: products.price,
           gstRate: products.gstRate,
           inventory: sellableStockSql,
+          serialTracking: products.serialTracking,
+          availableSerials: sql<
+            string[]
+          >`ARRAY(SELECT u.code FROM stock_serials u WHERE u.product_id="products".id AND u.business_id="products".business_id AND u.state='available' ORDER BY u.code LIMIT 20)`,
         })
         .from(products)
         .where(

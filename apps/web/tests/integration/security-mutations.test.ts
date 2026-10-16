@@ -25,6 +25,7 @@ vi.mock('@/lib/db', async () => {
   return { db: createDb('postgresql://postgres@127.0.0.1:55432/mybizone_release_test') };
 });
 vi.mock('@/lib/session', () => ({ requireUser: async () => ({ ...state }) }));
+vi.mock('react', () => ({ cache: (fn: unknown) => fn }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/storage', () => ({ uploadFile: vi.fn(async () => ({ key: 'test.pdf' })) }));
 import { db } from '@/lib/db';
