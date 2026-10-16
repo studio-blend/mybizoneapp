@@ -46,7 +46,7 @@ export function ActivityChart({
       <div
         role="img"
         aria-label={`${metricLabel} by day for the selected period`}
-        className="min-w-0"
+        className="min-w-0 overflow-hidden"
       >
         <ResponsiveContainer width="100%" height={245}>
           <AreaChart

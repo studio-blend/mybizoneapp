@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { retryBrowserTransport } from './browser-transport.mjs';
 const root = new URL('../', import.meta.url);
 const require = createRequire(new URL('apps/web/package.json', root));
 const { chromium } = require('@playwright/test');
@@ -11,12 +12,12 @@ const owner = read('pro-owner.json');
 const seed = read('four-store-seed.json');
 const origin = process.env.DASHBOARD_ORIGIN ?? 'http://localhost:3015';
 assert(['http://localhost:3015', 'https://mybizoneapp.vercel.app'].includes(origin));
-const result = { origin, checks: [], passed: false };
+const result = { origin, checks: [], networkRetries: 0, passed: false };
 const shots = new URL('.cache/operating-analysis-screenshots/', root);
 mkdirSync(shots, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 async function analysis(page, query = '') {
-  const response = await page.goto(`${origin}/dashboard/analysis${query}`);
+  const response = await navigate(page, `${origin}/dashboard/analysis${query}`);
   assert.equal(response.status(), 200);
   await page.locator('[data-operating-view]').waitFor();
 }
@@ -35,7 +36,7 @@ async function mobile(page, name) {
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
-  await page.goto(`${origin}/login`);
+  await navigate(page, `${origin}/login`);
   await page.getByLabel('Email', { exact: true }).fill(owner.email);
   await page.getByLabel('Password', { exact: true }).fill(owner.password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
@@ -171,7 +172,7 @@ try {
     try {
       assert.equal(
         (
-          await staffContext.request.post(`${origin}/api/emp-signin`, {
+          await post(staffContext, `${origin}/api/emp-signin`, {
             data: { empId: person.empId, password: person.password },
           })
         ).status(),
@@ -179,14 +180,14 @@ try {
         role,
       );
       const staff = await staffContext.newPage();
-      await staff.goto(`${origin}/dashboard`);
+      await navigate(staff, `${origin}/dashboard`);
       await staff.locator('[data-dashboard-view]').waitFor();
       if (role === 'marketing') {
         assert.equal(
           await staff.getByRole('link', { name: 'Operating analysis', exact: true }).count(),
           0,
         );
-        await staff.goto(`${origin}/dashboard/analysis`);
+        await navigate(staff, `${origin}/dashboard/analysis`);
         await staff.getByRole('heading', { name: 'Analysis access', exact: true }).waitFor();
         result.checks.push(
           'Marketing retains the customer workspace and cannot open operating analysis',
@@ -229,9 +230,9 @@ try {
       if (role === 'accounts') await mobile(staff, 'accounts');
       if (role === 'branch_manager') {
         const other = seed.stores.find((store) => store.id !== person.storeId);
-        await staff.goto(`${origin}/dashboard/analysis?storeId=${other.id}`);
+        await navigate(staff, `${origin}/dashboard/analysis?storeId=${other.id}`);
         await staff.getByRole('heading', { name: 'Analysis access', exact: true }).waitFor();
-        await staff.goto(`${origin}/dashboard/analysis?view=accounts`);
+        await navigate(staff, `${origin}/dashboard/analysis?view=accounts`);
         await staff.getByRole('heading', { name: 'Analysis access', exact: true }).waitFor();
       }
       result.checks.push(
@@ -259,4 +260,14 @@ try {
   );
   // biome-ignore lint/suspicious/noConsole: Acceptance output excludes credentials and sessions.
   console.log(JSON.stringify(result));
+}
+
+function recordRetry() {
+  result.networkRetries++;
+}
+function navigate(page, url) {
+  return retryBrowserTransport(() => page.goto(url), recordRetry);
+}
+function post(context, url, options) {
+  return retryBrowserTransport(() => context.request.post(url, options), recordRetry);
 }

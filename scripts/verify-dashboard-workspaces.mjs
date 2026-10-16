@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { retryBrowserTransport } from './browser-transport.mjs';
 const root = new URL('../', import.meta.url);
 const require = createRequire(new URL('apps/web/package.json', root));
 const { chromium } = require('@playwright/test');
@@ -14,10 +15,10 @@ assert(['http://localhost:3015', 'https://mybizoneapp.vercel.app'].includes(orig
 const shots = new URL('.cache/dashboard-screenshots/', root);
 const shotPath = (name) => fileURLToPath(new URL(name, shots));
 mkdirSync(shots, { recursive: true });
-const result = { origin, checks: [], passed: false };
+const result = { origin, checks: [], networkRetries: 0, passed: false };
 const browser = await chromium.launch({ headless: true });
 async function dashboard(page, query = '') {
-  const response = await page.goto(`${origin}/dashboard${query}`);
+  const response = await navigate(page, `${origin}/dashboard${query}`);
   assert.equal(response.status(), 200);
   await page.locator('[data-dashboard-view]').waitFor();
   assert.equal(
@@ -27,19 +28,19 @@ async function dashboard(page, query = '') {
 }
 async function mobile(page, name) {
   await page.setViewportSize({ width: 360, height: 800 });
-  assert(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
-    `Mobile overflow: ${name}`,
-  );
   await page.screenshot({
     path: shotPath(`${name}-mobile.png`),
     fullPage: true,
   });
+  assert(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+    `Mobile overflow: ${name}`,
+  );
   await page.setViewportSize({ width: 1440, height: 1000 });
 }
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  await page.goto(`${origin}/login`);
+  await navigate(page, `${origin}/login`);
   await page.getByLabel('Email', { exact: true }).fill(owner.email);
   await page.getByLabel('Password', { exact: true }).fill(owner.password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
@@ -109,7 +110,7 @@ try {
     );
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     try {
-      const login = await context.request.post(`${origin}/api/emp-signin`, {
+      const login = await post(context, `${origin}/api/emp-signin`, {
         data: { empId: person.empId, password: person.password },
       });
       assert.equal(login.status(), 200, role);
@@ -157,10 +158,10 @@ try {
       }
       if (role === 'branch_manager') {
         const other = seed.stores.find((s) => s.id !== person.storeId);
-        await staff.goto(`${origin}/dashboard?storeId=${other.id}`);
+        await navigate(staff, `${origin}/dashboard?storeId=${other.id}`);
         await staff.getByRole('heading', { name: 'Dashboard access', exact: true }).waitFor();
         assert.equal(await staff.locator('main dd').count(), 0);
-        await staff.goto(`${origin}/dashboard?view=overview`);
+        await navigate(staff, `${origin}/dashboard?view=overview`);
         await staff.getByRole('heading', { name: 'Dashboard access', exact: true }).waitFor();
         result.checks.push('Branch URL tampering rejected for other stores and master dashboard');
       }
@@ -176,7 +177,7 @@ try {
   try {
     assert.equal(
       (
-        await context.request.post(`${origin}/api/emp-signin`, {
+        await post(context, `${origin}/api/emp-signin`, {
           data: { empId: multi.empId, password: multi.password },
         })
       ).status(),
@@ -215,4 +216,14 @@ try {
   );
   // biome-ignore lint/suspicious/noConsole: Acceptance summary excludes credentials and sessions.
   console.log(JSON.stringify(result));
+}
+
+function recordRetry() {
+  result.networkRetries++;
+}
+function navigate(page, url) {
+  return retryBrowserTransport(() => page.goto(url), recordRetry);
+}
+function post(context, url, options) {
+  return retryBrowserTransport(() => context.request.post(url, options), recordRetry);
 }

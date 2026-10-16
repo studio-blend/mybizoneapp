@@ -108,3 +108,12 @@ passing check. Evidence: `.cache/operating-analysis-tests.log`,
 `.cache/operating-analysis-workspace-local.log`,
 `.cache/operating-analysis-nojs-observation.json`,
 `.cache/operating-analysis-screenshots/`.
+
+The hosted Phase 2 build reached READY with commit
+`73a5a86d327b55be675638e6799601176f348e70`. All 20 new hosted checks passed on
+16 October 2026. Earlier attempts encountered `ECONNRESET` and Chromium
+`ERR_NETWORK_CHANGED`; the acceptance runners now allow at most two retries for
+only those transport errors and record their retry count. HTTP failures and
+assertions are not retried. The successful operating-analysis run needed zero
+retries. Final workspace regression and chart-resize containment are recorded
+in the release work log. No financial entry was submitted by acceptance.
