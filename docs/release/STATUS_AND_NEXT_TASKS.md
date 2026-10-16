@@ -1,9 +1,9 @@
 # MyBizOne — status and next tasks
 
 > **17 October 2026:** Start with [the current project status and roadmap](../PROJECT_STATUS.md).
-> Role dashboards, business profiles, operating analysis and feature Phase 3a
-> batch/expiry tracking are now live. The latest release passed 80 focused automated
-> tests and 72 hosted browser checks. The dated entries below retain delivery and
+> Role dashboards, business profiles, operating analysis, feature Phase 3a
+> batch/expiry tracking and Phase 3b serials/recorded warranties are live. The latest
+> release passed 110 focused automated tests and 82 hosted browser checks. The dated entries below retain delivery and
 > commercial-release history; their older deployment/test statements are historical.
 > Product feature phases and commercial delivery phases are separate. Razorpay is
 > still on hold, and email, installer, complete cloud recovery and launch gates remain open.

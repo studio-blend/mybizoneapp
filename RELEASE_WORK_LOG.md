@@ -706,3 +706,30 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   and both new tables retain forced RLS and narrow grants. Recorded only
   0024_stock_serials.sql in _migrations. Unrelated migration 0020 remains pending.
   Application publication and hosted acceptance follow.
+- Published application commit 62e3ca5bdf983e0a7c06dfdcc82f4a8d8c76b16a with tree
+  1479630512290aa86b9a339b109790f2f76e30b0, verified identical to reviewed local
+  candidate b14727c (feature plus documentation/migration-status updates). This
+  also publishes the earlier consolidated status, work log, admin notes and
+  test-data reports. Local main was aligned using guarded update-ref after
+  fetching and confirming identical trees; unrelated unstaged changes remain.
+- Vercel deployment dpl_H8ANzvuiPo4jMfzrnzGM8SMFwYDa reached READY, and the public
+  mybizoneapp.vercel.app alias resolved to commit 62e3ca5b. All 82 hosted browser
+  checks passed: 10 serial/register, nine batch, 21 workspace, 20 operating-analysis
+  and 22 seeded transaction/bill/report checks. All five runners exited 0. The
+  four runners with transport retry counters reported zero retries. Hosted phone
+  reconciliation and warranty layouts were inspected at 360px. No stock activation
+  or financial form was submitted. All 13 checked row hashes still match the fresh
+  pre-migration baseline after all hosted acceptance.
+- Evidence: .cache/stock-serials-hosted-preapply.json,
+  .cache/stock-serials-hosted-migration-applied.json,
+  .cache/stock-serials-hosted-final-hashes.json,
+  .cache/stock-serials-hosted-acceptance.json,
+  .cache/stock-serials-register-hosted.log,
+  .cache/stock-serials-workspaces-hosted.log,
+  .cache/stock-serials-analysis-hosted.log,
+  .cache/stock-serials-transactions-hosted.log,
+  .cache/stock-serials-batches-hosted.log and register-hosted screenshots.
+  Phase 3b is published and complete within its documented scope. The final
+  documentation-only follow-up records this acceptance without changing tested
+  application code. Furniture orders/advances/delivery are the next planned
+  feature phase; commercial delivery/launch gates remain separate and open.

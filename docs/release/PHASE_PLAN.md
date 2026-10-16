@@ -2,7 +2,7 @@
 
 > **17 October 2026:** This document tracks commercial delivery/release gates.
 > For current application progress and the separate product feature phases, read
-> [the project status and roadmap](../PROJECT_STATUS.md). Feature Phase 3a is live;
+> [the project status and roadmap](../PROJECT_STATUS.md). Feature Phases 3a and 3b are live;
 > this does not mark delivery Phase 3 or commercial launch complete. Older dated
 > deployment and verification statements below remain historical evidence.
 

@@ -1,8 +1,10 @@
 # Serial inventory and recorded warranties — feature Phase 3b
 
-Status: implemented and validated locally. The owner approved migration 0024 and
-publication on 17 October 2026. The migration is applied and recorded, and its
-temporary branch is removed. Publication and hosted acceptance are in progress.
+Status: published and verified on 17 October 2026. The owner approved migration
+0024 and publication. The migration is applied and recorded, and its temporary
+branch is removed. Application acceptance commit: `62e3ca5bdf983e0a7c06dfdcc82f4a8d8c76b16a`.
+Vercel deployment `dpl_H8ANzvuiPo4jMfzrnzGM8SMFwYDa` reached READY and the public
+alias was verified. Documentation-only follow-ups do not change the application.
 
 This capability is optional per product, independent of industry profiles. It
 suits electronics and any other business selling individually identified pieces.
@@ -116,6 +118,13 @@ includes full-width phone serial entry below the checkout table. Its mutation
 runner verified all serial workflows and the existing batch runner rechecked
 shared checkout. The earlier workspace/analysis results use identical query,
 permission and dashboard code; only serial-entry layout changed afterwards.
+
+All 82 hosted browser checks passed: 10 serial/register, nine batch, 21 workspace,
+20 operating-analysis and 22 seeded transaction/bill/report checks. All five
+runners exited 0, with zero recorded transport retries. Read-only hosted review
+confirmed the opening form, phone layouts, empty warranty history and role/store
+access without activating products or creating financial documents. All 13 table
+hashes still matched the fresh pre-migration baseline after these checks.
 
 The local mutation browser runner is `scripts/verify-stock-serials.mjs`. It requires
 the exact disposable localhost database and verifies its cluster directory before
