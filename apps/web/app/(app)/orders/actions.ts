@@ -10,10 +10,13 @@ import {
   requestHash,
 } from '@/lib/order-ledger';
 import { centsText, deliveredShare, moneyCents } from '@/lib/order-policy';
+import { handoverPack } from '@/lib/pack-policy';
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
-import { indiaToday, stockText, stockUnits, validExpiry } from '@/lib/stock-batch-policy';
+import { stockText, stockUnits, validExpiry } from '@/lib/stock-batch-policy';
 import { moveStockBatches } from '@/lib/stock-batches';
+import { assertCustomerCredit, packFields, resolvePack } from '@/lib/wholesale';
+import { creditDueDate } from '@/lib/wholesale-policy';
 import {
   auditLogs,
   billSeries,
@@ -81,11 +84,17 @@ export const createOrderAction = safeAction(
     deliveryAddress: z.string().trim().min(1).max(1000),
     promisedOn: date,
     billType: z.enum(['gst_bill', 'non_gst_bill']),
+    tradeType: z.enum(['standard', 'wholesale']).default('standard'),
     isInterstate: z.boolean().default(false),
     notes: text(500),
     items: z
       .array(
-        z.object({ productId: uuid, qty, unitPrice: z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/) }),
+        z.object({
+          productId: uuid,
+          qty,
+          unitPrice: z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/),
+          ...packFields,
+        }),
       )
       .min(1)
       .max(100),
@@ -135,14 +144,21 @@ export const createOrderAction = safeAction(
           ),
         ),
       );
-    const mapped = input.items.map((item) => {
-      const product = rows.find((p) => p.id === item.productId);
-      if (!product?.active || product.storeId !== input.storeId)
-        throw new Error('Choose active products from the selected store');
-      if (product.unitType === 'piece' && stockUnits(item.qty) % 1000)
-        throw new Error('Pieces require whole quantities');
-      return { item, product };
-    });
+    const mapped = await Promise.all(
+      input.items.map(async (item) => {
+        const product = rows.find((p) => p.id === item.productId);
+        if (!product?.active || product.storeId !== input.storeId)
+          throw new Error('Choose active products from the selected store');
+        const converted = await resolvePack(tx, user.businessId, product, item);
+        if (product.unitType === 'piece' && stockUnits(converted.qty) % 1000)
+          throw new Error('Pieces require whole quantities');
+        return {
+          item: { ...item, qty: converted.qty },
+          product,
+          packSnapshot: converted.packSnapshot,
+        };
+      }),
+    );
     const gstEnabled = biz.enabled && input.billType === 'gst_bill';
     if (gstEnabled && !biz.gstin)
       throw new Error('Configure the business GSTIN before creating a GST order');
@@ -168,6 +184,8 @@ export const createOrderAction = safeAction(
       customerGstin: customer.gstin,
       deliveryAddress: input.deliveryAddress,
       promisedOn: input.promisedOn,
+      creditDays: customer.creditDays,
+      tradeType: input.tradeType,
       billType: input.billType,
       gstEnabled,
       businessGstin: gstEnabled ? biz.gstin : null,
@@ -178,7 +196,7 @@ export const createOrderAction = safeAction(
       createdBy: user.id,
     });
     await tx.insert(customerOrderItems).values(
-      mapped.map(({ item, product }, i) => {
+      mapped.map(({ item, product, packSnapshot }, i) => {
         const line = calc.lines[i];
         if (!line) throw new Error('Order calculation mismatch');
         return {
@@ -191,6 +209,7 @@ export const createOrderAction = safeAction(
           unitSymbol: product.unitSymbol,
           qty: item.qty,
           unitPrice: item.unitPrice,
+          packSnapshot,
           hsnCode: product.hsnCode,
           gstRate: product.gstRate,
           subtotal: line.lineSubtotal.toFixed(2),
@@ -333,6 +352,7 @@ export const deliverOrderAction = safeAction(
     const subtotal = chosen.reduce((n, l) => n + moneyCents(l.subtotal), 0);
     const tax = chosen.reduce((n, l) => n + moneyCents(l.tax), 0);
     const total = subtotal + tax;
+    const fundsBefore = await orderLedger(tx, order);
     const doc = await number(
       tx,
       user.businessId,
@@ -364,7 +384,7 @@ export const deliverOrderAction = safeAction(
         paymentMethod: 'order',
         paymentStatus: total ? 'due' : 'paid',
         billType: order.billType,
-        dueDate: indiaToday(),
+        dueDate: creditDueDate(order.creditDays),
         notes: `Order ${order.orderNo} · ${input.note}`,
       })
       .returning({ id: sales.id });
@@ -401,6 +421,7 @@ export const deliverOrderAction = safeAction(
         qty: line.raw.qty,
         unitSymbol: line.item.unitSymbol,
         unitPrice: line.item.unitPrice,
+        packSnapshot: handoverPack(line.item.packSnapshot, line.raw.qty),
         hsnCode: line.item.hsnCode,
         gstRate: line.item.gstRate,
         lineTotal: line.total,
@@ -450,6 +471,7 @@ export const deliverOrderAction = safeAction(
     }
     await adjustOrderDebt(tx, order, total);
     await applyOrderFunds(tx, order, 'delivery', input.id);
+    if (total > fundsBefore.held) await assertCustomerCredit(tx, user.businessId, order.customerId);
     await tx.insert(auditLogs).values({
       businessId: user.businessId,
       actorId: user.id,

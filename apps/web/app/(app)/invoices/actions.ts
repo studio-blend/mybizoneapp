@@ -1,5 +1,6 @@
 'use server';
 
+import { packDescription } from '@/lib/pack-policy';
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { uploadFile } from '@/lib/storage';
@@ -45,6 +46,7 @@ export const generateInvoiceAction = safeAction(GenerateInput, async (input, { u
       billNo: sales.billNo,
       billType: sales.billType,
       createdAt: sales.createdAt,
+      dueDate: sales.dueDate,
       customerName: sales.customerName,
       customerPhone: sales.customerPhone,
       customerGstin: sales.customerGstin,
@@ -89,6 +91,7 @@ export const generateInvoiceAction = safeAction(GenerateInput, async (input, { u
       qty: saleItems.qty,
       unitSymbol: saleItems.unitSymbol,
       unitPrice: saleItems.unitPrice,
+      packSnapshot: saleItems.packSnapshot,
       hsnCode: saleItems.hsnCode,
       gstRate: saleItems.gstRate,
       gstAmount: saleItems.gstAmount,
@@ -155,6 +158,7 @@ export const generateInvoiceAction = safeAction(GenerateInput, async (input, { u
     invoice: {
       number: inv.invoiceNo,
       date: new Date(saleRow.createdAt),
+      dueDate: saleRow.dueDate,
       isInterstate: interstate,
     },
     customer: {
@@ -169,6 +173,7 @@ export const generateInvoiceAction = safeAction(GenerateInput, async (input, { u
       qty: i.qty,
       unitSymbol: i.unitSymbol,
       unitPrice: i.unitPrice,
+      packDescription: packDescription(i.packSnapshot) || undefined,
       gstRate: i.gstRate,
       gstAmount: i.gstAmount,
       lineTotal: i.lineTotal,

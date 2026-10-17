@@ -1,4 +1,15 @@
-import { index, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import {
+  check,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
 
 export const customers = pgTable(
@@ -18,6 +29,7 @@ export const customers = pgTable(
     // 'mrp' = products.mrp, 'rate1'..'rate4' = products.rate_1..rate_4
     rateCategory: text('rate_category').notNull().default('retail'),
     creditLimit: numeric('credit_limit', { precision: 12, scale: 2 }).notNull().default('0'),
+    creditDays: integer('credit_days').notNull().default(0),
     // outstandingBalance is the running sum of unpaid bills minus settlements.
     // Updated transactionally on each sale + settlement.
     outstandingBalance: numeric('outstanding_balance', { precision: 12, scale: 2 })
@@ -28,6 +40,7 @@ export const customers = pgTable(
   },
   (t) => ({
     tenantUnique: unique('customers_id_business_unique').on(t.id, t.businessId),
+    creditDays: check('customers_credit_days_check', sql`${t.creditDays} BETWEEN 0 AND 365`),
     businessIdx: index('customers_business_id_idx').on(t.businessId),
     businessNameIdx: index('customers_business_name_idx').on(t.businessId, t.name),
     phoneIdx: index('customers_phone_idx').on(t.businessId, t.phone),

@@ -8,7 +8,12 @@ for (const isGstInvoice of [false, true]) {
     const bytes = await renderInvoicePdf({
       isGstInvoice,
       business: { name: 'Disposable PDF fixture', gstin: isGstInvoice ? '27AAPFU0939F1ZV' : null },
-      invoice: { number: 'TEST-1', date: new Date('2026-09-25T12:00:00Z'), isInterstate: false },
+      invoice: {
+        number: 'TEST-1',
+        date: new Date('2026-09-25T12:00:00Z'),
+        dueDate: '2026-10-25',
+        isInterstate: false,
+      },
       customer: { name: 'Test buyer', phone: null, gstin: null, address: null },
       lines: [
         {
@@ -17,6 +22,7 @@ for (const isGstInvoice of [false, true]) {
           qty: '1',
           unitSymbol: 'pc',
           unitPrice: '100.00',
+          packDescription: '1 × Case (1.000 pc each)',
           gstRate: isGstInvoice ? '18' : null,
           gstAmount: isGstInvoice ? '18.00' : '0.00',
           lineTotal: isGstInvoice ? '118.00' : '100.00',

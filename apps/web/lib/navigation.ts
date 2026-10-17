@@ -45,6 +45,12 @@ const definitions: { label: string; items: Entry[] }[] = [
     label: 'Inventory',
     items: [
       { href: '/products', label: 'Products', gate: 'manage_products', scoped: true },
+      {
+        href: '/inventory/packs',
+        label: 'Pack definitions',
+        gate: 'manage_products',
+        scoped: true,
+      },
       { href: '/inventory/batches', label: 'Batches & expiry', gate: 'manage_inventory' },
       { href: '/inventory/serials', label: 'Serial inventory', gate: 'manage_inventory' },
       { href: '/products/barcode', label: 'Barcodes', gate: 'manage_products' },

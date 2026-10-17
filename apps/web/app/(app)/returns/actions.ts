@@ -199,9 +199,19 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
     const changed = await tx
       .update(products)
       .set({ inventory: sql`${products.inventory} + ${line.qty}::numeric` })
-      .where(and(eq(products.id, line.productId), eq(products.businessId, user.businessId)))
+      .where(
+        and(
+          eq(products.id, line.productId),
+          eq(products.businessId, user.businessId),
+          eq(products.unitSymbol, source.unitSymbol),
+          source.packSnapshot ? eq(products.unitType, source.packSnapshot.unitType) : undefined,
+        ),
+      )
       .returning({ id: products.id });
-    if (!changed.length) throw new Error('returned product no longer exists');
+    if (!changed.length)
+      throw new Error(
+        'Returned product is unavailable or its stock units changed. Reconcile the original bill.',
+      );
     await moveStockBatches(tx, {
       businessId: user.businessId,
       productId: line.productId,

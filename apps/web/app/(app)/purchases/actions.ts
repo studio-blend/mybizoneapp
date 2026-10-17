@@ -2,8 +2,18 @@
 
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
+import { stockUnits } from '@/lib/stock-batch-policy';
 import { moveStockBatches } from '@/lib/stock-batches';
-import { auditLogs, billSeries, products, purchaseItems, purchases, suppliers } from '@mybizone/db';
+import { packFields, resolvePack } from '@/lib/wholesale';
+import {
+  type PackSnapshot,
+  auditLogs,
+  billSeries,
+  products,
+  purchaseItems,
+  purchases,
+  suppliers,
+} from '@mybizone/db';
 import { financialYear, formatBillNo } from '@mybizone/domain/bill-series';
 import { and, eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
@@ -33,6 +43,7 @@ const CreatePurchaseInput = z.object({
   items: z
     .array(
       z.object({
+        ...packFields,
         productId: uuid,
         qty: qtyText.refine((v) => Number(v) > 0, 'quantity must be positive'),
         unitPrice: moneyText,
@@ -91,6 +102,8 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
       id: products.id,
       name: products.name,
       unitSymbol: products.unitSymbol,
+      unitType: products.unitType,
+      storeId: products.storeId,
       hsnCode: products.hsnCode,
       gstRate: products.gstRate,
       active: products.active,
@@ -114,26 +127,31 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
     unitPrice: string;
     product: (typeof productRows)[number];
     lineTotal: string;
+    packSnapshot: PackSnapshot | null;
     batchCode?: string;
     expiresOn?: string;
     serialNumbers?: string[];
   };
 
-  const lines: LineCalc[] = input.items.map((item) => {
+  const lines: LineCalc[] = [];
+  for (const item of input.items) {
     const p = byId.get(item.productId);
     if (!p) throw new Error('unreachable');
-    const lineTotal = (Number(item.qty) * Number(item.unitPrice)).toFixed(2);
-    return {
+    const converted = await resolvePack(tx, user.businessId, p, item);
+    if (p.unitType === 'piece' && stockUnits(converted.qty) % 1000)
+      throw new Error('Pieces require whole quantities');
+    const lineTotal = (Number(converted.qty) * Number(item.unitPrice)).toFixed(2);
+    lines.push({
       productId: item.productId,
-      qty: item.qty,
+      ...converted,
       unitPrice: item.unitPrice,
       product: p,
       lineTotal,
       batchCode: item.batchCode,
       expiresOn: item.expiresOn,
       serialNumbers: item.serialNumbers,
-    };
-  });
+    });
+  }
 
   const subtotal = lines.reduce((acc, l) => acc + Number(l.lineTotal), 0);
   const total = subtotal; // No GST recalc; taxTotal = 0.
@@ -167,6 +185,7 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
       qty: line.qty,
       unitSymbol: line.product.unitSymbol,
       unitPrice: line.unitPrice,
+      packSnapshot: line.packSnapshot,
       hsnCode: line.product.hsnCode,
       gstRate: line.product.gstRate,
       gstAmount: '0.00',
@@ -174,10 +193,24 @@ export const createPurchaseAction = safeAction(CreatePurchaseInput, async (input
     });
 
     // 7. Increment product inventory.
-    await tx
+    const [received] = await tx
       .update(products)
       .set({ inventory: sql`${products.inventory} + ${line.qty}::numeric` })
-      .where(and(eq(products.id, line.productId), eq(products.businessId, user.businessId)));
+      .where(
+        and(
+          eq(products.id, line.productId),
+          eq(products.businessId, user.businessId),
+          eq(products.unitType, line.product.unitType),
+          eq(products.unitSymbol, line.product.unitSymbol),
+          eq(products.storeId, line.product.storeId),
+          eq(products.active, true),
+        ),
+      )
+      .returning({ id: products.id });
+    if (!received)
+      throw new Error(
+        'Product stock units or store changed. Refresh the purchase before receiving.',
+      );
     await moveStockBatches(tx, {
       businessId: user.businessId,
       productId: line.productId,

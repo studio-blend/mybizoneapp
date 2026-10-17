@@ -9,7 +9,13 @@ export const dynamic = 'force-dynamic';
 const money = (cents: number) =>
   `₹${(cents / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export default async function OrdersPage(props: {
-  searchParams: Promise<{ storeId?: string; q?: string; view?: string; page?: string }>;
+  searchParams: Promise<{
+    storeId?: string;
+    q?: string;
+    view?: string;
+    page?: string;
+    trade?: string;
+  }>;
 }) {
   const user = await requireUser();
   const roles = await getUserRoles(user);
@@ -35,6 +41,7 @@ export default async function OrdersPage(props: {
     if (data.storeId) params.set('storeId', data.storeId);
     if (data.q) params.set('q', data.q);
     if (data.view) params.set('view', data.view);
+    if (data.trade) params.set('trade', data.trade);
     params.set('page', String(page));
     return `/orders?${params}`;
   };
@@ -47,10 +54,13 @@ export default async function OrdersPage(props: {
             Track agreements, customer advances and physical handovers separately. Orders do not
             reserve stock; a handover creates its own sales bill.
           </p>
+          <Link href="/orders?trade=wholesale" className="mt-3 inline-block text-sm underline">
+            Wholesale fulfilment
+          </Link>
         </div>
         {canManageOrders(roles) && (
           <Link
-            href="/orders/new"
+            href={data.trade === 'wholesale' ? '/orders/new?trade=wholesale' : '/orders/new'}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           >
             New customer order
@@ -71,11 +81,23 @@ export default async function OrdersPage(props: {
         ))}
       </dl>
       <p className="text-xs text-muted-foreground">
-        Current totals in your permitted store selection, independent of the search filter. Advances
-        are unused customer funds, not sales revenue. Unpaid delivered bills are already included in
-        customer debt.
+        Current totals in your permitted stores and order type, independent of the search filter.
+        Advances are unused customer funds, not sales revenue. Unpaid delivered bills are already
+        included in customer debt.
       </p>
-      <form method="get" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <form method="get" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <label className="min-w-0 text-sm font-medium">
+          Order type
+          <select
+            name="trade"
+            defaultValue={data.trade}
+            className="mt-1 w-full rounded-md border bg-background p-2"
+          >
+            <option value="">All types</option>
+            <option value="standard">Standard</option>
+            <option value="wholesale">Wholesale</option>
+          </select>
+        </label>
         <label className="min-w-0 text-sm font-medium">
           Store
           <select
@@ -146,6 +168,9 @@ export default async function OrdersPage(props: {
             </div>
             <p className="mt-3 font-medium">{row.customer}</p>
             <p className="mt-1 text-xs text-muted-foreground">{row.store}</p>
+            {row.tradeType === 'wholesale' && (
+              <p className="mt-2 text-xs font-medium">Wholesale fulfilment</p>
+            )}
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div>
                 <dt className="text-muted-foreground">Promised handover</dt>

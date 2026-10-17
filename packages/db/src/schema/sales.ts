@@ -15,6 +15,7 @@ import {
 import { user } from './auth';
 import { businesses } from './businesses';
 import { customers } from './customers';
+import { type PackSnapshot, validPackSnapshot } from './product-packs';
 import { products } from './products';
 import { stores } from './stores';
 
@@ -102,6 +103,7 @@ export const saleItems = pgTable(
     qty: numeric('qty', { precision: 12, scale: 3 }).notNull(),
     unitSymbol: text('unit_symbol').notNull(),
     unitPrice: numeric('unit_price', { precision: 10, scale: 2 }).notNull(),
+    packSnapshot: jsonb('pack_snapshot').$type<PackSnapshot>(),
     hsnCode: text('hsn_code'),
     gstRate: numeric('gst_rate', { precision: 5, scale: 2 }),
     lineTotal: numeric('line_total', { precision: 12, scale: 2 }).notNull(),
@@ -116,6 +118,7 @@ export const saleItems = pgTable(
   },
   (t) => ({
     saleIdx: index('sale_items_sale_id_idx').on(t.saleId),
+    pack: check('sale_items_pack_check', validPackSnapshot(t.packSnapshot, t.qty, t.unitSymbol)),
     productIdx: index('sale_items_product_id_idx').on(t.productId),
     businessIdx: index('sale_items_business_id_idx').on(t.businessId),
   }),

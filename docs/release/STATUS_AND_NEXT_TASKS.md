@@ -9,9 +9,15 @@
 > Product feature phases and commercial delivery phases are separate. Razorpay is
 > still on hold, and email, installer, complete cloud recovery and launch gates remain open.
 > Migration 0025 is approved, applied and recorded; the temporary branch is removed.
-> All 19 checked existing-table hashes are preserved. Wholesale is the next planned
-> product feature phase; commercial launch work remains separate.
+> All 19 checked existing-table hashes are preserved. Wholesale is the next
+> product feature rollout; commercial launch work remains separate.
 > See [the Phase 3c record](../CUSTOMER_ORDERS_AND_ADVANCES.md).
+> Phase 3d wholesale passed local acceptance: 162 automated, two native PDF and
+> 136 production-browser checks, plus build/types. Migration 0026 preserved all
+> 25 checked existing tables on a temporary branch. The owner approved rollout;
+> migration 0026 is applied/recorded and its branch removed. All 25 fresh hosted
+> pre/post-migration hashes match; publication/hosted acceptance are in progress.
+> See [the wholesale candidate](../WHOLESALE_PACKS_AND_CREDIT.md).
 
 Updated: 15 October 2026. Scope: Windows desktop/LAN and cloud.
 

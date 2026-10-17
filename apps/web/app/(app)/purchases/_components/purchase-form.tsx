@@ -1,6 +1,8 @@
 'use client';
 
+import { PackQuantityFields, type PackSelection } from '@/components/pack-quantity-fields';
 import { SerialNumbersField } from '@/components/serial-numbers-field';
+import type { PackOption } from '@/lib/pack-policy';
 import { parseSerialText } from '@/lib/serial-policy';
 
 import { Button } from '@mybizone/ui/button';
@@ -11,7 +13,7 @@ import { Select } from '@mybizone/ui/select';
 import { Textarea } from '@mybizone/ui/textarea';
 import { useToast } from '@mybizone/ui/use-toast';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPurchaseAction } from '../actions';
 
 interface Product {
@@ -19,6 +21,7 @@ interface Product {
   name: string;
   price: string;
   unitSymbol: string;
+  unitType: string;
   batchTracking: boolean;
   serialTracking: boolean;
 }
@@ -33,9 +36,10 @@ interface Props {
   products: Product[];
   suppliers: Supplier[];
   defaultSupplierId?: string;
+  packs: PackOption[];
 }
 
-interface LineItem {
+interface LineItem extends PackSelection {
   id: number;
   productId: string;
   qty: string;
@@ -47,15 +51,18 @@ interface LineItem {
 
 let lineCounter = 0;
 
-function newLine(): LineItem {
+function newLine(id = ++lineCounter): LineItem {
   return {
-    id: ++lineCounter,
+    id,
     productId: '',
     qty: '',
     unitPrice: '',
     batchCode: '',
     expiresOn: '',
     serialText: '',
+    packId: '',
+    packCount: '1',
+    looseQty: '0',
   };
 }
 
@@ -63,10 +70,12 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Props) {
+export function PurchaseForm({ products, suppliers, packs, defaultSupplierId = '' }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, setPending] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const [error, setError] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState(defaultSupplierId);
   const [supplierName, setSupplierName] = useState(() => {
@@ -75,7 +84,7 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
     }
     return '';
   });
-  const [lines, setLines] = useState<LineItem[]>([newLine()]);
+  const [lines, setLines] = useState<LineItem[]>([newLine(0)]);
 
   const productById = new Map(products.map((p) => [p.id, p]));
   const _selectedSupplier = suppliers.find((s) => s.id === supplierId) ?? null;
@@ -98,6 +107,9 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
           updated.batchCode = '';
           updated.expiresOn = '';
           updated.serialText = '';
+          updated.packId = '';
+          updated.packCount = '1';
+          updated.looseQty = '0';
         }
         return updated;
       }),
@@ -134,6 +146,9 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
         batchCode: l.batchCode,
         expiresOn: l.expiresOn,
         serialNumbers: parseSerialText(l.serialText),
+        packId: l.packId,
+        packCount: l.packId ? l.packCount : undefined,
+        looseQty: l.packId ? l.looseQty : undefined,
       })),
     };
 
@@ -153,188 +168,212 @@ export function PurchaseForm({ products, suppliers, defaultSupplierId = '' }: Pr
       <CardHeader>
         <CardTitle>New Purchase Bill</CardTitle>
       </CardHeader>
-      <form onSubmit={onSubmit}>
-        <CardContent className="space-y-6">
-          {/* Supplier */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="supplierId">Supplier (optional)</Label>
-              <Select
-                id="supplierId"
-                name="supplierId"
-                value={supplierId}
-                onChange={(e) => handleSupplierChange(e.target.value)}
-              >
-                <option value="">Walk-in / unnamed</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                    {Number(s.outstandingBalance) > 0
-                      ? ` — ₹${Number(s.outstandingBalance).toFixed(2)} due`
-                      : ''}
-                  </option>
-                ))}
-              </Select>
+      <form method="post" onSubmit={onSubmit}>
+        <fieldset disabled={!ready || pending} className="min-w-0">
+          <CardContent className="space-y-6">
+            {/* Supplier */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="supplierId">Supplier (optional)</Label>
+                <Select
+                  id="supplierId"
+                  name="supplierId"
+                  value={supplierId}
+                  onChange={(e) => handleSupplierChange(e.target.value)}
+                >
+                  <option value="">Walk-in / unnamed</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                      {Number(s.outstandingBalance) > 0
+                        ? ` — ₹${Number(s.outstandingBalance).toFixed(2)} due`
+                        : ''}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="supplierName">Supplier name</Label>
+                <Input
+                  id="supplierName"
+                  name="supplierName"
+                  maxLength={120}
+                  required
+                  placeholder="Supplier name"
+                  value={supplierName}
+                  onChange={(e) => setSupplierName(e.target.value)}
+                />
+              </div>
             </div>
+
+            {/* Date & Payment */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="purchaseDate">Purchase date</Label>
+                <Input
+                  id="purchaseDate"
+                  name="purchaseDate"
+                  type="date"
+                  defaultValue={todayIso()}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="paymentMethod">Payment method</Label>
+                <Select id="paymentMethod" name="paymentMethod" defaultValue="cash">
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI</option>
+                  <option value="card">Card</option>
+                  <option value="credit">Credit</option>
+                  <option value="other">Other</option>
+                </Select>
+              </div>
+            </div>
+
+            {/* Line items */}
+            <div className="space-y-3">
+              <Label>Items</Label>
+              {lines.map((line) => {
+                const lineTotal =
+                  line.qty && line.unitPrice
+                    ? (Number.parseFloat(line.qty) * Number.parseFloat(line.unitPrice)).toFixed(2)
+                    : '—';
+                const selectedProduct = productById.get(line.productId);
+                return (
+                  <div key={line.id} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto_auto]">
+                    <Select
+                      required
+                      value={line.productId}
+                      onChange={(e) => updateLine(line.id, { productId: e.target.value })}
+                    >
+                      <option value="">Select product…</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </Select>
+                    <Input
+                      required
+                      type="text"
+                      inputMode="decimal"
+                      placeholder={`Qty${selectedProduct ? ` (${selectedProduct.unitSymbol})` : ''}`}
+                      value={line.qty}
+                      readOnly={!!line.packId}
+                      onChange={(e) => updateLine(line.id, { qty: e.target.value })}
+                    />
+                    <Input
+                      required
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Unit price"
+                      value={line.unitPrice}
+                      onChange={(e) => updateLine(line.id, { unitPrice: e.target.value })}
+                    />
+                    <span className="flex items-center text-sm text-muted-foreground min-w-[80px]">
+                      ₹{lineTotal}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeLine(line.id)}
+                      disabled={lines.length === 1}
+                    >
+                      ✕
+                    </Button>
+                    {selectedProduct && (
+                      <div className="min-w-0 sm:col-span-5">
+                        <PackQuantityFields
+                          id={`purchase-${line.id}`}
+                          productId={selectedProduct.id}
+                          unit={selectedProduct.unitSymbol}
+                          packs={packs}
+                          value={line}
+                          onChange={(patch) => updateLine(line.id, patch)}
+                        />
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Unit price is cost per {selectedProduct.unitSymbol}. Stock and returns use{' '}
+                          {selectedProduct.unitSymbol}.
+                        </p>
+                      </div>
+                    )}
+                    {selectedProduct?.serialTracking && (
+                      <div className="min-w-0 sm:col-span-5">
+                        <SerialNumbersField
+                          id={`purchase-serial-${line.id}`}
+                          value={line.serialText}
+                          onChange={(value) => updateLine(line.id, { serialText: value })}
+                        />
+                      </div>
+                    )}
+                    {selectedProduct?.batchTracking && (
+                      <fieldset className="grid min-w-0 gap-2 rounded-md border p-3 sm:col-span-5 sm:grid-cols-2">
+                        <legend className="text-xs px-1">
+                          Batch details · {selectedProduct.name}
+                        </legend>
+                        <div className="space-y-1">
+                          <Label htmlFor={`receipt-batch-${line.id}`}>Batch code</Label>
+                          <Input
+                            id={`receipt-batch-${line.id}`}
+                            required
+                            maxLength={80}
+                            value={line.batchCode}
+                            onChange={(e) => updateLine(line.id, { batchCode: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`receipt-expiry-${line.id}`}>Expiry date</Label>
+                          <Input
+                            id={`receipt-expiry-${line.id}`}
+                            type="date"
+                            required
+                            value={line.expiresOn}
+                            onChange={(e) => updateLine(line.id, { expiresOn: e.target.value })}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground sm:col-span-2">
+                          Use separate lines for different lots. Expired receipts are recorded but
+                          blocked at checkout.
+                        </p>
+                      </fieldset>
+                    )}
+                  </div>
+                );
+              })}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setLines((prev) => [...prev, newLine()])}
+              >
+                + Add item
+              </Button>
+            </div>
+
+            {/* Running total */}
+            <div className="flex justify-end text-lg font-semibold">
+              Total: ₹{runningTotal.toFixed(2)}
+            </div>
+
+            {/* Notes */}
             <div className="space-y-2">
-              <Label htmlFor="supplierName">Supplier name</Label>
-              <Input
-                id="supplierName"
-                name="supplierName"
-                maxLength={120}
-                required
-                placeholder="Supplier name"
-                value={supplierName}
-                onChange={(e) => setSupplierName(e.target.value)}
+              <Label htmlFor="notes">Notes (optional)</Label>
+              <Textarea
+                id="notes"
+                name="notes"
+                maxLength={500}
+                placeholder="Invoice reference, remarks…"
               />
             </div>
-          </div>
 
-          {/* Date & Payment */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="purchaseDate">Purchase date</Label>
-              <Input id="purchaseDate" name="purchaseDate" type="date" defaultValue={todayIso()} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="paymentMethod">Payment method</Label>
-              <Select id="paymentMethod" name="paymentMethod" defaultValue="cash">
-                <option value="cash">Cash</option>
-                <option value="upi">UPI</option>
-                <option value="card">Card</option>
-                <option value="credit">Credit</option>
-                <option value="other">Other</option>
-              </Select>
-            </div>
-          </div>
-
-          {/* Line items */}
-          <div className="space-y-3">
-            <Label>Items</Label>
-            {lines.map((line) => {
-              const lineTotal =
-                line.qty && line.unitPrice
-                  ? (Number.parseFloat(line.qty) * Number.parseFloat(line.unitPrice)).toFixed(2)
-                  : '—';
-              const selectedProduct = productById.get(line.productId);
-              return (
-                <div key={line.id} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto_auto]">
-                  <Select
-                    required
-                    value={line.productId}
-                    onChange={(e) => updateLine(line.id, { productId: e.target.value })}
-                  >
-                    <option value="">Select product…</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </Select>
-                  <Input
-                    required
-                    type="text"
-                    inputMode="decimal"
-                    placeholder={`Qty${selectedProduct ? ` (${selectedProduct.unitSymbol})` : ''}`}
-                    value={line.qty}
-                    onChange={(e) => updateLine(line.id, { qty: e.target.value })}
-                  />
-                  <Input
-                    required
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="Unit price"
-                    value={line.unitPrice}
-                    onChange={(e) => updateLine(line.id, { unitPrice: e.target.value })}
-                  />
-                  <span className="flex items-center text-sm text-muted-foreground min-w-[80px]">
-                    ₹{lineTotal}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeLine(line.id)}
-                    disabled={lines.length === 1}
-                  >
-                    ✕
-                  </Button>
-                  {selectedProduct?.serialTracking && (
-                    <div className="min-w-0 sm:col-span-5">
-                      <SerialNumbersField
-                        id={`purchase-serial-${line.id}`}
-                        value={line.serialText}
-                        onChange={(value) => updateLine(line.id, { serialText: value })}
-                      />
-                    </div>
-                  )}
-                  {selectedProduct?.batchTracking && (
-                    <fieldset className="grid min-w-0 gap-2 rounded-md border p-3 sm:col-span-5 sm:grid-cols-2">
-                      <legend className="text-xs px-1">
-                        Batch details · {selectedProduct.name}
-                      </legend>
-                      <div className="space-y-1">
-                        <Label htmlFor={`receipt-batch-${line.id}`}>Batch code</Label>
-                        <Input
-                          id={`receipt-batch-${line.id}`}
-                          required
-                          maxLength={80}
-                          value={line.batchCode}
-                          onChange={(e) => updateLine(line.id, { batchCode: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor={`receipt-expiry-${line.id}`}>Expiry date</Label>
-                        <Input
-                          id={`receipt-expiry-${line.id}`}
-                          type="date"
-                          required
-                          value={line.expiresOn}
-                          onChange={(e) => updateLine(line.id, { expiresOn: e.target.value })}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground sm:col-span-2">
-                        Use separate lines for different lots. Expired receipts are recorded but
-                        blocked at checkout.
-                      </p>
-                    </fieldset>
-                  )}
-                </div>
-              );
-            })}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setLines((prev) => [...prev, newLine()])}
-            >
-              + Add item
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? 'Creating…' : 'Create purchase bill'}
             </Button>
-          </div>
-
-          {/* Running total */}
-          <div className="flex justify-end text-lg font-semibold">
-            Total: ₹{runningTotal.toFixed(2)}
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optional)</Label>
-            <Textarea
-              id="notes"
-              name="notes"
-              maxLength={500}
-              placeholder="Invoice reference, remarks…"
-            />
-          </div>
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </CardContent>
-        <CardFooter>
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? 'Creating…' : 'Create purchase bill'}
-          </Button>
-        </CardFooter>
+          </CardFooter>
+        </fieldset>
       </form>
     </Card>
   );

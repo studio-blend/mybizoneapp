@@ -1,6 +1,7 @@
-import { index, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { check, index, jsonb, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { user } from './auth';
 import { businesses } from './businesses';
+import { type PackSnapshot, validPackSnapshot } from './product-packs';
 import { products } from './products';
 import { suppliers } from './suppliers';
 
@@ -58,6 +59,7 @@ export const purchaseItems = pgTable(
     qty: numeric('qty', { precision: 12, scale: 3 }).notNull(),
     unitSymbol: text('unit_symbol').notNull(),
     unitPrice: numeric('unit_price', { precision: 10, scale: 2 }).notNull(),
+    packSnapshot: jsonb('pack_snapshot').$type<PackSnapshot>(),
     hsnCode: text('hsn_code'),
     gstRate: numeric('gst_rate', { precision: 5, scale: 2 }),
     gstAmount: numeric('gst_amount', { precision: 10, scale: 2 }).notNull().default('0'),
@@ -65,6 +67,10 @@ export const purchaseItems = pgTable(
   },
   (t) => ({
     purchaseIdx: index('purchase_items_purchase_id_idx').on(t.purchaseId),
+    pack: check(
+      'purchase_items_pack_check',
+      validPackSnapshot(t.packSnapshot, t.qty, t.unitSymbol),
+    ),
     productIdx: index('purchase_items_product_id_idx').on(t.productId),
   }),
 );

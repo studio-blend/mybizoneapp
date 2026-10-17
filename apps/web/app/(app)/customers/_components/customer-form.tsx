@@ -16,11 +16,12 @@ import { Select } from '@mybizone/ui/select';
 import { Textarea } from '@mybizone/ui/textarea';
 import { useToast } from '@mybizone/ui/use-toast';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createCustomerAction, updateCustomerAction } from '../actions';
 
 interface Props {
   mode: 'create' | 'edit';
+  canConfigureCredit?: boolean;
   initial?: {
     id: string;
     name: string;
@@ -30,6 +31,7 @@ interface Props {
     address: string | null;
     rateCategory: string;
     creditLimit: string;
+    creditDays: number;
     outstandingBalance: string;
   };
 }
@@ -45,10 +47,12 @@ const RATE_CATEGORIES = [
   { value: 'rate4', label: 'Rate 4' },
 ] as const;
 
-export function CustomerForm({ mode, initial }: Props) {
+export function CustomerForm({ mode, initial, canConfigureCredit = false }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, setPending] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -65,6 +69,7 @@ export function CustomerForm({ mode, initial }: Props) {
       address: fd.get('address') as string,
       rateCategory: fd.get('rateCategory') as string,
       creditLimit: fd.get('creditLimit') as string,
+      creditDays: fd.get('creditDays') as string,
     };
 
     const result =
@@ -96,104 +101,138 @@ export function CustomerForm({ mode, initial }: Props) {
         <CardTitle>{title}</CardTitle>
         <CardDescription>Customer details for billing and credit management.</CardDescription>
       </CardHeader>
-      <form onSubmit={onSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              name="name"
-              required
-              maxLength={200}
-              defaultValue={initial?.name ?? ''}
-              placeholder="Customer name"
-            />
-          </div>
+      <form method="post" onSubmit={onSubmit}>
+        <fieldset disabled={!ready || pending} className="min-w-0">
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                name="name"
+                required
+                maxLength={200}
+                defaultValue={initial?.name ?? ''}
+                placeholder="Customer name"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone (optional)</Label>
-            <Input
-              id="phone"
-              name="phone"
-              maxLength={30}
-              defaultValue={initial?.phone ?? ''}
-              placeholder="+91 98765 43210"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone (optional)</Label>
+              <Input
+                id="phone"
+                name="phone"
+                maxLength={30}
+                defaultValue={initial?.phone ?? ''}
+                placeholder="+91 98765 43210"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email (optional)</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              maxLength={120}
-              defaultValue={initial?.email ?? ''}
-              placeholder="customer@example.com"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email (optional)</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                maxLength={120}
+                defaultValue={initial?.email ?? ''}
+                placeholder="customer@example.com"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="gstin">GSTIN (optional)</Label>
-            <Input
-              id="gstin"
-              name="gstin"
-              maxLength={20}
-              defaultValue={initial?.gstin ?? ''}
-              placeholder="22AAAAA0000A1Z5"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="gstin">GSTIN (optional)</Label>
+              <Input
+                id="gstin"
+                name="gstin"
+                maxLength={20}
+                defaultValue={initial?.gstin ?? ''}
+                placeholder="22AAAAA0000A1Z5"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="address">Address (optional)</Label>
-            <Textarea
-              id="address"
-              name="address"
-              maxLength={500}
-              defaultValue={initial?.address ?? ''}
-              placeholder="Street, city, state, pincode"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Address (optional)</Label>
+              <Textarea
+                id="address"
+                name="address"
+                maxLength={500}
+                defaultValue={initial?.address ?? ''}
+                placeholder="Street, city, state, pincode"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="rateCategory">Rate category</Label>
-            <Select
-              id="rateCategory"
-              name="rateCategory"
-              defaultValue={initial?.rateCategory ?? 'retail'}
-            >
-              {RATE_CATEGORIES.map((rc) => (
-                <option key={rc.value} value={rc.value}>
-                  {rc.label}
-                </option>
-              ))}
-            </Select>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="rateCategory">Rate category</Label>
+              <Select
+                id="rateCategory"
+                name="rateCategory"
+                defaultValue={initial?.rateCategory ?? 'retail'}
+              >
+                {RATE_CATEGORIES.map((rc) => (
+                  <option key={rc.value} value={rc.value}>
+                    {rc.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="creditLimit">Credit Limit ₹</Label>
-            <Input
-              id="creditLimit"
-              name="creditLimit"
-              inputMode="decimal"
-              pattern="^\d{1,10}(?:\.\d{1,2})?$"
-              defaultValue={initial?.creditLimit ?? '0'}
-              placeholder="0"
-            />
-            {mode === 'edit' && initial && (
+            <div className="space-y-2">
+              <Label htmlFor="creditLimit">Credit Limit ₹</Label>
+              <Input
+                id="creditLimit"
+                name="creditLimit"
+                readOnly={!canConfigureCredit}
+                inputMode="decimal"
+                pattern="^\d{1,10}(?:\.\d{1,2})?$"
+                defaultValue={initial?.creditLimit ?? '0'}
+                placeholder="0"
+              />
               <p className="text-xs text-muted-foreground">
-                Outstanding balance: ₹{initial.outstandingBalance}
+                0 means no configured ceiling. Positive limits apply to new unpaid sales and
+                deliveries, after order advances.
+              </p>
+              {mode === 'edit' && initial && (
+                <p className="text-xs text-muted-foreground">
+                  Outstanding balance: ₹{initial.outstandingBalance}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="creditDays">Credit days</Label>
+              <Input
+                id="creditDays"
+                name="creditDays"
+                readOnly={!canConfigureCredit}
+                type="number"
+                min="0"
+                max="365"
+                step="1"
+                required
+                defaultValue={initial?.creditDays ?? 0}
+              />
+              <p className="text-xs text-muted-foreground">
+                Days from billing or physical handover. 0 means due on that date. Existing orders
+                retain their agreed terms.
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Customer rate categories suggest product prices. Dealer uses Rate 1; an unset tier
+              falls back to retail.
+            </p>
+            {!canConfigureCredit && (
+              <p className="text-xs text-muted-foreground">
+                Credit limits and terms can be changed by a user with finance permission.
               </p>
             )}
-          </div>
-
-          <UpgradeAlert error={error} />
-        </CardContent>
-        <CardFooter>
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? 'Saving…' : submitLabel}
-          </Button>
-        </CardFooter>
+            <UpgradeAlert error={error} />
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? 'Saving…' : submitLabel}
+            </Button>
+          </CardFooter>
+        </fieldset>
       </form>
     </Card>
   );

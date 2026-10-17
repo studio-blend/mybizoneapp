@@ -68,12 +68,23 @@ Credentials and sessions stay in ignored private files.
 
 ## Product roadmap
 
+**Phase 3d approved rollout in progress — wholesale:** pack conversions,
+customer-tier pricing, credit days/limits and wholesale order fulfilment passed
+local acceptance: 162 focused automated tests, two native PDF checks, 136
+production-browser checks, TypeScript and the production build. Migration 0026
+passed on a temporary Neon branch with 25 checked existing tables preserved;
+the owner approved rollout and migration 0026 is applied/recorded, with its
+temporary branch removed. All 25 fresh pre/post-migration hashes match.
+Application publication and hosted acceptance follow; Phase 3c is the latest
+accepted application release until those checks finish.
+See [scope, verification and rollout status](WHOLESALE_PACKS_AND_CREDIT.md).
+
 The following capabilities are **not implemented by the latest hosted release**.
 Deliver each with its full data flow, permission checks and relevant acceptance
 before enabling it. Test new schema changes on a temporary branch and obtain the
 explicit migration approval required by the connected database tool.
 
-1. **Next — wholesale:** pack/unit conversions, credit terms and fulfilment. Keep the
+1. **Approved rollout in progress — wholesale:** pack/unit conversions, credit terms and fulfilment. Keep the
    existing retail/wholesale selling-model setting independent of these workflows.
 2. **Food service:** recipes, ingredient consumption, waste and kitchen tickets.
 3. **Accounting foundations:** invoice-level settlement allocation and cashbook/

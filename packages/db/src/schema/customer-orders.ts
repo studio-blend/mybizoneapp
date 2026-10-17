@@ -5,6 +5,8 @@ import {
   date,
   foreignKey,
   index,
+  integer,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -15,6 +17,7 @@ import {
 import { user } from './auth';
 import { businesses } from './businesses';
 import { customers } from './customers';
+import { type PackSnapshot, validPackSnapshot } from './product-packs';
 import { products } from './products';
 import { sales } from './sales';
 import { stores } from './stores';
@@ -36,6 +39,8 @@ export const customerOrders = pgTable(
     customerGstin: text('customer_gstin'),
     deliveryAddress: text('delivery_address').notNull(),
     promisedOn: date('promised_on').notNull(),
+    creditDays: integer('credit_days').notNull().default(0),
+    tradeType: text('trade_type').notNull().default('standard'),
     status: text('status').notNull().default('open'),
     billType: text('bill_type').notNull(),
     gstEnabled: boolean('gst_enabled').notNull(),
@@ -64,6 +69,11 @@ export const customerOrders = pgTable(
     due: index('customer_orders_store_due_idx').on(t.businessId, t.storeId, t.status, t.promisedOn),
     customerIdx: index('customer_orders_customer_idx').on(t.businessId, t.customerId),
     state: check('customer_orders_status_check', sql`${t.status} IN ('open','cancelled')`),
+    creditDays: check('customer_orders_credit_days_check', sql`${t.creditDays} BETWEEN 0 AND 365`),
+    tradeType: check(
+      'customer_orders_trade_type_check',
+      sql`${t.tradeType} IN ('standard','wholesale')`,
+    ),
     bill: check(
       'customer_orders_bill_type_check',
       sql`${t.billType} IN ('gst_bill','non_gst_bill')`,
@@ -90,6 +100,7 @@ export const customerOrderItems = pgTable(
     qty: numeric('qty', { precision: 12, scale: 3 }).notNull(),
     deliveredQty: numeric('delivered_qty', { precision: 12, scale: 3 }).notNull().default('0'),
     unitPrice: numeric('unit_price', { precision: 10, scale: 2 }).notNull(),
+    packSnapshot: jsonb('pack_snapshot').$type<PackSnapshot>(),
     hsnCode: text('hsn_code'),
     gstRate: numeric('gst_rate', { precision: 5, scale: 2 }),
     subtotal: numeric('subtotal', { precision: 12, scale: 2 }).notNull(),
@@ -117,6 +128,10 @@ export const customerOrderItems = pgTable(
       sql`${t.deliveredQty}>=0 AND ${t.deliveredQty}<=${t.qty}`,
     ),
     price: check('customer_order_items_unit_price_check', sql`${t.unitPrice}>=0`),
+    pack: check(
+      'customer_order_items_pack_check',
+      validPackSnapshot(t.packSnapshot, t.qty, t.unitSymbol),
+    ),
     subtotal: check('customer_order_items_subtotal_check', sql`${t.subtotal}>=0`),
     tax: check('customer_order_items_tax_total_check', sql`${t.taxTotal}>=0`),
     total: check(

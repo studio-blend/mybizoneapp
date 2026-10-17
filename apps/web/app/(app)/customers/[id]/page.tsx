@@ -119,6 +119,12 @@ export default async function CustomerDetailPage(props: { params: Promise<{ id: 
           </CardHeader>
           <CardContent>
             <p className="text-xl font-semibold">₹{Number(customer.creditLimit).toFixed(2)}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {customer.creditDays} credit days ·{' '}
+              {Number(customer.creditLimit) > 0
+                ? `₹${Math.max(0, Number(customer.creditLimit) - Number(customer.outstandingBalance)).toFixed(2)} available credit`
+                : 'No configured credit ceiling'}
+            </p>
           </CardContent>
         </Card>
         <Card>

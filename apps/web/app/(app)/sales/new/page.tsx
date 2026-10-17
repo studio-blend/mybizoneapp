@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { getUserRoles } from '@/lib/get-user-roles';
 import { requireUser } from '@/lib/session';
 import { sellableStockSql } from '@/lib/stock-batches';
+import { activePacks } from '@/lib/wholesale';
 import { businesses, customers, products, saleItems, sales, stores } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { hasPermission } from '@mybizone/domain';
@@ -41,6 +42,12 @@ export default async function NewSalePage() {
           unitType: products.unitType,
           unitSymbol: products.unitSymbol,
           price: products.price,
+          wholesalePrice: products.wholesalePrice,
+          mrp: products.mrp,
+          rate1: products.rate1,
+          rate2: products.rate2,
+          rate3: products.rate3,
+          rate4: products.rate4,
           gstRate: products.gstRate,
           inventory: sellableStockSql,
           serialTracking: products.serialTracking,
@@ -80,6 +87,9 @@ export default async function NewSalePage() {
           id: customers.id,
           name: customers.name,
           outstandingBalance: customers.outstandingBalance,
+          rateCategory: customers.rateCategory,
+          creditLimit: customers.creditLimit,
+          creditDays: customers.creditDays,
         })
         .from(customers)
         .where(
@@ -100,7 +110,20 @@ export default async function NewSalePage() {
       }
     }
 
+    const packs = await activePacks(
+      tx,
+      user.businessId,
+      ps.map((p) => p.id),
+    );
     return {
+      packs: packs.filter((p) =>
+        ps.some(
+          (product) =>
+            product.id === p.productId &&
+            product.unitType === p.unitType &&
+            product.unitSymbol === p.unitSymbol,
+        ),
+      ),
       stores: sts,
       products: ps,
       gstEnabled: biz?.gstEnabled ?? false,
@@ -137,6 +160,7 @@ export default async function NewSalePage() {
       gstEnabled={data.gstEnabled}
       recentProductIds={data.recentProductIds}
       customers={data.customers}
+      packs={data.packs}
     />
   );
 }

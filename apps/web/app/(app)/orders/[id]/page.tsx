@@ -3,6 +3,7 @@ import { getUserRoles } from '@/lib/get-user-roles';
 import { canCollectOrders, canManageOrders } from '@/lib/order-access';
 import { moneyCents, orderFulfilment } from '@/lib/order-policy';
 import { loadOrderDetail } from '@/lib/order-queries';
+import { packDescription } from '@/lib/pack-policy';
 import { requireUser } from '@/lib/session';
 import { hasPermission } from '@mybizone/domain';
 import Link from 'next/link';
@@ -85,6 +86,10 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
         <div>
           <p className="text-sm text-muted-foreground">Promised handover</p>
           <p className="mt-1 font-medium">{order.promisedOn}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {order.tradeType === 'wholesale' ? 'Wholesale' : 'Standard'} order · agreed credit:{' '}
+            {order.creditDays} days from each handover
+          </p>
           {pending && order.promisedOn < data.today && (
             <p className="mt-2 text-sm text-red-700">Past promised date</p>
           )}
@@ -103,8 +108,11 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
             <div>
               <h3 className="font-medium">{item.name}</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Agreed unit price {money(moneyCents(item.unitPrice))} · line total{' '}
+                Agreed price per {item.unit} {money(moneyCents(item.unitPrice))} · line total{' '}
                 {money(moneyCents(item.total))}
+                {item.packSnapshot && (
+                  <span className="mt-1 block">{packDescription(item.packSnapshot)}</span>
+                )}
               </p>
             </div>
             <div>

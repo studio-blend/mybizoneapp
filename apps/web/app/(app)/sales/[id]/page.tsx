@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { packDescription } from '@/lib/pack-policy';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import {
@@ -35,6 +36,7 @@ export default async function SaleDetailPage(props: { params: Promise<{ id: stri
         billType: sales.billType,
         gstEnabledAtSale: sales.gstEnabledAtSale,
         createdAt: sales.createdAt,
+        dueDate: sales.dueDate,
         customerName: sales.customerName,
         customerPhone: sales.customerPhone,
         customerGstin: sales.customerGstin,
@@ -58,6 +60,7 @@ export default async function SaleDetailPage(props: { params: Promise<{ id: stri
         qty: saleItems.qty,
         unitSymbol: saleItems.unitSymbol,
         unitPrice: saleItems.unitPrice,
+        packSnapshot: saleItems.packSnapshot,
         gstRate: saleItems.gstRate,
         gstAmount: saleItems.gstAmount,
         lineTotal: saleItems.lineTotal,
@@ -197,6 +200,7 @@ export default async function SaleDetailPage(props: { params: Promise<{ id: stri
           <Field label="Date" value={new Date(row.createdAt).toLocaleString('en-IN')} />
           <Field label="Store" value={row.storeName ?? '—'} />
           <Field label="Payment" value={row.paymentMethod} />
+          {row.dueDate && <Field label="Due date" value={row.dueDate} />}
           <Field label="Customer" value={row.customerName ?? '—'} />
           <Field label="Phone" value={row.customerPhone ?? '—'} />
           <Field label="Customer GSTIN" value={row.customerGstin ?? '—'} />
@@ -218,7 +222,14 @@ export default async function SaleDetailPage(props: { params: Promise<{ id: stri
             <TableBody>
               {items.map((i) => (
                 <TableRow key={i.id}>
-                  <TableCell>{i.productName}</TableCell>
+                  <TableCell>
+                    {i.productName}
+                    {i.packSnapshot && (
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {packDescription(i.packSnapshot)}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     {i.qty} {i.unitSymbol}
                   </TableCell>

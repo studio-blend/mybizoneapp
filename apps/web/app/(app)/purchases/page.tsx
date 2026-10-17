@@ -83,7 +83,11 @@ export default async function PurchasesPage() {
               ) : (
                 rows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-mono text-xs">{r.billNo}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <Link className="underline" href={`/purchases/${r.id}`}>
+                        {r.billNo}
+                      </Link>
+                    </TableCell>
                     <TableCell>{formatDate(r.purchaseDate)}</TableCell>
                     <TableCell className="text-muted-foreground">{r.supplierName || '—'}</TableCell>
                     <TableCell className="text-right">{r.total}</TableCell>

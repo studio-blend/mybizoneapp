@@ -46,7 +46,8 @@ export default async function NewPurchaseReturnPage() {
       <div>
         <h1 className="text-2xl font-semibold">New Purchase Return</h1>
         <p className="text-sm text-muted-foreground">
-          Record goods returned to a supplier and decrement inventory.
+          Record goods returned to a supplier and decrement inventory. Enter base stock units: for a
+          12-piece carton, return 12 pc. Original receipt quantities and prices apply.
         </p>
       </div>
 

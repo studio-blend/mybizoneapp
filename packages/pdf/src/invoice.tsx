@@ -86,6 +86,7 @@ export interface InvoiceData {
   invoice: {
     number: string;
     date: Date;
+    dueDate?: string | null;
     isInterstate: boolean;
   };
   customer: {
@@ -100,6 +101,7 @@ export interface InvoiceData {
     qty: string;
     unitSymbol: string;
     unitPrice: string;
+    packDescription?: string;
     gstRate: string | null;
     gstAmount: string;
     lineTotal: string;
@@ -131,7 +133,7 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
             <Text style={styles.invoiceLabel}>{docTitle}</Text>
             <Text style={styles.bizMeta}>Number: {data.invoice.number}</Text>
             <Text style={styles.bizMeta}>
-              Date: {data.invoice.date.toLocaleDateString('en-IN')}
+              Date: {data.invoice.date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
             </Text>
           </View>
         </View>
@@ -156,6 +158,9 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
           )}
         </View>
 
+        {data.invoice.dueDate && (
+          <Text style={styles.bizMeta}>Due date: {data.invoice.dueDate}</Text>
+        )}
         <View style={styles.table}>
           <View style={styles.tHeader}>
             <Text style={[styles.tCell, styles.cellSr]}>#</Text>
@@ -175,7 +180,10 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
             // biome-ignore lint/suspicious/noArrayIndexKey: react-pdf has no DOM diff; index is stable + rows are render-only.
             <View key={i} style={styles.tRow}>
               <Text style={[styles.tCell, styles.cellSr]}>{i + 1}</Text>
-              <Text style={[styles.tCell, styles.cellDesc]}>{l.productName}</Text>
+              <Text style={[styles.tCell, styles.cellDesc]}>
+                {l.productName}
+                {l.packDescription ? `\n${l.packDescription}` : ''}
+              </Text>
               {data.isGstInvoice && (
                 <Text style={[styles.tCell, styles.cellHsn]}>{l.hsnCode ?? '—'}</Text>
               )}

@@ -34,11 +34,14 @@ const CustomerInput = z.object({
   creditLimit: z
     .string()
     .regex(/^\d{1,10}(?:\.\d{1,2})?$/, 'Invalid credit limit')
-    .default('0'),
+    .optional(),
+  creditDays: z.coerce.number().int().min(0).max(365).optional(),
 });
 
 export const createCustomerAction = safeAction(CustomerInput, async (input, { user, tx }) => {
   await requirePermission(user, 'manage_customers');
+  if (Number(input.creditLimit ?? 0) > 0 || (input.creditDays ?? 0) > 0)
+    await requirePermission(user, 'manage_expenses');
   const [row] = await tx
     .insert(customers)
     .values({
@@ -49,7 +52,8 @@ export const createCustomerAction = safeAction(CustomerInput, async (input, { us
       gstin: input.gstin ?? null,
       address: input.address ?? null,
       rateCategory: input.rateCategory,
-      creditLimit: input.creditLimit,
+      creditLimit: input.creditLimit ?? '0',
+      creditDays: input.creditDays ?? 0,
     })
     .returning({ id: customers.id, name: customers.name });
   if (!row) throw new Error('insert failed');
@@ -60,7 +64,12 @@ export const createCustomerAction = safeAction(CustomerInput, async (input, { us
     action: 'customer.create',
     entity: 'customer',
     entityId: row.id,
-    after: { name: row.name },
+    after: {
+      name: row.name,
+      creditLimit: input.creditLimit ?? '0',
+      creditDays: input.creditDays ?? 0,
+      rateCategory: input.rateCategory,
+    },
   });
 
   revalidatePath('/customers');
@@ -80,10 +89,17 @@ export const updateCustomerAction = safeAction(UpdateCustomerInput, async (input
       address: customers.address,
       rateCategory: customers.rateCategory,
       creditLimit: customers.creditLimit,
+      creditDays: customers.creditDays,
     })
     .from(customers)
-    .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)));
+    .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)))
+    .for('update');
   if (!before) throw new Error('not found');
+  if (
+    (input.creditLimit !== undefined && Number(input.creditLimit) !== Number(before.creditLimit)) ||
+    (input.creditDays !== undefined && input.creditDays !== before.creditDays)
+  )
+    await requirePermission(user, 'manage_expenses');
 
   const [row] = await tx
     .update(customers)
@@ -95,6 +111,7 @@ export const updateCustomerAction = safeAction(UpdateCustomerInput, async (input
       address: input.address ?? null,
       rateCategory: input.rateCategory,
       creditLimit: input.creditLimit,
+      creditDays: input.creditDays,
       updatedAt: new Date(),
     })
     .where(and(eq(customers.id, input.id), eq(customers.businessId, user.businessId)))
@@ -108,7 +125,12 @@ export const updateCustomerAction = safeAction(UpdateCustomerInput, async (input
     entity: 'customer',
     entityId: row.id,
     before,
-    after: { name: row.name },
+    after: {
+      name: row.name,
+      creditLimit: input.creditLimit ?? before.creditLimit,
+      creditDays: input.creditDays ?? before.creditDays,
+      rateCategory: input.rateCategory,
+    },
   });
 
   revalidatePath('/customers');

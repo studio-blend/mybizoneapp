@@ -5,8 +5,11 @@ import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { type ActionResult, safeAction } from '@/lib/server-action';
 import { requireUser } from '@/lib/session';
+import { stockUnits, validExpiry } from '@/lib/stock-batch-policy';
 import { moveStockBatches } from '@/lib/stock-batches';
 import { uploadFile } from '@/lib/storage';
+import { packFields, resolvePack, withinCreditLimit } from '@/lib/wholesale';
+import { creditDueDate, customerPrice } from '@/lib/wholesale-policy';
 import {
   auditLogs,
   billSeries,
@@ -55,6 +58,8 @@ const PAYMENT_STATUSES = ['paid', 'partial', 'due', 'overdue'] as const;
 const optionalUuid = z.union([uuid, z.literal('')]).transform((v) => (v === '' ? null : v));
 
 const SaleLineInput = z.object({
+  ...packFields,
+  expectedUnitPrice: moneyText.optional(),
   productId: uuid,
   serialNumbers: z.array(z.string().max(100)).max(500).optional(),
   qty: qtyText,
@@ -87,6 +92,7 @@ const CreateSaleInput = z.object({
   dueDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD')
+    .refine(validExpiry, 'Enter a valid due date')
     .optional()
     .or(z.literal('').transform(() => undefined)),
   lines: z.array(SaleLineInput).min(1, 'add at least one product').max(500),
@@ -127,7 +133,14 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
       storeId: products.storeId,
       name: products.name,
       unitSymbol: products.unitSymbol,
+      unitType: products.unitType,
       price: products.price,
+      wholesalePrice: products.wholesalePrice,
+      mrp: products.mrp,
+      rate1: products.rate1,
+      rate2: products.rate2,
+      rate3: products.rate3,
+      rate4: products.rate4,
       costPrice: products.costPrice,
       hsnCode: products.hsnCode,
       gstRate: products.gstRate,
@@ -146,14 +159,37 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
     }
   }
 
+  let rateCategory = 'retail';
+  let creditDays = 0;
   if (input.customerId) {
     // Customer accounts and balances are shared across the business.
     await requirePermission(user, 'create_sale');
     const [customer] = await tx
-      .select({ id: customers.id })
+      .select({
+        id: customers.id,
+        rateCategory: customers.rateCategory,
+        creditDays: customers.creditDays,
+      })
       .from(customers)
       .where(and(eq(customers.id, input.customerId), eq(customers.businessId, user.businessId)));
     if (!customer) throw new Error('customer not found');
+    rateCategory = customer.rateCategory;
+    creditDays = customer.creditDays;
+  }
+  const normalizedLines = [];
+  for (const line of input.lines) {
+    const product = byId.get(line.productId);
+    if (!product) throw new Error('Product not found');
+    const converted = await resolvePack(tx, user.businessId, product, line);
+    if (product.unitType === 'piece' && stockUnits(converted.qty) % 1000)
+      throw new Error('Pieces require whole quantities');
+    const unitPrice = customerPrice(product, rateCategory);
+    if (
+      line.expectedUnitPrice !== undefined &&
+      Number(line.expectedUnitPrice) !== Number(unitPrice)
+    )
+      throw new Error('Customer price changed. Refresh checkout before billing.');
+    normalizedLines.push({ ...line, ...converted, unitPrice });
   }
   if (
     input.billType !== 'estimate' &&
@@ -178,12 +214,12 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
     gstEnabled: effectiveGstEnabled,
     isInterstate: input.isInterstate,
     discount: Number(input.discount),
-    lines: input.lines.map((l) => {
+    lines: normalizedLines.map((l) => {
       const p = byId.get(l.productId);
       if (!p) throw new Error('unreachable');
       return {
         qty: Number(l.qty),
-        unitPrice: Number(p.price),
+        unitPrice: Number(l.unitPrice),
         gstRate: p.gstRate ? Number(p.gstRate) : null,
         itemDiscount: Number(l.itemDiscount ?? '0'),
         isFreeItem: l.isFreeItem ?? false,
@@ -278,7 +314,8 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
       paymentDetails: input.paymentDetails ?? null,
       billType: input.billType,
       paymentStatus,
-      dueDate: input.dueDate ?? null,
+      dueDate:
+        input.dueDate ?? (input.paymentMethod === 'credit' ? creditDueDate(creditDays) : null),
       notes: input.notes,
     })
     .returning({ id: sales.id });
@@ -287,8 +324,8 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
   // Insert sale_items + decrement inventory atomically with floor check.
   // M8: estimates skip the decrement entirely.
   const skipInventory = input.billType === 'estimate';
-  for (let i = 0; i < input.lines.length; i++) {
-    const l = input.lines[i];
+  for (let i = 0; i < normalizedLines.length; i++) {
+    const l = normalizedLines[i];
     const calcLine = calc.lines[i];
     if (!l || !calcLine) throw new Error('calc/line mismatch');
     const p = byId.get(l.productId);
@@ -301,7 +338,8 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
       productName: p.name,
       qty: l.qty,
       unitSymbol: p.unitSymbol,
-      unitPrice: p.price,
+      unitPrice: l.unitPrice,
+      packSnapshot: l.packSnapshot,
       hsnCode: p.hsnCode,
       gstRate: p.gstRate,
       lineTotal: calcLine.lineTotal.toFixed(2),
@@ -321,12 +359,18 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
         and(
           eq(products.id, p.id),
           eq(products.businessId, user.businessId),
+          eq(products.unitType, p.unitType),
+          eq(products.unitSymbol, p.unitSymbol),
+          eq(products.storeId, p.storeId),
+          eq(products.active, true),
           gte(products.inventory, l.qty),
         ),
       )
       .returning({ id: products.id });
     if (decrement.length === 0) {
-      throw new Error(`insufficient stock for "${p.name}"`);
+      throw new Error(
+        `insufficient stock or changed product units/store for "${p.name}". Refresh checkout.`,
+      );
     }
     await moveStockBatches(tx, {
       businessId: user.businessId,
@@ -345,13 +389,24 @@ export const createSaleAction = safeAction(CreateSaleInput, async (input, { user
     (input.paymentMethod === 'credit' || input.paymentMethod === 'finance_emi') &&
     !!input.customerId;
   if (updatesOutstanding && input.customerId) {
-    await tx
+    const [credited] = await tx
       .update(customers)
       .set({
         outstandingBalance: sql`${customers.outstandingBalance} + ${round2(calc.total - downPaymentRaw).toFixed(2)}::numeric`,
         updatedAt: new Date(),
       })
-      .where(and(eq(customers.id, input.customerId), eq(customers.businessId, user.businessId)));
+      .where(
+        and(
+          eq(customers.id, input.customerId),
+          eq(customers.businessId, user.businessId),
+          withinCreditLimit(Math.round((calc.total - downPaymentRaw) * 100)),
+        ),
+      )
+      .returning({ id: customers.id });
+    if (!credited)
+      throw new Error(
+        'Customer credit limit exceeded. Record a payment or reduce the unpaid sale.',
+      );
   }
 
   // M8: finance_emi generates an emi_schedules row + N emi_payments (one per instalment).

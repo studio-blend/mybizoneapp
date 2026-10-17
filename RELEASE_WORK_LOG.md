@@ -833,3 +833,79 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   records acceptance without changing tested application code. Wholesale
   packs/units/credit/fulfilment is the next product phase; commercial launch gates
   remain separate and open.
+
+## 17 October 2026 — feature Phase 3d: wholesale candidate
+
+- Continued the owner-approved phased business workflow plan with optional product
+  pack conversions, customer-tier prices, credit terms/ceilings and wholesale
+  fulfilment through the existing order ledger. The accepted hosted application
+  remains Phase 3c; migration 0026 and publication require their own explicit approval.
+- Products retain one stock unit. Whole packs plus loose quantities use integer
+  thousandths; purchase, POS and order lines retain immutable conversion snapshots.
+  Archiving/replacing a pack affects future selection only. Bills, purchase receipts
+  and native PDFs show original pack notes alongside authoritative base quantities
+  and per-base-unit prices. Returns and stock/batch/serial/warranty operations use
+  base units. Independently stocked sealed containers, arbitrary pack prices,
+  quantity-break bands and new supplier credit-day terms are outside this phase.
+- Registered POS customers now use their configured retail, wholesale, MRP or
+  Rate 1–4 tier (Dealer uses Rate 1). Missing tiers fall back to retail; explicit
+  zero remains valid. The server checks the displayed price before billing.
+  Wholesale bookings suggest wholesale for retail-category customers and retain
+  explicit customer tiers and editable agreed base-unit prices.
+- Customer credit days default to zero; orders freeze them at booking and start
+  each bill's due period on physical handover in India time. Positive credit
+  ceilings constrain new unpaid POS/EMI principal and net unpaid deliveries after
+  held advances. Zero retains the existing no-configured-ceiling meaning. Existing
+  debt, paid sales, collections, returns and fully advanced handovers are preserved.
+  Concurrent customer balance updates enforce ceilings atomically; failed handovers
+  roll back stock, bills, progress and allocations. Updating customer credit terms
+  requires both business-wide customer and finance permission; contact-only updates
+  preserve omitted terms under a customer row lock.
+- Stock writes atomically recheck product activity, store and units. Customer and
+  supplier returns reject recorded/current unit mismatches for reconciliation.
+  The wholesale queue uses native filters and the existing partial/late order flow;
+  booking still leaves stock, revenue and customer debt unchanged.
+- All **162 focused automated tests across 15 suites** passed, zero failed/skipped,
+  including 25 new policy/integration checks and the existing order, batch, serial,
+  transaction, dashboard, profile, analysis and security regressions. Both native
+  GST/non-GST PDF rendering checks passed with pack notes and due dates. Scoped
+  Biome checks passed with six non-null assertion warnings in customer/return code. All **28 new
+  development-browser checks** passed: 17 complete workflow/permissions and 11
+  read-only register/legacy receipt/phone checks, with zero read-only transport
+  retries. Shared pack-field updates were corrected to avoid accidentally resetting
+  a purchase line's selected product/pack. Phone layouts were inspected at 360px.
+- Migration 0026 passed on Neon temporary branch `br-noisy-shape-aopw6g4c`, parent
+  `br-odd-tree-aomevkex`, migration `f3ec5133-756d-4da1-bbaf-5fcac3ec6b88`.
+  All 25 checked existing-table counts/hashes match parent and copy, excluding only
+  new default/null fields. Product packs remain empty; old customer/order defaults,
+  FORCE RLS, tenant/product ownership, immutable conversion grants and frozen order
+  terms passed. Pending context is ignored
+  `.local/test-accounts/pending-wholesale-migration.json`. **Hosted migration,
+  temporary-branch removal and publication remain unapplied/unapproved.**
+- Evidence: `.cache/wholesale-regression-final2.log`, `.cache/wholesale-pdf-build.log`,
+  `.cache/wholesale-pdf-tests.log`, `.cache/wholesale-lint.log`,
+  `.cache/wholesale-script-lint.log`, `.cache/wholesale-browser-preflight5.log`,
+  `.cache/wholesale-register-preflight.log`, `.cache/wholesale-migration-validation.json`
+  and phone screenshots. The isolated production build (including TypeScript)
+  passed, exit 0. All **136 production-browser checks** passed: 17 wholesale workflow,
+  11 wholesale/register, 19 order workflow, 10 order/register, 12 batch workflow,
+  16 serial workflow, 10 serial/register, 21 dashboard workspace and 20 operating
+  analysis. All nine runners exited 0; all five read-only transport counters were
+  zero. Production phone layouts were inspected at 360px. Final evidence:
+  `.cache/wholesale-build.log`, `.cache/wholesale-production-acceptance.json` and
+  nine `.cache/wholesale-production-*.log` runner logs. Generated Next configuration
+  was restored. The accepted 51-file candidate is saved in the local feature commit
+  and awaits explicit hosted migration/publication approval; unrelated work remains
+  outside the scope.
+  Feature specification: `docs/WHOLESALE_PACKS_AND_CREDIT.md`;
+  current project status and next phases: `docs/PROJECT_STATUS.md`.
+- The owner explicitly approved "Apply migration and publish Phase 3d". Applied
+  prepared migration `f3ec5133-756d-4da1-bbaf-5fcac3ec6b88` to
+  `br-odd-tree-aomevkex` and recorded only `0026_wholesale_packs_credit.sql`.
+  The completion tool removed temporary branch `br-noisy-shape-aopw6g4c`.
+  All 25 fresh pre-migration counts/hashes match after application. Hosted FORCE
+  RLS, narrow immutable-conversion grants and frozen order credit terms passed;
+  product packs remain empty and old customer/order terms retain their defaults.
+  Unrelated subscription migration 0020 remains pending. Accepted application
+  commit `ae0fc9469f866cde8ed58f651179383695297e44` is unchanged apart from rollout
+  documentation. Publication and hosted acceptance follow.

@@ -164,11 +164,16 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
         and(
           eq(products.id, line.productId),
           eq(products.businessId, user.businessId),
+          eq(products.unitSymbol, source.unitSymbol),
+          source.packSnapshot ? eq(products.unitType, source.packSnapshot.unitType) : undefined,
           gte(products.inventory, line.qty),
         ),
       )
       .returning({ id: products.id });
-    if (!changed.length) throw new Error('insufficient stock to return to supplier');
+    if (!changed.length)
+      throw new Error(
+        'insufficient stock or changed stock units; reconcile the original purchase before returning to the supplier',
+      );
     await moveStockBatches(tx, {
       businessId: user.businessId,
       productId: line.productId,

@@ -44,7 +44,8 @@ export default async function NewReturnPage() {
       <div>
         <h1 className="text-2xl font-semibold">New Return</h1>
         <p className="text-sm text-muted-foreground">
-          Record a sales return and restock inventory.
+          Record a sales return and restock inventory. Enter base stock units: for a 12-piece
+          carton, return 12 pc. Original bill quantities and prices apply.
         </p>
       </div>
 

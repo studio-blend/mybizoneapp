@@ -1,4 +1,7 @@
 'use client';
+import { PackQuantityFields, type PackSelection } from '@/components/pack-quantity-fields';
+import type { PackOption } from '@/lib/pack-policy';
+import { type PriceTiers, customerPrice } from '@/lib/wholesale-policy';
 import { calculateSaleTotals } from '@mybizone/domain/sale';
 import { Button } from '@mybizone/ui/button';
 import { Input } from '@mybizone/ui/input';
@@ -7,7 +10,7 @@ import { Select } from '@mybizone/ui/select';
 import { Textarea } from '@mybizone/ui/textarea';
 import { useEffect, useState } from 'react';
 import { createOrderAction } from '../actions';
-type Product = {
+type Product = PriceTiers & {
   id: string;
   name: string;
   storeId: string;
@@ -16,27 +19,56 @@ type Product = {
   price: string;
   gstRate: string | null;
 };
-type Line = { key: string; productId: string; qty: string; unitPrice: string };
+type Line = PackSelection & { key: string; productId: string; qty: string; unitPrice: string };
 export function OrderForm({
   stores,
   customers,
   products,
   gstEnabled,
+  packs,
+  initialTrade = 'standard',
 }: {
   stores: { id: string; name: string }[];
-  customers: { id: string; name: string; address: string | null }[];
+  customers: {
+    id: string;
+    name: string;
+    address: string | null;
+    rateCategory: string;
+    creditDays: number;
+    creditLimit: string;
+    outstandingBalance: string;
+  }[];
   products: Product[];
   gstEnabled: boolean;
+  packs: PackOption[];
+  initialTrade?: 'standard' | 'wholesale';
 }) {
   const [id] = useState(() => crypto.randomUUID());
   const [storeId, setStoreId] = useState(stores[0]?.id ?? '');
   const [customerId, setCustomerId] = useState('');
+  const [tradeType, setTradeType] = useState(initialTrade);
   const [address, setAddress] = useState('');
   const [billType, setBillType] = useState(gstEnabled ? 'gst_bill' : 'non_gst_bill');
   const [interstate, setInterstate] = useState(false);
-  const fresh = (): Line => ({ key: crypto.randomUUID(), productId: '', qty: '1', unitPrice: '' });
+  const fresh = (): Line => ({
+    key: crypto.randomUUID(),
+    productId: '',
+    qty: '1',
+    unitPrice: '',
+    packId: '',
+    packCount: '1',
+    looseQty: '0',
+  });
   const [lines, setLines] = useState<Line[]>([
-    { key: 'initial-item', productId: '', qty: '1', unitPrice: '' },
+    {
+      key: 'initial-item',
+      productId: '',
+      qty: '1',
+      unitPrice: '',
+      packId: '',
+      packCount: '1',
+      looseQty: '0',
+    },
   ]);
   const [pending, setPending] = useState(false);
   const [ready, setReady] = useState(false);
@@ -44,6 +76,21 @@ export function OrderForm({
   const [error, setError] = useState('');
   const edit = (key: string, patch: Partial<Line>) =>
     setLines((old) => old.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  function suggested(product: Product, id = customerId, trade = tradeType) {
+    const category = customers.find((c) => c.id === id)?.rateCategory ?? 'retail';
+    return customerPrice(
+      product,
+      trade === 'wholesale' && category === 'retail' ? 'wholesale' : category,
+    );
+  }
+  function reprice(id: string, trade: 'standard' | 'wholesale') {
+    setLines((old) =>
+      old.map((l) => {
+        const p = products.find((p) => p.id === l.productId);
+        return p ? { ...l, unitPrice: suggested(p, id, trade) } : l;
+      }),
+    );
+  }
   let total: string | null = null;
   try {
     if (lines.every((l) => l.productId && l.qty.trim() && l.unitPrice.trim())) {
@@ -78,9 +125,17 @@ export function OrderForm({
             deliveryAddress: address,
             promisedOn: fd.get('promisedOn'),
             billType,
+            tradeType,
             isInterstate: interstate,
             notes: fd.get('notes'),
-            items: lines.map(({ productId, qty, unitPrice }) => ({ productId, qty, unitPrice })),
+            items: lines.map(({ productId, qty, unitPrice, packId, packCount, looseQty }) => ({
+              productId,
+              qty,
+              unitPrice,
+              packId,
+              packCount: packId ? packCount : undefined,
+              looseQty: packId ? looseQty : undefined,
+            })),
           });
           if (!result.ok) {
             setError(result.error);
@@ -124,6 +179,7 @@ export function OrderForm({
               value={customerId}
               onChange={(e) => {
                 setCustomerId(e.target.value);
+                reprice(e.target.value, tradeType);
                 setAddress(customers.find((c) => c.id === e.target.value)?.address ?? '');
               }}
             >
@@ -133,6 +189,21 @@ export function OrderForm({
                   {c.name}
                 </option>
               ))}
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="order-trade">Order type</Label>
+            <Select
+              id="order-trade"
+              value={tradeType}
+              onChange={(e) => {
+                const trade = e.target.value as 'standard' | 'wholesale';
+                setTradeType(trade);
+                reprice(customerId, trade);
+              }}
+            >
+              <option value="standard">Standard</option>
+              <option value="wholesale">Wholesale</option>
             </Select>
           </div>
           <Label className="block space-y-2">
@@ -160,6 +231,13 @@ export function OrderForm({
             />
           </Label>
         </div>
+        {customers.find((c) => c.id === customerId) && (
+          <p className="text-sm text-muted-foreground">
+            Credit terms agreed at booking: {customers.find((c) => c.id === customerId)?.creditDays}{' '}
+            days from each handover. Unpaid deliveries must fit the customer's current credit limit
+            after advances.
+          </p>
+        )}
         {billType === 'gst_bill' && (
           <label className="flex gap-2 text-sm">
             <input
@@ -188,7 +266,14 @@ export function OrderForm({
                     value={line.productId}
                     onChange={(e) => {
                       const p = products.find((p) => p.id === e.target.value);
-                      edit(line.key, { productId: e.target.value, unitPrice: p?.price ?? '' });
+                      edit(line.key, {
+                        productId: e.target.value,
+                        unitPrice: p ? suggested(p) : '',
+                        qty: '1',
+                        packId: '',
+                        packCount: '1',
+                        looseQty: '0',
+                      });
                     }}
                   >
                     <option value="">Choose product</option>
@@ -201,6 +286,18 @@ export function OrderForm({
                       ))}
                   </Select>
                 </div>
+                {product && (
+                  <div className="sm:col-span-2">
+                    <PackQuantityFields
+                      id={`order-pack-${line.key}`}
+                      productId={product.id}
+                      unit={product.unitSymbol}
+                      packs={packs}
+                      value={line}
+                      onChange={(patch) => edit(line.key, patch)}
+                    />
+                  </div>
+                )}
                 <Label className="block space-y-2">
                   Quantity{product ? ` (${product.unitSymbol})` : ''}
                   <Input
@@ -209,6 +306,7 @@ export function OrderForm({
                     min={product?.unitType === 'piece' ? 1 : 0.001}
                     step={product?.unitType === 'piece' ? 1 : 0.001}
                     value={line.qty}
+                    readOnly={!!line.packId}
                     onChange={(e) => edit(line.key, { qty: e.target.value })}
                   />
                 </Label>
@@ -224,6 +322,13 @@ export function OrderForm({
                     onChange={(e) => edit(line.key, { unitPrice: e.target.value })}
                   />
                 </Label>
+                {product && (
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    Agreed price is per {product.unitSymbol}, before GST. Suggestions use the
+                    customer's rate category; wholesale orders use wholesale prices for
+                    retail-category customers.
+                  </p>
+                )}
                 {lines.length > 1 && (
                   <Button
                     type="button"

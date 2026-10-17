@@ -5,6 +5,7 @@ export * from './audit-logs';
 export * from './categories';
 export * from './brands';
 export * from './products';
+export * from './product-packs';
 export * from './stock-batches';
 export * from './stock-serials';
 export * from './sales';

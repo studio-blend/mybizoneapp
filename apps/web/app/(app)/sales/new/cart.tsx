@@ -1,7 +1,10 @@
 'use client';
 
+import { PackQuantityFields, type PackSelection } from '@/components/pack-quantity-fields';
 import { SerialNumbersField } from '@/components/serial-numbers-field';
+import { type PackOption, convertPack } from '@/lib/pack-policy';
 import { parseSerialText } from '@/lib/serial-policy';
+import { type PriceTiers, creditDueDate, customerPrice } from '@/lib/wholesale-policy';
 
 import { allowsFractionalQty, isUnitType } from '@mybizone/domain/catalog';
 import { calculateSaleTotals } from '@mybizone/domain/sale';
@@ -17,7 +20,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createSaleAction, uploadSaleBillImageAction } from '../actions';
 
-interface ProductOption {
+interface ProductOption extends PriceTiers {
   id: string;
   storeId: string;
   name: string;
@@ -41,9 +44,12 @@ interface CustomerOption {
   id: string;
   name: string;
   outstandingBalance: string;
+  rateCategory: string;
+  creditLimit: string;
+  creditDays: number;
 }
 
-interface CartLine {
+interface CartLine extends PackSelection {
   productId: string;
   qty: string;
   itemDiscount: string;
@@ -68,6 +74,7 @@ interface Props {
   gstEnabled: boolean;
   recentProductIds: string[];
   customers: CustomerOption[];
+  packs: PackOption[];
 }
 
 function todayPlusDays(days: number): string {
@@ -76,7 +83,14 @@ function todayPlusDays(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function PosCart({ stores, products, gstEnabled, recentProductIds, customers }: Props) {
+export function PosCart({
+  stores,
+  products,
+  gstEnabled,
+  recentProductIds,
+  customers,
+  packs,
+}: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [storeId, setStoreId] = useState(stores[0]?.id ?? '');
@@ -112,7 +126,11 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
 
   // Effective GST mode: false for non_gst_bill regardless of business setting.
   const effectiveGstEnabled = gstEnabled && billType !== 'non_gst_bill';
-  const showDueDate = billType === 'estimate' || paymentMethod === 'finance_emi';
+  const showDueDate =
+    billType === 'estimate' || paymentMethod === 'finance_emi' || paymentMethod === 'credit';
+  const selectedCustomer = customers.find((c) => c.id === customerId);
+  const priceFor = (p: ProductOption) =>
+    customerPrice(p, selectedCustomer?.rateCategory ?? 'retail');
 
   const productsByStore = useMemo(
     () => products.filter((p) => p.storeId === storeId),
@@ -155,7 +173,12 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
           if (!p) throw new Error('product missing');
           return {
             qty: Number(l.qty) || 0,
-            unitPrice: Number(p.price),
+            unitPrice: Number(
+              customerPrice(
+                p,
+                customers.find((c) => c.id === customerId)?.rateCategory ?? 'retail',
+              ),
+            ),
             gstRate: p.gstRate ? Number(p.gstRate) : null,
             itemDiscount: Number(l.itemDiscount) || 0,
             isFreeItem: l.isFreeItem,
@@ -165,12 +188,18 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
     } catch {
       return null;
     }
-  }, [lines, discount, effectiveGstEnabled, isInterstate, productById]);
+  }, [lines, discount, effectiveGstEnabled, isInterstate, productById, customers, customerId]);
 
   function addLine(productId: string) {
     setLines((prev) => {
       const existing = prev.find((l) => l.productId === productId);
       if (existing) {
+        const pack = packs.find((p) => p.id === existing.packId);
+        if (pack) {
+          const packCount = String(Number(existing.packCount) + 1);
+          const converted = convertPack(pack, packCount, existing.looseQty);
+          return prev.map((l) => (l === existing ? { ...l, packCount, qty: converted.qty } : l));
+        }
         return prev.map((l) =>
           l.productId === productId ? { ...l, qty: bumpQty(l.qty, productId) } : l,
         );
@@ -183,6 +212,9 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
           itemDiscount: '0',
           isFreeItem: false,
           serialText: '',
+          packId: '',
+          packCount: '1',
+          looseQty: '0',
         },
       ];
     });
@@ -307,6 +339,12 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
         itemDiscount: l.itemDiscount || '0',
         isFreeItem: l.isFreeItem,
         serialNumbers: parseSerialText(l.serialText),
+        packId: l.packId,
+        packCount: l.packId ? l.packCount : undefined,
+        looseQty: l.packId ? l.looseQty : undefined,
+        expectedUnitPrice: productById.get(l.productId)
+          ? priceFor(productById.get(l.productId) as ProductOption)
+          : undefined,
       })),
     });
     setPending(false);
@@ -430,7 +468,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
                             )}
                           </span>
                           <span className="text-muted-foreground">
-                            ₹{p.price} / {p.unitSymbol} · stock {p.inventory}
+                            ₹{priceFor(p)} / {p.unitSymbol} · stock {p.inventory}
                           </span>
                         </button>
                       </li>
@@ -464,7 +502,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
                   lines.map((l) => {
                     const p = productById.get(l.productId);
                     if (!p) return null;
-                    const rawSubtotal = Number(p.price) * (Number(l.qty) || 0);
+                    const rawSubtotal = Number(priceFor(p)) * (Number(l.qty) || 0);
                     const itemDisc = Number(l.itemDiscount) || 0;
                     const net = l.isFreeItem ? 0 : Math.max(rawSubtotal - itemDisc, 0);
                     return (
@@ -478,6 +516,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
                         <TableCell className="text-right">
                           <Input
                             value={l.qty}
+                            readOnly={!!l.packId}
                             onChange={(e) => setQty(l.productId, e.target.value)}
                             inputMode="decimal"
                             className="w-20 text-right"
@@ -487,7 +526,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
                           <span
                             className={l.isFreeItem ? 'text-muted-foreground line-through' : ''}
                           >
-                            {p.price}
+                            {priceFor(p)}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
@@ -524,6 +563,29 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
                 )}
               </TableBody>
             </Table>
+            {lines.map((line) => {
+              const product = productById.get(line.productId);
+              return product && packs.some((p) => p.productId === product.id) ? (
+                <fieldset
+                  key={`pack-${product.id}`}
+                  className="min-w-0 space-y-2 rounded-lg border p-3"
+                >
+                  <legend className="px-1 text-sm font-medium">{product.name} · pack entry</legend>
+                  <PackQuantityFields
+                    id={`pos-${product.id}`}
+                    productId={product.id}
+                    unit={product.unitSymbol}
+                    packs={packs}
+                    value={line}
+                    onChange={(patch) =>
+                      setLines((old) =>
+                        old.map((l) => (l.productId === line.productId ? { ...l, ...patch } : l)),
+                      )
+                    }
+                  />
+                </fieldset>
+              ) : null;
+            })}
             {lines.map((line) => {
               const product = productById.get(line.productId);
               if (!product?.serialTracking) return null;
@@ -655,7 +717,7 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
               onChange={(e) => {
                 const v = e.target.value as PaymentType;
                 setPaymentMethod(v);
-                if (v !== 'credit' && v !== 'finance_emi') setCustomerId('');
+                if (v === 'credit') setDueDate(creditDueDate(selectedCustomer?.creditDays ?? 0));
               }}
             >
               <option value="cash">Cash</option>
@@ -786,7 +848,9 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
             </div>
           )}
 
-          {(paymentMethod === 'credit' || paymentMethod === 'finance_emi') && (
+          {(customers.length > 0 ||
+            paymentMethod === 'credit' ||
+            paymentMethod === 'finance_emi') && (
             <div className="space-y-2">
               <Label htmlFor="creditCustomer">
                 Customer {paymentMethod === 'credit' ? '(required for credit)' : '(optional)'}
@@ -794,7 +858,13 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
               <Select
                 id="creditCustomer"
                 value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
+                onChange={(e) => {
+                  setCustomerId(e.target.value);
+                  const customer = customers.find((c) => c.id === e.target.value);
+                  if (customer) setCustomerName(customer.name);
+                  if (paymentMethod === 'credit')
+                    setDueDate(creditDueDate(customer?.creditDays ?? 0));
+                }}
                 required={paymentMethod === 'credit'}
               >
                 <option value="">Select customer…</option>
@@ -805,6 +875,16 @@ export function PosCart({ stores, products, gstEnabled, recentProductIds, custom
                   </option>
                 ))}
               </Select>
+              {selectedCustomer && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedCustomer.rateCategory} rates per stock unit ·{' '}
+                  {selectedCustomer.creditDays} credit days ·{' '}
+                  {Number(selectedCustomer.creditLimit) > 0
+                    ? `₹${Math.max(0, Number(selectedCustomer.creditLimit) - Number(selectedCustomer.outstandingBalance)).toFixed(2)} available credit`
+                    : 'No configured credit ceiling'}
+                  . Server checks unpaid credit when saved.
+                </p>
+              )}
             </div>
           )}
 

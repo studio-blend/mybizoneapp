@@ -23,8 +23,13 @@
    browser checks passed on 17 October 2026.
    Phase 3c [orders, advances and deliveries](CUSTOMER_ORDERS_AND_ADVANCES.md)
    is published with migration 0025 approved/applied and all 92 hosted browser
-   checks passed. Wholesale and restaurant capabilities remain
-   subsequent deliveries.
+   checks passed. Phase 3d [wholesale packs/credit/fulfilment](WHOLESALE_PACKS_AND_CREDIT.md)
+   passed local acceptance with 162 automated, two PDF and 136 production-browser
+   checks, plus build/types. Migration 0026 passed on a temporary branch with 25
+   checked existing tables preserved. The owner approved rollout; migration 0026
+   is applied/recorded and its temporary branch removed. Publication/hosted
+   acceptance are in progress. Restaurant
+   capabilities remain a subsequent delivery.
 
 ## Phase 1 behaviour
 

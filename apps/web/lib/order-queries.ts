@@ -23,6 +23,7 @@ export interface OrderSummaryRow extends Record<string, unknown> {
   customer: string;
   promisedOn: string;
   status: string;
+  tradeType: string;
   total: string;
   qty: number;
   delivered: number;
@@ -32,7 +33,7 @@ export interface OrderSummaryRow extends Record<string, unknown> {
   applied: string;
 }
 export function orderSummariesSql(businessId: string, predicate: SQL = sql`TRUE`) {
-  return sql`SELECT o.id,o.order_no AS "orderNo",o.store_id AS "storeId",st.name AS store,o.customer_name AS customer,o.promised_on::text AS "promisedOn",o.status,o.total::text,
+  return sql`SELECT o.id,o.order_no AS "orderNo",o.store_id AS "storeId",st.name AS store,o.customer_name AS customer,o.promised_on::text AS "promisedOn",o.status,o.trade_type AS "tradeType",o.total::text,
  (SELECT sum(i.qty)::float8 FROM customer_order_items i WHERE i.order_id=o.id AND i.business_id=o.business_id) AS qty,
  (SELECT sum(i.delivered_qty)::float8 FROM customer_order_items i WHERE i.order_id=o.id AND i.business_id=o.business_id) AS delivered,
  COALESCE((SELECT sum(CASE p.kind WHEN 'receipt' THEN p.amount ELSE -p.amount END) FROM customer_order_payments p WHERE p.order_id=o.id AND p.business_id=o.business_id),0)::text AS received,
@@ -59,7 +60,7 @@ export async function loadOrderList(
   db: Database,
   businessId: string,
   roles: DashboardGrant[],
-  query: { storeId?: string; q?: string; view?: string; page?: string },
+  query: { storeId?: string; q?: string; view?: string; page?: string; trade?: string },
 ) {
   return withTenant(db, businessId, async (tx) => {
     const all = await tx
@@ -82,7 +83,9 @@ export async function loadOrderList(
       ? query.view
       : '';
     const q = query.q?.trim().slice(0, 100) ?? '';
-    const predicate = sql`${scope} ${q ? sql`AND (o.order_no ILIKE ${`%${q}%`} OR o.customer_name ILIKE ${`%${q}%`})` : sql``}
+    const trade = ['standard', 'wholesale'].includes(query.trade ?? '') ? query.trade : '';
+    const selectedScope = sql`${scope} ${trade ? sql`AND o.trade_type=${trade}` : sql``}`;
+    const predicate = sql`${selectedScope} ${q ? sql`AND (o.order_no ILIKE ${`%${q}%`} OR o.customer_name ILIKE ${`%${q}%`})` : sql``}
    ${view === 'pending' ? sql`AND o.status='open' AND ${pending}` : view === 'late' ? sql`AND o.status='open' AND o.promised_on<${today}::date AND ${pending}` : view === 'delivered' ? sql`AND o.status='open' AND NOT ${pending}` : view === 'cancelled' ? sql`AND o.status='cancelled'` : sql``}`;
     const page = /^[1-9]\d{0,3}$/.test(query.page ?? '') ? Number(query.page) : 1;
     const rows = Array.from(
@@ -94,7 +97,7 @@ export async function loadOrderList(
       sql`SELECT count(*)::int AS total FROM customer_orders o WHERE o.business_id=${businessId}::uuid AND ${predicate}`,
     );
     const [totals] = await tx.execute<{ orders: number; late: number; held: string; due: string }>(
-      sql`WITH v AS (${orderSummariesSql(businessId, scope)}) SELECT count(*) FILTER(WHERE status='open' AND delivered<qty)::int AS orders,count(*) FILTER(WHERE status='open' AND delivered<qty AND "promisedOn"<${today})::int AS late,COALESCE(sum(received::numeric-applied::numeric),0)::text AS held,COALESCE(sum(invoiced::numeric-returned::numeric-applied::numeric),0)::text AS due FROM v`,
+      sql`WITH v AS (${orderSummariesSql(businessId, selectedScope)}) SELECT count(*) FILTER(WHERE status='open' AND delivered<qty)::int AS orders,count(*) FILTER(WHERE status='open' AND delivered<qty AND "promisedOn"<${today})::int AS late,COALESCE(sum(received::numeric-applied::numeric),0)::text AS held,COALESCE(sum(invoiced::numeric-returned::numeric-applied::numeric),0)::text AS due FROM v`,
     );
     return {
       rows: rows.map(summarizeOrder),
@@ -103,6 +106,7 @@ export async function loadOrderList(
       page,
       view,
       q,
+      trade,
       storeId: query.storeId ?? '',
       today,
       totals: totals ?? { orders: 0, late: 0, held: '0', due: '0' },
@@ -132,6 +136,7 @@ export async function loadOrderDetail(
         unit: customerOrderItems.unitSymbol,
         unitType: customerOrderItems.unitType,
         unitPrice: customerOrderItems.unitPrice,
+        packSnapshot: customerOrderItems.packSnapshot,
         total: customerOrderItems.lineTotal,
         serialTracking: products.serialTracking,
         inventory: sellableStockSql,

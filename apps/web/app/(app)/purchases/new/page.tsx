@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
+import { activePacks } from '@/lib/wholesale';
 import { products, suppliers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { and, asc, eq } from 'drizzle-orm';
@@ -18,6 +19,7 @@ export default async function NewPurchasePage() {
         name: products.name,
         price: products.price,
         unitSymbol: products.unitSymbol,
+        unitType: products.unitType,
         batchTracking: products.batchTracking,
         serialTracking: products.serialTracking,
       })
@@ -35,12 +37,28 @@ export default async function NewPurchasePage() {
       .where(eq(suppliers.businessId, user.businessId))
       .orderBy(asc(suppliers.name));
 
-    return { products: ps, suppliers: ss };
+    const packs = await activePacks(
+      tx,
+      user.businessId,
+      ps.map((p) => p.id),
+    );
+    return {
+      products: ps,
+      suppliers: ss,
+      packs: packs.filter((p) =>
+        ps.some(
+          (product) =>
+            product.id === p.productId &&
+            product.unitType === p.unitType &&
+            product.unitSymbol === p.unitSymbol,
+        ),
+      ),
+    };
   });
 
   return (
     <div className="mx-auto max-w-2xl">
-      <PurchaseForm products={data.products} suppliers={data.suppliers} />
+      <PurchaseForm products={data.products} suppliers={data.suppliers} packs={data.packs} />
     </div>
   );
 }

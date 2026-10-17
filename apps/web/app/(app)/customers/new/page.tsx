@@ -1,5 +1,7 @@
+import { getUserRoles } from '@/lib/get-user-roles';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
+import { hasPermission } from '@mybizone/domain';
 import { CustomerForm } from '../_components/customer-form';
 
 export default async function NewCustomerPage() {
@@ -8,7 +10,10 @@ export default async function NewCustomerPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-6 text-2xl font-semibold">New customer</h1>
-      <CustomerForm mode="create" />
+      <CustomerForm
+        mode="create"
+        canConfigureCredit={hasPermission(await getUserRoles(user), 'manage_expenses')}
+      />
     </div>
   );
 }
