@@ -69,6 +69,13 @@ or performance percentages invented by the UI.
 
 ## Verification
 
+Phase 3c candidate (local production acceptance passed, not yet hosted): handover priorities show
+late/open orders and remaining lines within each workspace's scope, independent
+of the activity period. Department inventory views omit customer and money fields.
+Financial workspaces with whole-store scope show period order receipts/refunds
+and current advances held/delivered bills due. These are separate from sales and
+general customer settlements. [Order ledger boundaries](CUSTOMER_ORDERS_AND_ADVANCES.md).
+
 - **21 tests passed** across new policy tests, real isolated PostgreSQL dashboard
   tests and existing auth/role-revocation regressions. Includes cross-tenant/store
   isolation, mixed-department bills, free-item costs, returns, zero-sale days,

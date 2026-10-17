@@ -21,7 +21,10 @@
    optional [serial inventory and recorded warranties](SERIAL_INVENTORY_AND_WARRANTIES.md);
    Migration 0024 is approved/applied, and Phase 3b is published with 82 hosted
    browser checks passed on 17 October 2026.
-   The remaining capabilities are subsequent deliveries.
+   Phase 3c [orders, advances and deliveries](CUSTOMER_ORDERS_AND_ADVANCES.md)
+   passed local production acceptance; migration 0025 is approved/applied and
+   publication/hosted acceptance are in progress. Wholesale and restaurant capabilities remain
+   subsequent deliveries.
 
 ## Phase 1 behaviour
 

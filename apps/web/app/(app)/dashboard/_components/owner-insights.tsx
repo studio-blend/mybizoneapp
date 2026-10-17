@@ -11,11 +11,13 @@ export function OwnerInsights({
   canOpenProducts,
   canOpenBatches,
   canOpenSerials,
+  canOpenOrders,
 }: {
   data: WorkspaceDashboard;
   canOpenProducts: boolean;
   canOpenBatches: boolean;
   canOpenSerials: boolean;
+  canOpenOrders: boolean;
 }) {
   const { insights, access, profile } = data;
   const product = (id: string | null, name: string) =>
@@ -128,6 +130,58 @@ export function OwnerInsights({
   const stockFirst = priority === 'stock';
   return (
     <div className="space-y-5" data-dashboard-insights>
+      {(data.orderInsights.attention.length > 0 ||
+        (data.orderInsights.money &&
+          Object.values(data.orderInsights.money).some((value) => Number(value) !== 0))) && (
+        <section className={panel}>
+          <h2 className="text-base font-semibold tracking-tight">Orders awaiting handover</h2>
+          <p className={subtitle}>
+            Current order lines still to hand over, earliest promised date first. Orders do not
+            reserve stock. Up to six orders in your scope.
+          </p>
+          {data.orderInsights.money && (
+            <dl className="mt-4 grid grid-cols-2 gap-4 xl:grid-cols-4">
+              {[
+                ['Unused advances', data.orderInsights.money.held],
+                ['Delivered bills due', data.orderInsights.money.due],
+                ['Order receipts · this period', data.orderInsights.money.received],
+                ['Order refunds · this period', data.orderInsights.money.refunds],
+              ].map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">{label}</dt>
+                  <dd className="mt-2 break-words text-lg font-semibold tabular-nums">
+                    {money(Number(value))}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          <ul className="mt-4 divide-y">
+            {data.orderInsights.attention.map((row) => (
+              <li key={row.id} className="flex flex-wrap justify-between gap-3 py-3 text-sm">
+                <div>
+                  {canOpenOrders ? (
+                    <Link className="font-medium underline" href={`/orders/${row.id}`}>
+                      {row.orderNo}
+                    </Link>
+                  ) : (
+                    <p className="font-medium">{row.orderNo}</p>
+                  )}
+                  <p className="mt-1 text-xs text-muted-foreground">{row.store}</p>
+                </div>
+                <p className="text-xs">
+                  {row.promisedOn} · {row.units} lines remaining
+                </p>
+              </li>
+            ))}
+          </ul>
+          {canOpenOrders && (
+            <Link href="/orders?view=pending" className="mt-3 inline-block text-sm underline">
+              Review customer orders
+            </Link>
+          )}
+        </section>
+      )}
       {insights.serials.length > 0 && (
         <section className={panel}>
           <h2 className="text-base font-semibold tracking-tight">

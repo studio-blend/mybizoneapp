@@ -598,7 +598,7 @@ export default async function DashboardPage({
                 {[
                   ['Customer receivables', data.ledger.receivables],
                   ['Supplier payables', data.ledger.payables],
-                  ['Customer collections', data.ledger.collections],
+                  ['General customer settlements', data.ledger.collections],
                   ['Supplier payments', data.ledger.supplierPayments],
                 ].map(([label, value]) => (
                   <div key={String(label)}>
@@ -688,6 +688,7 @@ export default async function DashboardPage({
               canOpenProducts={allowed('/products')}
               canOpenBatches={allowed('/inventory/batches')}
               canOpenSerials={allowed('/inventory/serials')}
+              canOpenOrders={allowed('/orders')}
             />
           )}
 

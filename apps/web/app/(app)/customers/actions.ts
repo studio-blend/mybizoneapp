@@ -2,7 +2,7 @@
 
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
-import { auditLogs, customers, openingBalances } from '@mybizone/db';
+import { auditLogs, customerOrders, customers, openingBalances } from '@mybizone/db';
 import { financialYear } from '@mybizone/domain/bill-series';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
@@ -193,6 +193,18 @@ export const deleteCustomerAction = safeAction(DeleteCustomerInput, async (input
       `cannot delete customer with outstanding balance of ₹${before.outstandingBalance}`,
     );
   }
+
+  const [order] = await tx
+    .select({ id: customerOrders.id })
+    .from(customerOrders)
+    .where(
+      and(eq(customerOrders.customerId, input.id), eq(customerOrders.businessId, user.businessId)),
+    )
+    .limit(1);
+  if (order)
+    throw new Error(
+      'Cannot delete a customer with order history. Keep their payment and delivery records available.',
+    );
 
   await tx
     .delete(customers)

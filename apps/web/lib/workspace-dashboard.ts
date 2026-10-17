@@ -5,6 +5,7 @@ import { BUSINESS_PROFILES, effectiveProfile } from './business-profile';
 import type { DashboardGrant, DashboardSelection } from './dashboard-policy';
 import { dashboardSalesQueries, loadDashboardContext, scopeCondition } from './dashboard-queries';
 import { loadDashboardStockInsights } from './dashboard-stock-insights';
+import { loadDashboardOrders } from './order-queries';
 
 export interface SalesSummary {
   revenue: number;
@@ -155,6 +156,7 @@ export async function loadWorkspaceDashboard(
       customerRows,
       movements,
       insights,
+      orderInsights,
     ] = await Promise.all([
       hasSales
         ? tx.execute<{
@@ -285,6 +287,15 @@ export async function loadWorkspaceDashboard(
           days: BUSINESS_PROFILES[row.businessProfile].slowDays,
         })),
       }),
+      loadDashboardOrders(
+        tx,
+        businessId,
+        access.scopes,
+        hasInsights && access.financial,
+        hasInsights,
+        start,
+        end,
+      ),
     ]);
     const activity = new Map(Array.from(trend).map((row) => [row.date, row]));
     const dailyTrend: { date: string; revenue: number; profit?: number | null }[] = [];
@@ -311,6 +322,7 @@ export async function loadWorkspaceDashboard(
       sales: summaryRows[0]?.value ?? emptySales,
       inventory: inventoryRows[0]?.value ?? emptyInventory,
       attention: Array.from(attention),
+      orderInsights,
       stock: Array.from(stock),
       recent: Array.from(recent),
       performance: Array.from(performance),

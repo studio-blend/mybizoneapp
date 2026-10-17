@@ -733,3 +733,79 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   documentation-only follow-up records this acceptance without changing tested
   application code. Furniture orders/advances/delivery are the next planned
   feature phase; commercial delivery/launch gates remain separate and open.
+
+## 17 October 2026 — feature Phase 3c candidate: customer orders and advances
+
+- Continued the owner's approved phased roadmap with a complete order workflow,
+  useful for furniture and available independently of the business profile.
+  Added Billing → Customer orders: customer/store agreement, promised handover,
+  address, immutable item/price/GST snapshots, partial handovers and source-bill
+  links. Booking leaves stock, sales revenue and customer debt unchanged.
+- Physical handover creates a normal bill and consumes stock exactly once using
+  existing batch/expiry and serial/warranty paths. Cumulative integer rounding
+  preserves the agreement across partial GST deliveries; current cost is captured
+  at handover. Changed store/unit/activity or GST identity prevents unsafe billing.
+- Append-only receipts/refunds and signed allocation entries pay only this order's
+  bills. Unused funds are advance liabilities; delivered unpaid value enters the
+  shared customer balance. Legacy general settlements exclude order debt as well
+  as reserved EMI principal. Existing invoice backfill/cashbook limits remain.
+- Order-linked returns lock the order before the bill, clear its exact unpaid
+  value, and reapply released funds to other unpaid bills of that same order.
+  Remaining released funds stay held until an explicit actual refund is recorded.
+  Cancellation closes only undelivered quantities and requires held funds refunded
+  first; delivered bills/debt survive. Returns do not reopen replacement quantity.
+- Added scoped dashboard handover priorities and separate period receipts/refunds,
+  advances held and delivered bills due. Nonfinancial/department views omit money
+  and customer details. Due-bill reports show exact allocated order remainder,
+  while clearly identifying the unreconciled general-bill values. Management
+  balance sheet includes held advances; date cutoffs use India calendar boundaries.
+- Enforced store/report reads, global sales mutations and global finance plus
+  order-read permission for receipts/refunds. Database FORCE RLS and composite
+  foreign keys bind tenant/store/customer/order/delivery ownership. Column grants
+  protect agreed prices; payment/allocation history cannot be updated or deleted.
+  Customer deletion gives a clear history guard even when receivable debt is zero.
+- Request UUIDs/fingerprints and order/advisory locks make competing/repeated
+  commands safe. Browser preflight fixed form readiness and visible quantity
+  submission, so slow client loading cannot send an accidental native GET or omit
+  a displayed quantity. Forms retain request IDs on uncertain save retries.
+- 137 automated tests across 13 focused suites passed, zero skipped/failed:
+  order policy/integration, stock batch/serial policy/integration, transaction
+  actions, dashboard policy/integration, business profiles, operating analysis
+  policy/integration and security mutation regressions. Scoped Biome passed with
+  three non-null assertion warnings in returns; both new acceptance scripts passed
+  Biome. All 19 development-browser workflow checks passed. The isolated production
+  build (including TypeScript) passed, exit 0. All **108 production-browser checks**
+  passed: 19 order workflow, 10 read-only order/register, 12 batch workflow, 16
+  serial workflow, 10 serial/register, 21 dashboard workspaces and 20 operating
+  analysis. All seven runners exited 0; read-only transport retry counts were zero.
+  A new register test's ambiguous text locator was narrowed to the metric term;
+  the source build was unchanged and passed suites were retained. Phone layouts
+  were visually inspected at 360px. These are local candidate results, not rollout.
+- Prepared migration 0025 on Neon temporary branch `br-bold-sea-ao7nfopd`, parent
+  `br-odd-tree-aomevkex`, migration `a9cba0a9-41fd-47fe-8b85-957f0148ec0f`.
+  All 19 checked existing tables have identical row counts/hashes on parent/copy;
+  six new tables are empty, tenant policies/column grants/composite keys passed.
+  Durable pending context is ignored `.local/test-accounts/pending-customer-orders-migration.json`.
+  **Hosted migration, branch deletion and publication remain unapplied/unapproved.**
+  Neon's completion tool requires explicit approval after final local acceptance.
+- Evidence: `.cache/customer-orders-regression-final.log`,
+  `.cache/customer-orders-lint.log`, `.cache/customer-orders-script-lint.log`,
+  `.cache/customer-orders-browser-preflight6.log`,
+  `.cache/customer-orders-migration-validation.json`,
+  `.cache/customer-orders-migration-foreign-keys.json` and local phone screenshots.
+  Final evidence: `.cache/customer-orders-build.log`,
+  `.cache/customer-orders-production-acceptance.json` and seven individual
+  `.cache/customer-orders-production-*.log` runner logs. Generated Next build
+  configuration was restored; unrelated work remains unstaged. The accepted
+  37-file candidate will be committed locally and await explicit migration and
+  publication approval before any hosted change.
+  Feature scope: `docs/CUSTOMER_ORDERS_AND_ADVANCES.md`; current roadmap:
+  `docs/PROJECT_STATUS.md`. Preexisting unrelated changes remain outside this phase.
+- Owner approved "Apply migration and publish Phase 3c". Applied prepared migration
+  `a9cba0a9-41fd-47fe-8b85-957f0148ec0f` to `br-odd-tree-aomevkex` and recorded only
+  `0025_customer_orders.sql` in `_migrations`. Temporary branch `br-bold-sea-ao7nfopd`
+  was removed by the completion tool. All 19 fresh pre-migration table hashes
+  match after application; six tables retain FORCE RLS and narrow grants.
+  Unrelated subscription migration 0020 remains pending. Accepted local feature
+  commit `a0515d044a51cb43af51284276ba86055b738cc6` is unchanged apart from this
+  documentation follow-up. Publication and hosted acceptance follow.

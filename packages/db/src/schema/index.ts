@@ -33,3 +33,4 @@ export * from './customer-tags';
 export * from './campaigns';
 export * from './departments';
 export * from './user-roles';
+export * from './customer-orders';

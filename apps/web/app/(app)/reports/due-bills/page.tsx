@@ -1,12 +1,13 @@
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
+import { indiaToday } from '@/lib/stock-batch-policy';
 import { sales } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
 import { Button } from '@mybizone/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,12 @@ export default async function DueBillsReportPage(props: PageProps) {
         billNo: sales.billNo,
         createdAt: sales.createdAt,
         customerName: sales.customerName,
-        total: sales.total,
+        total: sql<string>`CASE WHEN "sales".payment_method='order' THEN GREATEST(0,"sales".total
+         -COALESCE((SELECT sum(r.total) FROM sales_returns r WHERE r.business_id="sales".business_id AND r.original_sale_id="sales".id AND r.status='completed'),0)
+         -COALESCE((SELECT sum(a.amount) FROM customer_order_allocations a JOIN customer_order_deliveries d ON d.id=a.delivery_id AND d.business_id=a.business_id WHERE d.sale_id="sales".id AND d.business_id="sales".business_id),0)) ELSE "sales".total END::text`,
+        orderId: sql<
+          string | null
+        >`(SELECT d.order_id FROM customer_order_deliveries d WHERE d.sale_id="sales".id AND d.business_id="sales".business_id)`,
         dueDate: sales.dueDate,
         paymentStatus: sales.paymentStatus,
         paymentMethod: sales.paymentMethod,
@@ -46,15 +52,16 @@ export default async function DueBillsReportPage(props: PageProps) {
       .orderBy(desc(sales.createdAt));
   });
 
-  const today = new Date();
+  const todayDay = indiaToday();
+  const today = new Date(`${todayDay}T00:00:00Z`);
   // Decorate with days-overdue + bucket, then filter.
   const decorated = rows.map((r) => {
-    const reference = r.dueDate ? new Date(r.dueDate) : new Date(r.createdAt);
+    const reference = new Date(`${r.dueDate ?? indiaToday(r.createdAt)}T00:00:00Z`);
     const days = Math.max(
       0,
       Math.floor((today.getTime() - reference.getTime()) / (1000 * 60 * 60 * 24)),
     );
-    const isOverdue = r.dueDate ? new Date(r.dueDate) < today : false;
+    const isOverdue = r.dueDate ? r.dueDate < todayDay : false;
     return { ...r, daysOverdue: days, isOverdue, bucket: bucketOf(days) };
   });
 
@@ -73,13 +80,15 @@ export default async function DueBillsReportPage(props: PageProps) {
       <div>
         <h1 className="text-2xl font-semibold">Due bills</h1>
         <p className="text-sm text-muted-foreground">
-          Unsettled bills (credit, partial, finance/EMI). Click a row to open the bill.
+          General bills show original bill values until payments are reconciled to invoices. Order
+          bills show their remaining allocated balance. Date groups use bill/reference dates; they
+          are not verified invoice ageing. Use customer balances for general collections.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-5">
         <BucketCard
-          label="Total outstanding"
+          label="Unsettled bill values"
           value={`₹${totalOutstanding.toFixed(2)}`}
           active={bucket === 'all'}
           href="/reports/due-bills"
@@ -164,7 +173,9 @@ export default async function DueBillsReportPage(props: PageProps) {
                     <TableCell className="text-right">{r.daysOverdue}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/sales/${r.id}`}>View</Link>
+                        <Link href={r.orderId ? `/orders/${r.orderId}` : `/sales/${r.id}`}>
+                          View
+                        </Link>
                       </Button>
                     </TableCell>
                   </TableRow>

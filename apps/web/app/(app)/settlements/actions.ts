@@ -1,5 +1,6 @@
 'use server';
 
+import { unpaidOrderDebt } from '@/lib/order-ledger';
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import {
@@ -85,9 +86,15 @@ export const createSalesSettlementAction = safeAction(
       );
     if (
       Number(input.amount) >
-      round2(Number(customer.outstandingBalance) - Number(finance?.amount ?? 0))
+      round2(
+        Number(customer.outstandingBalance) -
+          Number(finance?.amount ?? 0) -
+          (await unpaidOrderDebt(tx, user.businessId, input.customerId)) / 100,
+      )
     ) {
-      throw new Error('amount includes EMI principal; record EMI payments from the EMI schedule');
+      throw new Error(
+        'amount includes EMI principal or order bills; record their payments in the EMI schedule or order ledger',
+      );
     }
 
     // 5. Insert settlement record

@@ -5,7 +5,13 @@ export interface NavGroup {
   label: string;
   items: { href: string; label: string }[];
 }
-type Entry = { href: string; label: string; gate: PermissionGate; scoped?: boolean };
+type Entry = {
+  href: string;
+  label: string;
+  gate: PermissionGate;
+  alternativeGate?: PermissionGate;
+  scoped?: boolean;
+};
 const definitions: { label: string; items: Entry[] }[] = [
   {
     label: 'Billing',
@@ -13,6 +19,13 @@ const definitions: { label: string; items: Entry[] }[] = [
       { href: '/sales/new', label: 'New Sale (POS)', gate: 'create_sale', scoped: true },
       { href: '/sales', label: 'Sales', gate: 'view_sales', scoped: true },
       { href: '/warranties', label: 'Warranty lookup', gate: 'view_sales', scoped: true },
+      {
+        href: '/orders',
+        label: 'Customer orders',
+        gate: 'view_sales',
+        alternativeGate: 'view_reports',
+        scoped: true,
+      },
       { href: '/returns', label: 'Sales Returns', gate: 'create_sale' },
       { href: '/quotations', label: 'Quotations', gate: 'create_sale' },
       { href: '/delivery-challans', label: 'Delivery Challans', gate: 'create_sale' },
@@ -93,11 +106,16 @@ export function permittedNavigation(roles: DashboardGrant[]): NavGroup[] {
         .filter(
           (item) =>
             hasPermission(roles, item.gate) ||
+            (!!item.alternativeGate && hasPermission(roles, item.alternativeGate)) ||
             (item.scoped &&
               roles.some(
                 (role) =>
                   !role.departmentId &&
-                  hasPermission([role], item.gate, { storeId: role.storeId ?? undefined }),
+                  (hasPermission([role], item.gate, { storeId: role.storeId ?? undefined }) ||
+                    (!!item.alternativeGate &&
+                      hasPermission([role], item.alternativeGate, {
+                        storeId: role.storeId ?? undefined,
+                      }))),
               )),
         )
         .map(({ href, label }) => ({ href, label })),

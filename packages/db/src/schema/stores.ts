@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { check, index, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
 
 export const stores = pgTable(
@@ -19,6 +19,7 @@ export const stores = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    tenantUnique: unique('stores_id_business_unique').on(t.id, t.businessId),
     businessIdx: index('stores_business_id_idx').on(t.businessId),
     profileValid: check(
       'stores_business_profile_check',

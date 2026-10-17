@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import {
+  customerOrderDeliveries,
   invoices,
   products,
   saleItems,
@@ -16,6 +17,7 @@ import { withTenant } from '@mybizone/db/tenant';
 import { Card, CardContent, CardHeader, CardTitle } from '@mybizone/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
 import { and, asc, eq } from 'drizzle-orm';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { GenerateInvoiceButton } from './_components/generate-invoice-button';
 
@@ -105,7 +107,16 @@ export default async function SaleDetailPage(props: { params: Promise<{ id: stri
         ),
       )
       .orderBy(asc(stockSerials.code));
-    return { row, items, invoice: inv ?? null, batches, serials };
+    const [orderDelivery] = await tx
+      .select({ orderId: customerOrderDeliveries.orderId })
+      .from(customerOrderDeliveries)
+      .where(
+        and(
+          eq(customerOrderDeliveries.saleId, row.id),
+          eq(customerOrderDeliveries.businessId, user.businessId),
+        ),
+      );
+    return { row, items, invoice: inv ?? null, batches, serials, orderId: orderDelivery?.orderId };
   });
 
   if (!data) notFound();
@@ -113,6 +124,17 @@ export default async function SaleDetailPage(props: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-4">
+      {data.orderId && (
+        <div className="rounded-xl border p-4 text-sm">
+          <p>
+            This bill records a physical order handover. Payments, unused advances and exact bill
+            allocations are tracked in its order ledger.
+          </p>
+          <Link className="mt-2 inline-block underline" href={`/orders/${data.orderId}`}>
+            Open customer order
+          </Link>
+        </div>
+      )}
       {data.serials.length > 0 && (
         <details className="rounded-xl border p-4">
           <summary className="cursor-pointer text-sm font-semibold">

@@ -69,13 +69,23 @@ Credentials and sessions stay in ignored private files.
 
 ## Product roadmap
 
+Feature **Phase 3c — customer orders, advances and deliveries** passed local
+production acceptance and the owner approved rollout. [Its specification and rollout
+status](CUSTOMER_ORDERS_AND_ADVANCES.md) document the money/stock boundaries.
+Migration 0025 passed on a temporary Neon branch with 19 existing tables preserved;
+it is now applied and recorded on the hosted database, with the temporary branch
+removed and all 19 fresh pre-migration table hashes preserved. All **137 automated tests and 108
+production-browser checks passed**, along with TypeScript, scoped lint and build.
+Publication and read-only hosted acceptance are in progress. Phase 3b remains
+the latest accepted hosted application until those checks finish.
+
 The following capabilities are **not implemented by the latest hosted release**.
 Deliver each with its full data flow, permission checks and relevant acceptance
 before enabling it. Test new schema changes on a temporary branch and obtain the
 explicit migration approval required by the connected database tool.
 
-1. **Next — furniture:** orders, customer advances and delivery allocation, with clear
-   ordered/paid/delivered/outstanding states.
+1. **Approved rollout in progress — furniture:** orders, customer advances and delivery allocation,
+   with separate agreement, funds, handover and unpaid delivery states.
 2. **Wholesale:** pack/unit conversions, credit terms and fulfilment. Keep the
    existing retail/wholesale selling-model setting independent of these workflows.
 3. **Food service:** recipes, ingredient consumption, waste and kitchen tickets.

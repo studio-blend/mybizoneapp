@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
+import { indiaToday, validExpiry } from '@/lib/stock-batch-policy';
 import {
   customers,
   expenseEntries,
@@ -25,8 +26,7 @@ interface PageProps {
 }
 
 function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return indiaToday();
 }
 
 function fmt(n: number): string {
@@ -53,8 +53,9 @@ export default async function BalanceSheetPage(props: PageProps) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
   await requirePermission(user, 'view_reports');
-  const asOfStr = searchParams.asOf ?? todayStr();
-  const asOfDate = new Date(`${asOfStr}T23:59:59`);
+  const asOfStr =
+    searchParams.asOf && validExpiry(searchParams.asOf) ? searchParams.asOf : todayStr();
+  const asOfDate = new Date(Date.parse(`${asOfStr}T00:00:00+05:30`) + 86400000);
 
   const data = await withTenant(db, user.businessId, async (tx) => {
     // Stock value: products inventory × cost_price
@@ -162,7 +163,11 @@ export default async function BalanceSheetPage(props: PageProps) {
         ),
       );
 
+    const [advances] = await tx.execute<{ total: string }>(sql`SELECT
+      (COALESCE((SELECT sum(CASE kind WHEN 'receipt' THEN amount ELSE -amount END) FROM customer_order_payments WHERE business_id=${user.businessId}::uuid AND created_at<${asOfDate.toISOString()}::timestamptz),0)
+      -COALESCE((SELECT sum(amount) FROM customer_order_allocations WHERE business_id=${user.businessId}::uuid AND created_at<${asOfDate.toISOString()}::timestamptz),0))::text AS total`);
     return {
+      orderAdvances: Number(advances?.total ?? 0),
       stockValue: Number(stockRows[0]?.stockValue ?? 0),
       tradeReceivables: Number(receivablesRows[0]?.total ?? 0),
       obCustomer: Number(obCustomerRows[0]?.total ?? 0),
@@ -180,7 +185,7 @@ export default async function BalanceSheetPage(props: PageProps) {
   );
 
   const totalAssets = round2(data.stockValue + data.tradeReceivables + data.obCustomer);
-  const totalLiabilities = round2(data.tradePayables + data.obSupplier);
+  const totalLiabilities = round2(data.tradePayables + data.obSupplier + data.orderAdvances);
   const totalEquity = retainedEarnings;
   const liabilitiesPlusEquity = round2(totalLiabilities + totalEquity);
 
@@ -245,6 +250,7 @@ export default async function BalanceSheetPage(props: PageProps) {
             <CardContent>
               <SectionRow label="Trade Payables (Suppliers)" amount={data.tradePayables} />
               <SectionRow label="Opening Bal. (Suppliers)" amount={data.obSupplier} indent />
+              <SectionRow label="Customer order advances held" amount={data.orderAdvances} />
               <SectionRow label="Total Liabilities" amount={totalLiabilities} bold />
             </CardContent>
           </Card>

@@ -68,6 +68,7 @@ export const sales = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    tenantUnique: unique('sales_id_business_unique').on(t.id, t.businessId),
     taxSnapshotConsistent: check(
       'sales_tax_snapshot_consistent',
       sql`

@@ -7,6 +7,11 @@
 > commercial-release history; their older deployment/test statements are historical.
 > Product feature phases and commercial delivery phases are separate. Razorpay is
 > still on hold, and email, installer, complete cloud recovery and launch gates remain open.
+> Phase 3c orders/advances/deliveries are now implemented locally; 137 automated
+> tests and 108 production-browser checks passed, including build/types. Migration 0025 is
+> approved, applied and recorded; the temporary branch is removed. Publication
+> and read-only hosted acceptance are in progress.
+> See [the Phase 3c record](../CUSTOMER_ORDERS_AND_ADVANCES.md).
 
 Updated: 15 October 2026. Scope: Windows desktop/LAN and cloud.
 

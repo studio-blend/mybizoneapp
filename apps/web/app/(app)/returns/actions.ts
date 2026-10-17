@@ -1,11 +1,13 @@
 'use server';
 
+import { lockOrder, reconcileOrderReturn } from '@/lib/order-ledger';
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
 import { moveStockBatches } from '@/lib/stock-batches';
 import {
   auditLogs,
   billSeries,
+  customerOrderDeliveries,
   customers,
   products,
   returnItems,
@@ -45,6 +47,30 @@ const Input = z
   .refine((v) => !!v.originalSaleId || !!v.originalBillNo, 'provide the original bill number');
 
 export const createSalesReturnAction = safeAction(Input, async (input, { user, tx }) => {
+  // Order commands lock the order before its bill. Keep returns in that same order.
+  const [lookup] = await tx
+    .select({ id: sales.id })
+    .from(sales)
+    .where(
+      and(
+        eq(sales.businessId, user.businessId),
+        input.originalSaleId
+          ? eq(sales.id, input.originalSaleId)
+          : eq(sales.billNo, input.originalBillNo!),
+      ),
+    );
+  if (!lookup) throw new Error('original bill not found');
+  const [delivery] = await tx
+    .select({ orderId: customerOrderDeliveries.orderId })
+    .from(customerOrderDeliveries)
+    .where(
+      and(
+        eq(customerOrderDeliveries.saleId, lookup.id),
+        eq(customerOrderDeliveries.businessId, user.businessId),
+      ),
+    );
+  if (delivery) await requirePermission(user, 'create_sale');
+  const sourceOrder = delivery ? await lockOrder(tx, user.businessId, delivery.orderId) : undefined;
   // Lock the source document to serialize concurrent partial returns.
   const [original] = await tx
     .select()
@@ -63,6 +89,8 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
   if (original.customerId) await requirePermission(user, 'create_sale');
   if (original.paymentMethod === 'finance_emi')
     throw new Error('close or adjust the finance agreement before returning an EMI bill');
+  if (original.paymentMethod === 'order' && !sourceOrder)
+    throw new Error('Order bill needs allocation reconciliation');
   if (original.billType === 'estimate') throw new Error('estimates cannot be returned');
   if (original.status !== 'completed') throw new Error('only completed sales can be returned');
   if (original.paymentMethod === 'credit' && !original.customerId)
@@ -185,6 +213,8 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
     });
   }
   // Paid bills must not reduce debt from unrelated invoices.
+  if (sourceOrder)
+    await reconcileOrderReturn(tx, sourceOrder, original.id, row.id, total.toFixed(2));
   if (original.paymentMethod === 'credit' && original.customerId) {
     const adjusted = await tx
       .update(customers)
@@ -218,5 +248,13 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
   revalidatePath('/inventory/serials');
   revalidatePath('/warranties');
   revalidatePath('/customers');
+  if (sourceOrder) {
+    revalidatePath('/orders');
+    revalidatePath(`/orders/${sourceOrder.id}`);
+    revalidatePath('/dashboard');
+    revalidatePath('/reports/balance-sheet');
+    revalidatePath('/reports/due-bills');
+    revalidatePath(`/sales/${original.id}`);
+  }
   return { id: row.id, returnNo, total: total.toFixed(2) };
 });
