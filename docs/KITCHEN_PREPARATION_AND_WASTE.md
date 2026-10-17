@@ -1,9 +1,12 @@
 # Recipes, kitchen preparation and waste — feature Phase 3e
 
-Status: local production acceptance passed; owner approved hosted rollout.
-Migration 0027 is applied and recorded, and its temporary branch is removed.
-Publication and hosted acceptance are in progress; Phase 3d remains the latest
-accepted application release until those checks finish.
+Status: published and verified on 17 October 2026. The owner approved rollout;
+migration 0027 is applied and recorded, and its temporary branch is removed.
+Application acceptance commit: `779afcc471c53ba2f64e7d6161495efe19914104`.
+Vercel deployment `dpl_779hMViZ4WASFLCQ7VuNNkFTgDKL` reached READY and its
+public alias was verified. This includes the phone-filter readability follow-up.
+Entry point: **Inventory → Kitchen preparation**. Documentation-only follow-ups
+preserve this application source.
 
 This is a **prep-to-stock** workflow for cafés, bakeries and prepared-food counters.
 A kitchen ticket plans whole recipe batches. Recording actual completed preparation
@@ -102,9 +105,17 @@ kinds and add signed kitchen consumption/output kinds. Hosted application of
 0027 and publication are approved. Migration 0027 is applied/recorded and the
 temporary branch removed; all 26 fresh pre/post-migration existing-table hashes
 match. Hosted tenant/column grant checks passed and the five new tables are empty.
-Publication and read-only hosted acceptance follow. Subscription migration 0020
-is unrelated and remains pending.
+Subscription migration 0020 is unrelated and remains pending.
 No kitchen or financial fixtures have been added to hosted data.
+
+All **113 hosted browser checks passed**: 10 kitchen/register, 11 wholesale/register,
+10 order/register, 10 serial/register, nine batch, 21 workspace, 20 operating
+analysis and 22 seeded transaction/bill/report checks. All eight runners exited 0;
+all seven transport counters were zero. The phone-only filter correction then
+passed the hosted production build and all 10 kitchen checks again, including an
+explicit minimum usable width assertion. Phone layouts were inspected at 360px.
+No financial or inventory form was saved. All five new tables remain empty and
+all 26 existing-table hashes match the fresh pre-migration baseline after acceptance.
 
 Detailed evidence and subsequent work belong in [the work log](../RELEASE_WORK_LOG.md)
 and [project roadmap](PROJECT_STATUS.md).

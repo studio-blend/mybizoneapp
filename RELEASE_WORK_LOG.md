@@ -1019,3 +1019,42 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   checks. Subscription migration 0020 remains pending. Accepted application
   commit `518de809a7ff63a5c98b0f29a70bd4d08481f21a` is unchanged apart from rollout
   documentation. Publication and hosted acceptance follow.
+- Published application commit `485fe590f93207fc8aecafa1e925ee66c1da847b`, tree
+  `b0e47a5635659fb0e6440ed1103fa1e0a685b1af`, identical to the accepted local
+  application plus migration-status documentation commit
+  `708f822a9544121ae39de1d927018d3f7c07775a`. GitHub's guarded ref update and
+  read-only fetch/tree comparison passed. Local main was aligned while preserving
+  unrelated working files. Vercel deployment `dpl_7jtwDeGeMMmq8BTTSUYMMoE1DRjC`
+  is READY and its public alias resolves to the published SHA. Read-only hosted
+  acceptance is in progress.
+- All **113 hosted browser checks passed**: 10 kitchen/register, 11 wholesale/
+  register, 10 order/register, 10 serial/register, nine batch, 21 workspace,
+  20 operating analysis and 22 seeded transaction/bill/report checks. All eight
+  runners exited 0; all seven transport counters were zero. No financial or
+  inventory form was saved. All 26 checked table hashes still match the fresh
+  pre-migration baseline after acceptance. The five new kitchen tables remain empty.
+- Hosted phone inspection found that the kitchen's two filter selects were too
+  narrow at 360px. Published follow-up `779afcc471c53ba2f64e7d6161495efe19914104`,
+  tree `5cd9aed1e0b375aeb5d92b3d3a36ec941c9a5d07`, identical to local follow-up
+  `5c09518b91d2f0643f26a64c59cc8c25c90ddae2`. Only three responsive class strings
+  changed in the kitchen page; a browser assertion now checks usable filter widths.
+  Stock, costs, permissions and transaction code are unchanged. Scoped lint passed;
+  the hosted build and targeted kitchen recheck follow. No migration change is needed.
+- The phone-layout follow-up reached READY as deployment
+  `dpl_779hMViZ4WASFLCQ7VuNNkFTgDKL`; its public alias resolves to
+  `779afcc471c53ba2f64e7d6161495efe19914104`. All **10 targeted hosted kitchen checks
+  passed again**, including readable filter widths at 360px, with zero transport
+  retries. The stacked filters were visually inspected. The earlier 187 automated,
+  165 local production-browser and 113 full hosted checks remain the core feature
+  acceptance; the follow-up changes only responsive classes and a browser assertion.
+- Final evidence: `.cache/kitchen-hosted-preapply.json`,
+  `.cache/kitchen-hosted-migration-applied.json`, `.cache/kitchen-hosted-postapply.json`,
+  `.cache/kitchen-hosted-schema-checks.json`, `.cache/kitchen-hosted-final-hashes.json`,
+  `.cache/kitchen-hosted-final-schema.json`, `.cache/kitchen-application-deployment.json`,
+  `.cache/kitchen-hosted-acceptance.json`, eight `.cache/kitchen-hosted-*.log` runner
+  logs, `.cache/kitchen-phone-deployment.json` and
+  `.cache/kitchen-phone-hosted-acceptance.log`. Phase 3e is published and complete
+  within its documented prep-to-stock scope. The final documentation-only follow-up
+  records acceptance without changing tested application code. Accounting foundations
+  (invoice settlement allocation, cashbook, advance/refund records) are next;
+  commercial release gates remain separate and open.

@@ -1,26 +1,21 @@
 # MyBizOne — status and next tasks
 
 > **17 October 2026:** Start with [the current project status and roadmap](../PROJECT_STATUS.md).
-> Role dashboards, business profiles, operating analysis and feature Phases 3a–3d
-> (batch/expiry, serials/warranties, orders/advances/deliveries and wholesale) are live.
-> The latest release passed 162 automated tests, two PDF checks, 136 local
-> production-browser checks and 103 hosted browser checks, plus build/types.
+> Role dashboards, business profiles, operating analysis and feature Phases 3a–3e
+> (batch/expiry, serials/warranties, orders/advances/deliveries, wholesale and kitchen
+> preparation/waste) are live. The latest release passed 187 automated tests,
+> 165 local production-browser checks and 113 hosted browser checks, plus build/types.
+> The phone-only correction repeated all 10 kitchen checks with a width assertion;
+> all passed with zero retries.
 > The dated entries below retain delivery and
 > commercial-release history; their older deployment/test statements are historical.
 > Product feature phases and commercial delivery phases are separate. Razorpay is
 > still on hold, and email, installer, complete cloud recovery and launch gates remain open.
-> Migration 0026 is approved, applied and recorded; the temporary branch is removed.
-> All 25 checked existing-table hashes match before/after migration and hosted
-> acceptance. No packaging sizes or financial records were fabricated. Food service
-> is the next product feature phase; commercial launch work remains separate.
-> See [the wholesale release record](../WHOLESALE_PACKS_AND_CREDIT.md).
-> Phase 3e kitchen preparation/waste passed local acceptance: 187 automated tests,
-> 165 production-browser checks and build/types. Migration 0027
-> preserved all 26 checked existing tables on a temporary Neon branch. It has not
-> been published yet. The owner approved rollout; migration 0027 is applied/recorded
-> and its branch removed. All 26 fresh pre/post-migration hashes match; publication
-> and hosted acceptance follow. See
-> [the candidate specification](../KITCHEN_PREPARATION_AND_WASTE.md).
+> Migration 0027 is approved, applied and recorded; the temporary branch is removed.
+> All 26 checked existing-table hashes match before/after migration and hosted
+> acceptance. No kitchen/financial records were fabricated. Accounting foundations
+> are the next product feature phase; commercial launch work remains separate.
+> See [the kitchen release record](../KITCHEN_PREPARATION_AND_WASTE.md).
 
 Updated: 15 October 2026. Scope: Windows desktop/LAN and cloud.
 

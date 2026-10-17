@@ -6,7 +6,8 @@ aggregate stock. Changing a business profile never invents expiry dates or enabl
 tracking automatically. [Serial inventory and recorded warranties](SERIAL_INVENTORY_AND_WARRANTIES.md)
 are delivered separately in Phase 3b. [Orders, advances and handovers](CUSTOMER_ORDERS_AND_ADVANCES.md)
 are delivered in Phase 3c. [Wholesale pack conversions and credit](WHOLESALE_PACKS_AND_CREDIT.md)
-are delivered in Phase 3d. Restaurant recipes remain a later delivery.
+are delivered in Phase 3d. [Recipes, kitchen preparation and waste](KITCHEN_PREPARATION_AND_WASTE.md)
+are delivered in Phase 3e; table ordering and restaurant checks remain separate capabilities.
 
 ## Daily workflow
 
