@@ -73,12 +73,25 @@ Credentials and sessions stay in ignored private files.
 
 ## Product roadmap
 
+**Phase 3e approved rollout in progress — food-service preparation:** immutable recipes,
+prep-to-stock kitchen tickets, ingredient consumption, finished yield/cost and
+waste history are implemented locally. All 187 focused automated tests across
+17 suites passed, plus 165 production-browser checks, TypeScript and the isolated
+production build. Migration 0027
+passed on a temporary Neon branch with all 26 checked existing tables preserved.
+The owner approved rollout. Migration 0027 is applied/recorded and its temporary
+branch removed; all 26 fresh pre/post-migration hashes match. Publication and
+hosted acceptance follow; Phase 3d remains the latest accepted application release. See
+[the supported workflow and rollout status](KITCHEN_PREPARATION_AND_WASTE.md).
+
 The following capabilities are **not implemented by the latest hosted release**.
 Deliver each with its full data flow, permission checks and relevant acceptance
 before enabling it. Test new schema changes on a temporary branch and obtain the
 explicit migration approval required by the connected database tool.
 
-1. **Next — food service:** recipes, ingredient consumption, waste and kitchen tickets.
+1. **Approved rollout in progress — food-service preparation:** recipes, ingredient consumption,
+   waste and prep-to-stock kitchen tickets. Table ordering and restaurant checks
+   are separate future capabilities, not part of this candidate.
 2. **Accounting foundations:** invoice-level settlement allocation and cashbook/
    advance/refund records before adding invoice ageing or available-cash claims.
 

@@ -936,3 +936,86 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   acceptance without changing tested application code. Food-service recipes,
   ingredient consumption, waste and kitchen tickets are the next product phase;
   commercial launch gates remain separate and open.
+
+## 17 October 2026 — feature Phase 3e: kitchen preparation candidate
+
+- Continued the owner's phased capability plan with a prep-to-stock workflow for
+  cafés, bakeries and prepared-food counters: immutable recipe versions, whole-batch
+  prep tickets, ingredient coverage, actual finished yield, consumption snapshots,
+  batch trace, printable tickets and kitchen waste linked once to existing damage/
+  loss reports. Existing profile selection does not invent or activate recipes.
+- Planning and starting tickets record intent without reserving or consuming stock.
+  Recording actual completed preparation consumes the full agreed ingredients and
+  adds positive actual output in one locked transaction. Lower usable yield is
+  allowed up to the ticket target. Ordinary POS then consumes only prepared stock.
+  Failed batches with no output require explicit ingredient waste plus cancellation
+  of the unrecorded ticket. There is no table ordering, restaurant check, automatic
+  sale-to-kitchen dispatch, recursive recipe execution or partial cooking in this phase.
+- Ingredients/output must be active, non-serial, separate products in one permitted
+  store. Whole pieces and three-decimal measured stock use integer arithmetic.
+  Tracked ingredients use available/unexpired batches FEFO; tracked output requires
+  real batch code/expiry. Current store/unit/tracking/activity is checked under
+  sorted product locks. Shortages or output receipt conflicts roll back every
+  ingredient, output, cost and batch movement. Fingerprints and request/ticket
+  locks make repeated/competing commands safe.
+- Completion records current ingredient cost estimates, excludes labour/overheads,
+  and blends prepared unit cost with known prior stock. Missing cost remains unknown.
+  Waste removes explicitly discarded physical stock, selecting a batch when tracked,
+  and is counted once in current loss reports. The kitchen summary shows 30 India-
+  calendar days of recorded waste value and a separate unknown-cost count. Recipe
+  archive affects future planning while existing tickets keep their version.
+- Store-level inventory permission is required; recipe configuration also needs
+  store-level product permission. Department-only and other-store access is excluded.
+  Five new tables use FORCE RLS, composite tenant keys and append-only/column grants.
+  Existing product/stock/finance data is unchanged by migration 0027 itself.
+- **187 automated tests across 17 focused suites passed**, zero failures/skips:
+  25 new kitchen policy/integration checks plus all previous 162 wholesale, order,
+  batch, serial, transaction, dashboard, profile, analysis and security regressions.
+  Test-fixture cleanup was corrected to remove scoped role grants before their
+  temporary stores; only guarded synthetic local fixtures were cleaned. A Next.js
+  production compilation issue required moving optional-batch validation out of
+  the exported action initializer; all 25 kitchen tests passed again afterward.
+  TypeScript and scoped lint passed with one existing batch-helper non-null assertion
+  warning. The corrected isolated production build (including TypeScript) passed,
+  exit 0. All **165 production-browser checks passed** across 11 runners: 19 kitchen
+  workflow, 10 kitchen/register, 17 wholesale workflow, 11 wholesale/register,
+  19 order workflow, 10 order/register, 12 batch workflow, 16 serial workflow,
+  10 serial/register, 21 dashboard workspace and 20 operating analysis. All runners
+  exited 0; all six read-only transport counters were zero. Phone recipe/prep/
+  completed/waste/queue layouts were inspected at 360px. The complete kitchen
+  workflow verified shortage rollback, archived agreements, lower actual yield,
+  FEFO trace, refresh safety, normal checkout without repeated ingredient use,
+  unsold-food waste and explicit expired-ingredient disposal. Local fixture cleanup
+  preserved existing stock, sales and customer/supplier balances.
+- Prepared migration 0027 on Neon branch `br-solitary-fog-aodajtsv`, parent
+  `br-odd-tree-aomevkex`, migration `06b4d3d9-6734-4843-81d3-196109e16a4d`.
+  All 26 checked existing-table counts/full-row hashes match parent/copy. All five
+  new tables are empty with FORCE RLS and narrow grants. Immutable recipe/ingredient,
+  ticket-plan, consumption and new waste-reference fields cannot be updated/deleted; only archive
+  and ticket progress/completion fields are writable. Batch movement constraints
+  retain old kinds and include correctly signed kitchen input/output kinds.
+  Pending context: `.local/test-accounts/pending-kitchen-migration.json`.
+  Waste quantities/values remain in the existing damage ledger with its legacy
+  database grants unchanged; no application waste-edit/reversal command is exposed.
+  **Hosted migration, branch removal and publication remain unapproved/unapplied.**
+- Evidence: `.cache/kitchen-regression-final.log`, `.cache/kitchen-targeted-final.log`,
+  `.cache/kitchen-typecheck.log`, `.cache/kitchen-lint.log`,
+  `.cache/kitchen-script-lint.log`, `.cache/kitchen-migration-validation.json` and
+  `.cache/kitchen-migration-details.json`. Supported scope:
+  `docs/KITCHEN_PREPARATION_AND_WASTE.md`; current roadmap: `docs/PROJECT_STATUS.md`.
+  Final evidence: `.cache/kitchen-build-final.log`,
+  `.cache/kitchen-production-acceptance.json`, 11 individual
+  `.cache/kitchen-production-*.log` runner logs and phone screenshots. Generated
+  Next configuration was restored. The accepted 24-file candidate is saved in the
+  local feature commit and awaits explicit hosted migration/publication approval.
+  Unrelated working changes remain outside the feature candidate.
+- The owner explicitly approved "Apply migration and publish Phase 3e". Applied
+  prepared migration `06b4d3d9-6734-4843-81d3-196109e16a4d` to
+  `br-odd-tree-aomevkex` and recorded only `0027_kitchen_preparation.sql`.
+  The completion tool removed temporary branch `br-solitary-fog-aodajtsv`.
+  All 26 fresh pre-migration counts/full-row hashes match after application.
+  Five new tables are empty with FORCE RLS and narrow grants; archive/progress
+  grants and immutable agreed/consumption/waste-reference fields passed hosted
+  checks. Subscription migration 0020 remains pending. Accepted application
+  commit `518de809a7ff63a5c98b0f29a70bd4d08481f21a` is unchanged apart from rollout
+  documentation. Publication and hosted acceptance follow.

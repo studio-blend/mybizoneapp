@@ -70,12 +70,12 @@ export const stockBatchMovements = pgTable(
     }).onDelete('cascade'),
     kindCheck: check(
       'stock_batch_movements_kind_check',
-      sql`${t.kind} IN ('opening','purchase','sale','sales_return','purchase_return','damage')`,
+      sql`${t.kind} IN ('opening','purchase','sale','sales_return','purchase_return','damage','kitchen_use','kitchen_output')`,
     ),
     quantityCheck: check('stock_batch_movements_quantity_check', sql`${t.quantity} <> 0`),
     signCheck: check(
       'stock_batch_movements_sign',
-      sql`(${t.kind} IN ('opening','purchase','sales_return') AND ${t.quantity} > 0) OR (${t.kind} IN ('sale','purchase_return','damage') AND ${t.quantity} < 0)`,
+      sql`(${t.kind} IN ('opening','purchase','sales_return','kitchen_output') AND ${t.quantity} > 0) OR (${t.kind} IN ('sale','purchase_return','damage','kitchen_use') AND ${t.quantity} < 0)`,
     ),
     document: index('stock_batch_movements_document_idx').on(t.businessId, t.kind, t.documentId),
     batch: index('stock_batch_movements_batch_idx').on(t.batchId),

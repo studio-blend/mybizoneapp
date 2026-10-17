@@ -14,6 +14,13 @@
 > acceptance. No packaging sizes or financial records were fabricated. Food service
 > is the next product feature phase; commercial launch work remains separate.
 > See [the wholesale release record](../WHOLESALE_PACKS_AND_CREDIT.md).
+> Phase 3e kitchen preparation/waste passed local acceptance: 187 automated tests,
+> 165 production-browser checks and build/types. Migration 0027
+> preserved all 26 checked existing tables on a temporary Neon branch. It has not
+> been published yet. The owner approved rollout; migration 0027 is applied/recorded
+> and its branch removed. All 26 fresh pre/post-migration hashes match; publication
+> and hosted acceptance follow. See
+> [the candidate specification](../KITCHEN_PREPARATION_AND_WASTE.md).
 
 Updated: 15 October 2026. Scope: Windows desktop/LAN and cloud.
 

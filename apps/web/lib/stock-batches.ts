@@ -4,7 +4,14 @@ import { indiaToday, stockText, stockUnits, validExpiry } from './stock-batch-po
 import { moveStockSerials } from './stock-serials';
 
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
-type Kind = 'purchase' | 'sale' | 'sales_return' | 'purchase_return' | 'damage';
+type Kind =
+  | 'purchase'
+  | 'sale'
+  | 'sales_return'
+  | 'purchase_return'
+  | 'damage'
+  | 'kitchen_use'
+  | 'kitchen_output';
 
 export async function lockedStockProduct(tx: Tx, businessId: string, productId: string) {
   const [product] = await tx
@@ -64,7 +71,11 @@ export async function moveStockBatches(
 ) {
   const { businessId, productId, qty, kind, documentId } = input;
   const product = await lockedStockProduct(tx, businessId, productId);
-  if (product.serialTracking) return moveStockSerials(tx, input, product);
+  if (product.serialTracking) {
+    if (kind === 'kitchen_use' || kind === 'kitchen_output')
+      throw new Error('Kitchen preparation does not support serial-tracked products');
+    return moveStockSerials(tx, { ...input, kind }, product);
+  }
   if (!product.batchTracking) return;
   const units = stockUnits(qty);
   if (units <= 0) throw new Error('Batch quantity must be positive');
@@ -74,7 +85,7 @@ export async function moveStockBatches(
     .where(and(eq(stockBatches.businessId, businessId), eq(stockBatches.productId, productId)))
     .orderBy(asc(stockBatches.expiresOn), asc(stockBatches.createdAt), asc(stockBatches.id))
     .for('update');
-  const incoming = kind === 'purchase' || kind === 'sales_return';
+  const incoming = kind === 'purchase' || kind === 'sales_return' || kind === 'kitchen_output';
   const total = batches.reduce((n, batch) => n + stockUnits(batch.quantity), 0);
   if (total + (incoming ? units : -units) !== stockUnits(product.inventory))
     throw new Error('Batch stock needs reconciliation; no transaction was saved');
@@ -122,14 +133,13 @@ export async function moveStockBatches(
     return;
   }
 
-  if (kind !== 'sale' && !input.batchId) throw new Error('Select the physical batch being removed');
-  let candidates =
-    kind === 'sale'
-      ? batches.filter(
-          (batch) =>
-            batch.state === 'available' && batch.expiresOn && batch.expiresOn > indiaToday(),
-        )
-      : batches.filter((batch) => batch.id === input.batchId);
+  const automatic = kind === 'sale' || kind === 'kitchen_use';
+  if (!automatic && !input.batchId) throw new Error('Select the physical batch being removed');
+  let candidates = automatic
+    ? batches.filter(
+        (batch) => batch.state === 'available' && batch.expiresOn && batch.expiresOn > indiaToday(),
+      )
+    : batches.filter((batch) => batch.id === input.batchId);
   if (kind === 'purchase_return' && input.originalPurchaseId) {
     const received = await tx
       .select({ batchId: stockBatchMovements.batchId })
@@ -149,7 +159,7 @@ export async function moveStockBatches(
   }
   if (candidates.reduce((n, batch) => n + stockUnits(batch.quantity), 0) < units)
     throw new Error(
-      kind === 'sale'
+      automatic
         ? `Insufficient sellable batch stock for ${product.name}; check expiry and quarantine`
         : 'Selected batch has insufficient stock or does not belong to the original purchase',
     );

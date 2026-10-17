@@ -35,3 +35,4 @@ export * from './campaigns';
 export * from './departments';
 export * from './user-roles';
 export * from './customer-orders';
+export * from './kitchen';

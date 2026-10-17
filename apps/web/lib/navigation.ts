@@ -52,6 +52,7 @@ const definitions: { label: string; items: Entry[] }[] = [
         scoped: true,
       },
       { href: '/inventory/batches', label: 'Batches & expiry', gate: 'manage_inventory' },
+      { href: '/kitchen', label: 'Kitchen preparation', gate: 'manage_inventory', scoped: true },
       { href: '/inventory/serials', label: 'Serial inventory', gate: 'manage_inventory' },
       { href: '/products/barcode', label: 'Barcodes', gate: 'manage_products' },
       { href: '/categories', label: 'Categories', gate: 'manage_products' },

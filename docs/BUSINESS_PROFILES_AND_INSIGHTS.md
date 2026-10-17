@@ -28,8 +28,12 @@
    checks, plus build/types. Migration 0026 passed on a temporary branch with 25
    checked existing tables preserved. It is published with owner-approved migration
    0026 applied/recorded, the temporary branch removed and all 103 hosted browser
-   checks passed. Restaurant
-   capabilities remain a subsequent delivery.
+   checks passed. Phase 3e [kitchen preparation and waste](KITCHEN_PREPARATION_AND_WASTE.md)
+   passed local acceptance with 187 automated tests, 165 production-browser checks
+   and build/types. Migration 0027 preserved 26 checked existing tables on
+   a temporary branch. Owner-approved migration 0027 is applied/recorded and its
+   temporary branch removed; publication/hosted acceptance are in progress. Table ordering and
+   restaurant checks remain separate future capabilities.
 
 ## Phase 1 behaviour
 

@@ -1,4 +1,4 @@
-import { index, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { index, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { user } from './auth';
 import { businesses } from './businesses';
 import { products } from './products';
@@ -25,6 +25,7 @@ export const damageLogs = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    tenantUnique: unique('damage_logs_id_business_unique').on(t.id, t.businessId),
     businessIdx: index('damage_logs_business_id_idx').on(t.businessId),
     productIdx: index('damage_logs_product_id_idx').on(t.productId),
     loggedAtIdx: index('damage_logs_logged_at_idx').on(t.businessId, t.loggedAt),
