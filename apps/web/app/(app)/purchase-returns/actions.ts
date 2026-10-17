@@ -2,6 +2,7 @@
 
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
+import { settlementBillBalance, unallocatedSettlements } from '@/lib/settlement-ledger';
 import { moveStockBatches } from '@/lib/stock-batches';
 import {
   auditLogs,
@@ -10,7 +11,6 @@ import {
   purchaseItems,
   purchaseReturnItems,
   purchaseReturns,
-  purchaseSettlements,
   purchases,
   suppliers,
 } from '@mybizone/db';
@@ -69,17 +69,10 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
       .from(suppliers)
       .where(and(eq(suppliers.id, original.supplierId), eq(suppliers.businessId, user.businessId)))
       .for('update');
-    const [settlement] = await tx
-      .select({ id: purchaseSettlements.id })
-      .from(purchaseSettlements)
-      .where(
-        and(
-          eq(purchaseSettlements.supplierId, original.supplierId),
-          eq(purchaseSettlements.businessId, user.businessId),
-        ),
-      )
-      .limit(1);
-    if (!supplier || settlement) {
+    if (
+      !supplier ||
+      (await unallocatedSettlements(tx, user.businessId, 'purchases', original.supplierId)) > 0
+    ) {
       throw new Error(
         'credit return requires payment allocation reconciliation before adjusting debt',
       );
@@ -109,6 +102,14 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
     );
   const lines = calculateReturnLines(sourceItems, previous, input.items);
   const total = round2(lines.reduce((n, line) => n + Number(line.lineTotal), 0));
+  if (
+    original.paymentMethod === 'credit' &&
+    Math.round(total * 100) >
+      (await settlementBillBalance(tx, user.businessId, 'purchases', original.id)).remaining
+  )
+    throw new Error(
+      'Credit return exceeds unpaid bill value; a paid return requires refund reconciliation',
+    );
   const taxTotal = round2(lines.reduce((n, line) => n + Number(line.gstAmount), 0));
   const fy = financialYear(new Date());
   const [series] = await tx
@@ -218,5 +219,6 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
   revalidatePath('/inventory/batches');
   revalidatePath('/inventory/serials');
   revalidatePath('/suppliers');
+  revalidatePath('/settlements');
   return { id: row.id, returnNo, total: total.toFixed(2) };
 });

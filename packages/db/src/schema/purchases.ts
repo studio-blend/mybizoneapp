@@ -1,4 +1,14 @@
-import { check, index, jsonb, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  check,
+  index,
+  jsonb,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { user } from './auth';
 import { businesses } from './businesses';
 import { type PackSnapshot, validPackSnapshot } from './product-packs';
@@ -35,6 +45,7 @@ export const purchases = pgTable(
   },
   (t) => ({
     businessIdx: index('purchases_business_id_idx').on(t.businessId),
+    partyUnique: unique('purchases_party_unique').on(t.id, t.businessId, t.supplierId),
     supplierIdx: index('purchases_supplier_id_idx').on(t.supplierId),
     businessPurchaseDateIdx: index('purchases_business_purchase_date_idx').on(
       t.businessId,

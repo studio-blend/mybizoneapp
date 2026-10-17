@@ -70,6 +70,7 @@ export const sales = pgTable(
   },
   (t) => ({
     tenantUnique: unique('sales_id_business_unique').on(t.id, t.businessId),
+    partyUnique: unique('sales_party_unique').on(t.id, t.businessId, t.customerId),
     taxSnapshotConsistent: check(
       'sales_tax_snapshot_consistent',
       sql`

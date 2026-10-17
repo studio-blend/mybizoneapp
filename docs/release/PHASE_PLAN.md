@@ -6,6 +6,11 @@
 > this does not mark delivery Phase 3 or commercial launch complete. Older dated
 > deployment and verification statements below remain historical evidence.
 
+> Product Phase 4a (bill allocations and recorded cashbook) is a local candidate
+> awaiting hosted rollout approval. Its supported scope and follow-on accounting
+> work are in [accounting foundations](../ACCOUNTING_FOUNDATIONS.md). Commercial
+> phases below remain separate and open where previously recorded.
+
 **15 October 2026 update:** Hosted development performance changes are deployed and verified with the saved Pro owner; 133 web + 17 DB tests, types, scoped lint and production build passed. Phase 1 remains complete within supported scope. Phase 2 retains deferred Razorpay and unverified cloud email gates. Windows installer and full cloud delivery/recovery acceptance remain pending; the working hosted development site does not complete those gates. See [current status](STATUS_AND_NEXT_TASKS.md) and [performance report](../PERFORMANCE_OPTIMIZATION.md).
 
 **14 October 2026 owner steering:** Hold Razorpay acceptance for now. Reusable Pro owner is verified locally and on `mybizoneapp.vercel.app` after Neon provisioning; saved credentials are shared across those test accounts. Provider and complete cloud delivery acceptance remain incomplete, not waived. See [Pro testing](LOCAL_PRO_TESTING.md).

@@ -18,6 +18,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 const enabled =
   process.env.DATABASE_URL === 'postgresql://postgres@127.0.0.1:55432/mybizone_release_test';
 const state = vi.hoisted(() => ({ current: null as (AppUser & { businessId: string }) | null }));
+vi.mock('react', async (original) => ({
+  ...(await original<typeof import('react')>()),
+  cache: (fn: unknown) => fn,
+}));
 vi.mock('@/lib/db', async () => {
   const { createDb } = await import('@mybizone/db');
   return { db: createDb('postgresql://postgres@127.0.0.1:55432/mybizone_release_test') };

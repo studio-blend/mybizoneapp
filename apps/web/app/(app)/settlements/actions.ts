@@ -1,8 +1,16 @@
 'use server';
 
 import { unpaidOrderDebt } from '@/lib/order-ledger';
+import { requestHash } from '@/lib/order-ledger';
+import { centsText, moneyCents } from '@/lib/order-policy';
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
+import {
+  allocateSettlement,
+  lockSettlementBill,
+  newAllocationId,
+  settlementBillBalance,
+} from '@/lib/settlement-ledger';
 import {
   auditLogs,
   customers,
@@ -33,6 +41,8 @@ const paymentMethod = z.enum(['cash', 'upi', 'card', 'cheque', 'other']);
 // ─── Sales Settlement ────────────────────────────────────────────────────────
 
 const SalesSettlementInput = z.object({
+  id: uuid.default(newAllocationId),
+  billId: uuid.optional(),
   customerId: uuid,
   amount: moneyText,
   paymentMethod,
@@ -43,7 +53,10 @@ const SalesSettlementInput = z.object({
 export const createSalesSettlementAction = safeAction(
   SalesSettlementInput,
   async (input, { user, tx }) => {
-    await requirePermission(user, 'manage_customers');
+    await requirePermission(user, 'manage_expenses');
+    const hash = requestHash({ ...input, amount: centsText(moneyCents(input.amount)) });
+    if (input.billId)
+      await lockSettlementBill(tx, user.businessId, 'sales', input.billId, input.customerId);
     // 1. Fetch the customer row
     const [customer] = await tx
       .select({
@@ -57,6 +70,31 @@ export const createSalesSettlementAction = safeAction(
 
     // 2. Guard: customer must exist in this business
     if (!customer) throw new Error('customer not found');
+    const [existing] = await tx
+      .select()
+      .from(salesSettlements)
+      .where(
+        and(eq(salesSettlements.id, input.id), eq(salesSettlements.businessId, user.businessId)),
+      );
+    if (existing) {
+      if (existing.requestHash !== hash)
+        throw new Error('This payment request was already used with different details');
+      return {
+        id: existing.id,
+        customerId: input.customerId,
+        amount: existing.amount,
+        newBalance: customer.outstandingBalance,
+      };
+    }
+    if (input.billId) {
+      const balance = await settlementBillBalance(tx, user.businessId, 'sales', input.billId);
+      if (balance.unreconciledStatus)
+        throw new Error(
+          'Bill payment history needs allocation reconciliation before collecting more',
+        );
+      if (moneyCents(input.amount) > balance.remaining)
+        throw new Error('Amount exceeds remaining bill value');
+    }
 
     // 3. Guard: amount must be positive
     if (Number(input.amount) <= 0) throw new Error('amount must be greater than zero');
@@ -101,6 +139,8 @@ export const createSalesSettlementAction = safeAction(
     const [row] = await tx
       .insert(salesSettlements)
       .values({
+        id: input.id,
+        requestHash: hash,
         businessId: user.businessId,
         customerId: input.customerId,
         amount: input.amount,
@@ -111,6 +151,17 @@ export const createSalesSettlementAction = safeAction(
       })
       .returning({ id: salesSettlements.id });
     if (!row) throw new Error('insert failed');
+    if (input.billId)
+      await allocateSettlement(tx, {
+        id: newAllocationId(),
+        businessId: user.businessId,
+        actorId: user.id,
+        side: 'sales',
+        settlementId: row.id,
+        billId: input.billId,
+        amount: input.amount,
+        note: 'Allocated when receipt was recorded',
+      });
 
     // 6. Update customer outstanding balance — clamp to 0
     await tx
@@ -138,6 +189,7 @@ export const createSalesSettlementAction = safeAction(
     // 8. Revalidate
     revalidatePath('/settlements');
     revalidatePath('/customers');
+    refreshAccounting();
 
     // Derive new balance (clamped)
     const newBalance = Math.max(
@@ -152,6 +204,8 @@ export const createSalesSettlementAction = safeAction(
 // ─── Purchase Settlement ─────────────────────────────────────────────────────
 
 const PurchaseSettlementInput = z.object({
+  id: uuid.default(newAllocationId),
+  billId: uuid.optional(),
   supplierId: uuid,
   amount: moneyText,
   paymentMethod,
@@ -162,7 +216,10 @@ const PurchaseSettlementInput = z.object({
 export const createPurchaseSettlementAction = safeAction(
   PurchaseSettlementInput,
   async (input, { user, tx }) => {
-    await requirePermission(user, 'manage_suppliers');
+    await requirePermission(user, 'manage_expenses');
+    const hash = requestHash({ ...input, amount: centsText(moneyCents(input.amount)) });
+    if (input.billId)
+      await lockSettlementBill(tx, user.businessId, 'purchases', input.billId, input.supplierId);
     // 1. Fetch the supplier row
     const [supplier] = await tx
       .select({
@@ -176,6 +233,31 @@ export const createPurchaseSettlementAction = safeAction(
 
     // 2. Guard: supplier must exist in this business
     if (!supplier) throw new Error('supplier not found');
+    const [existing] = await tx
+      .select()
+      .from(purchaseSettlements)
+      .where(
+        and(
+          eq(purchaseSettlements.id, input.id),
+          eq(purchaseSettlements.businessId, user.businessId),
+        ),
+      );
+    if (existing) {
+      if (existing.requestHash !== hash)
+        throw new Error('This payment request was already used with different details');
+      return {
+        id: existing.id,
+        supplierId: input.supplierId,
+        amount: existing.amount,
+        newBalance: supplier.outstandingBalance,
+      };
+    }
+    if (
+      input.billId &&
+      moneyCents(input.amount) >
+        (await settlementBillBalance(tx, user.businessId, 'purchases', input.billId)).remaining
+    )
+      throw new Error('Amount exceeds remaining bill value');
 
     // 3. Guard: amount must be positive
     if (Number(input.amount) <= 0) throw new Error('amount must be greater than zero');
@@ -189,6 +271,8 @@ export const createPurchaseSettlementAction = safeAction(
     const [row] = await tx
       .insert(purchaseSettlements)
       .values({
+        id: input.id,
+        requestHash: hash,
         businessId: user.businessId,
         supplierId: input.supplierId,
         amount: input.amount,
@@ -199,6 +283,17 @@ export const createPurchaseSettlementAction = safeAction(
       })
       .returning({ id: purchaseSettlements.id });
     if (!row) throw new Error('insert failed');
+    if (input.billId)
+      await allocateSettlement(tx, {
+        id: newAllocationId(),
+        businessId: user.businessId,
+        actorId: user.id,
+        side: 'purchases',
+        settlementId: row.id,
+        billId: input.billId,
+        amount: input.amount,
+        note: 'Allocated when payment was recorded',
+      });
 
     // 6. Update supplier outstanding balance — clamp to 0
     await tx
@@ -226,6 +321,7 @@ export const createPurchaseSettlementAction = safeAction(
     // 8. Revalidate
     revalidatePath('/settlements');
     revalidatePath('/suppliers');
+    refreshAccounting();
 
     const newBalance = Math.max(
       0,
@@ -235,3 +331,39 @@ export const createPurchaseSettlementAction = safeAction(
     return { id: row.id, supplierId: input.supplierId, amount: input.amount, newBalance };
   },
 );
+
+function refreshAccounting() {
+  for (const path of [
+    '/settlements',
+    '/cashbook',
+    '/reports/due-bills',
+    '/sales',
+    '/purchases',
+    '/dashboard',
+  ])
+    revalidatePath(path);
+}
+const allocateExistingSettlement = safeAction(
+  z.object({
+    id: uuid,
+    side: z.enum(['sales', 'purchases']),
+    settlementId: uuid,
+    billId: uuid,
+    amount: moneyText.refine((v) => Number(v) > 0, 'Amount must be positive'),
+    note: z.string().trim().min(3).max(500),
+  }),
+  async (input, { user, tx }) => {
+    await requirePermission(user, 'manage_expenses');
+    const result = await allocateSettlement(tx, {
+      ...input,
+      businessId: user.businessId,
+      actorId: user.id,
+    });
+    refreshAccounting();
+    return result;
+  },
+);
+
+export async function allocateExistingSettlementAction(input: unknown) {
+  return allocateExistingSettlement(input);
+}

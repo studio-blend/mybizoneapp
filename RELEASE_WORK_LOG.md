@@ -1058,3 +1058,103 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   records acceptance without changing tested application code. Accounting foundations
   (invoice settlement allocation, cashbook, advance/refund records) are next;
   commercial release gates remain separate and open.
+
+## 17 October 2026 — product Phase 4a accounting foundations candidate
+
+- Continued the approved phased product roadmap after published Phase 3e. Graph
+  tools required by the inherited AGENTS.md were unavailable in this session, so
+  targeted source searches, dependency tracing and diff review were used.
+- Added explicit customer/supplier bill allocations with partial amounts, existing
+  payment reassignment, permanent evidence notes, audit events, party/tenant FKs
+  and FORCE RLS. New browser commands have request IDs; retries cannot repeat the
+  financial effect. Existing money documents stay unchanged, with no guessed
+  historical assignment. Application UPDATE/DELETE grants on settlements are
+  revoked; allocation evidence is SELECT/INSERT only. Party locks serialize
+  payment assignment without requiring UPDATE access to immutable money documents.
+- Aligned settlement actions to the existing global manage_expenses gate. Accounts
+  staff can collect/pay without party-editing grants; sales-only and scoped staff
+  cannot use business-wide finance commands. Updated the due-bills report to use
+  explicit credit allocations and linked returns. Known unpaid portions can be
+  returned after allocation; paid portions still require refund reconciliation.
+- Added a source-document cashbook: receipts/payments once, order advances/refunds,
+  EMI down payments/instalments and other income/expenses. Allocation and delivery
+  rows do not create money. India-date filters, full-period totals, daily/method
+  comparisons and 100-row pagination are included. Unknown methods remain unknown.
+  UI and docs distinguish recorded net movement from cleared/available cash.
+- Initial new accounting tests passed; full web run exposed two pre-existing Node
+  suites missing React cache stubs. Added stubs without weakening real permission
+  lookup. The older kitchen guard now rejects an absent database-directory row.
+  Full web suite then passed 317 tests/34 suites. Two further supplier-reassignment
+  and cross-tenant cases passed in the 26-case accounting suite. Existing database
+  suite passed all 17 tests/3 suites, zero skips/failures. Final combined gate follows.
+- Initial build found Next's Server Action analysis rejected the inline Zod refine
+  callback in the exported wrapper. Kept validation in a private safeAction and
+  exported an explicit async function; the subsequent production build passed.
+  A final frozen build follows finance-permission/tab-state fixes. Scoped source/
+  schema/script lint passed with five pre-existing return-helper non-null warnings.
+- Prepared migration 0028 using Neon's temporary branch workflow: migration
+  c793d654-f12f-4c5c-8c01-621e3070f5ec, branch br-green-firefly-aoc9y1l7. All **37**
+  checked existing-table row counts/hashes match the hosted parent; new allocation
+  tables are empty, legacy request hashes remain null, and eight foreign keys plus
+  FORCE RLS/narrow grants are present. No hosted schema application, migration
+  record, automatic allocation or publication has occurred. Migration 0020 remains
+  unrelated and pending. Private complete migration context and baselines are in
+  `.local/test-accounts/pending-accounting-migration.json`.
+- Scope and roadmap: `docs/ACCOUNTING_FOUNDATIONS.md`, `docs/PROJECT_STATUS.md` and
+  release status/phase notes. General advances, general refunds/corrections and
+  reconciled opening cash/bank clearing remain subsequent accounting work.
+- Final financial review retained conservative handling of legacy paid/partial
+  credit flags without allocation evidence. These require reconciliation before
+  another bill-specific collection or debt-reducing return, while assigning actual
+  earlier payment evidence remains possible. Added a real regression. One-character
+  and maximum-length optional receipt/payment notes now remain valid independently
+  of the generated allocation evidence note; a successful payment clears its bill
+  selection. Final automated gate: **320 web tests/34 suites plus 17 database
+  tests/3 suites**, zero failures/skips. Source/schema/script lint has no new errors.
+- Production-browser acceptance found a stale assignment dropdown after a new
+  unallocated receipt. Financial records were correct and fixture cleanup preserved
+  all six checked financial tables. Gave the two sibling client forms distinct
+  React keys; the corrected development UI passed all nine mutating accounting
+  scenarios and all 12 read-only finance/phone/role checks, with zero transport
+  retries in the read-only runner. Inspected customer/allocation/cashbook phone
+  screenshots. Rebuilding this exact source for final production-browser acceptance;
+  development checks do not replace the final production gate.
+- The final production check still reproduced the stale page despite distinct
+  keys, so development acceptance was not treated as sufficient. Diagnostics
+  confirmed the receipt existed unallocated and a fresh document read included it.
+  Adopted the existing order/kitchen full-navigation save pattern, with a success
+  banner validated against the actual payment/allocation ID in the tenant ledger.
+  Added hydration guards and recoverable uncertain-save errors; request IDs persist
+  for the form's lifetime, including edited retries after a lost response. Temporary
+  response diagnostics were removed. Rebuilding and rerunning production acceptance.
+- The post-save navigation fix passed all nine production accounting scenarios,
+  with six financial-table hashes preserved after fixture cleanup. The read-only
+  runner then exposed the same stale client rendering when switching settlement
+  tabs. Preserved the original settlement page's native-link approach for all new
+  accounting tabs, source links and pagination. The final source is frozen again;
+  full production-browser acceptance follows. No financial/schema changes were
+  needed for these navigation corrections.
+- Final acceptance passed **186 production-browser checks across all 13 runners**:
+  nine accounting transactions, 12 accounting/register, 19 kitchen, 10 kitchen/
+  register, 17 wholesale, 11 wholesale/register, 19 orders, 10 orders/register,
+  12 batches, 16 serials, 10 serial/register, 21 workspace and 20 analysis checks.
+  Every runner exited 0 and all seven transport counters were zero. Analysis's
+  collection-link verifier now asserts the correct customer/visible debt and a
+  deliberately blank receipt amount; collecting the party's whole balance can
+  include reserved order/EMI debt, so the old prefill assertion was obsolete.
+- Final production build and TypeScript passed; scoped lint passed with five
+  existing return-helper non-null warnings. The final automated gate remains
+  **320 web tests/34 suites plus 17 database tests/3 suites**, zero failures/skips.
+  Generated Next configuration was restored. Accepted source hashes remain
+  unchanged after browser acceptance; only verification's intentional amount
+  expectation and documentation changed after the application build.
+- Final evidence: `.cache/accounting-all-tests-accepted.log`,
+  `.cache/accounting-db-tests.log`, `.cache/accounting-build-accepted.log`,
+  `.cache/accounting-lint-final.log`, `.cache/accounting-production-acceptance.json`,
+  13 `.cache/accounting-production-*.log` files, accounting/register phone
+  screenshots and `.cache/accounting-accepted-source.json`. Migration validation
+  and complete pending context are in ignored
+  `.local/test-accounts/pending-accounting-migration.json`. The 34-file scoped
+  candidate is committed locally and awaits explicit approval to apply/record
+  only migration 0028, remove its temporary branch and publish. Hosted Phase 3e
+  remains unchanged; subscription migration 0020 and commercial gates remain open.

@@ -20,6 +20,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const url = 'postgresql://postgres@127.0.0.1:55432/mybizone_release_test';
+vi.mock('react', async (original) => ({
+  ...(await original<typeof import('react')>()),
+  cache: (fn: unknown) => fn,
+}));
 const state = vi.hoisted(() => ({
   id: '',
   businessId: '',

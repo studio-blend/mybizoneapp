@@ -33,7 +33,10 @@ export default async function DueBillsReportPage(props: PageProps) {
         customerName: sales.customerName,
         total: sql<string>`CASE WHEN "sales".payment_method='order' THEN GREATEST(0,"sales".total
          -COALESCE((SELECT sum(r.total) FROM sales_returns r WHERE r.business_id="sales".business_id AND r.original_sale_id="sales".id AND r.status='completed'),0)
-         -COALESCE((SELECT sum(a.amount) FROM customer_order_allocations a JOIN customer_order_deliveries d ON d.id=a.delivery_id AND d.business_id=a.business_id WHERE d.sale_id="sales".id AND d.business_id="sales".business_id),0)) ELSE "sales".total END::text`,
+         -COALESCE((SELECT sum(a.amount) FROM customer_order_allocations a JOIN customer_order_deliveries d ON d.id=a.delivery_id AND d.business_id=a.business_id WHERE d.sale_id="sales".id AND d.business_id="sales".business_id),0))
+         WHEN "sales".payment_method='credit' THEN GREATEST(0,"sales".total
+         -COALESCE((SELECT sum(r.total) FROM sales_returns r WHERE r.business_id="sales".business_id AND r.original_sale_id="sales".id AND r.status='completed'),0)
+         -COALESCE((SELECT sum(a.amount) FROM sales_settlement_allocations a WHERE a.business_id="sales".business_id AND a.sale_id="sales".id),0)) ELSE "sales".total END::text`,
         orderId: sql<
           string | null
         >`(SELECT d.order_id FROM customer_order_deliveries d WHERE d.sale_id="sales".id AND d.business_id="sales".business_id)`,
@@ -47,6 +50,8 @@ export default async function DueBillsReportPage(props: PageProps) {
         and(
           eq(sales.businessId, user.businessId),
           inArray(sales.paymentStatus, ['due', 'partial', 'overdue']),
+          eq(sales.status, 'completed'),
+          sql`${sales.billType}<>'estimate'`,
         ),
       )
       .orderBy(desc(sales.createdAt));
@@ -55,15 +60,17 @@ export default async function DueBillsReportPage(props: PageProps) {
   const todayDay = indiaToday();
   const today = new Date(`${todayDay}T00:00:00Z`);
   // Decorate with days-overdue + bucket, then filter.
-  const decorated = rows.map((r) => {
-    const reference = new Date(`${r.dueDate ?? indiaToday(r.createdAt)}T00:00:00Z`);
-    const days = Math.max(
-      0,
-      Math.floor((today.getTime() - reference.getTime()) / (1000 * 60 * 60 * 24)),
-    );
-    const isOverdue = r.dueDate ? r.dueDate < todayDay : false;
-    return { ...r, daysOverdue: days, isOverdue, bucket: bucketOf(days) };
-  });
+  const decorated = rows
+    .filter((r) => Number(r.total) > 0)
+    .map((r) => {
+      const reference = new Date(`${r.dueDate ?? indiaToday(r.createdAt)}T00:00:00Z`);
+      const days = Math.max(
+        0,
+        Math.floor((today.getTime() - reference.getTime()) / (1000 * 60 * 60 * 24)),
+      );
+      const isOverdue = r.dueDate ? r.dueDate < todayDay : false;
+      return { ...r, daysOverdue: days, isOverdue, bucket: bucketOf(days) };
+    });
 
   const filtered = bucket === 'all' ? decorated : decorated.filter((r) => r.bucket === bucket);
 
@@ -80,9 +87,10 @@ export default async function DueBillsReportPage(props: PageProps) {
       <div>
         <h1 className="text-2xl font-semibold">Due bills</h1>
         <p className="text-sm text-muted-foreground">
-          General bills show original bill values until payments are reconciled to invoices. Order
-          bills show their remaining allocated balance. Date groups use bill/reference dates; they
-          are not verified invoice ageing. Use customer balances for general collections.
+          Credit and order bills show values remaining after linked returns and bill allocations.
+          Unallocated general payments may still reduce customer debt; assign them in Settlements
+          before treating these groups as invoice ageing. EMI values remain original bill values;
+          use the EMI schedule for principal and interest still due.
         </p>
       </div>
 

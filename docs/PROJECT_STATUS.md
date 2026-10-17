@@ -53,6 +53,15 @@ table ordering and restaurant checks remain separate capabilities. See
 
 ## Latest verification
 
+**Phase 4a ready for rollout:** invoice-level customer/supplier settlement allocation and
+a recorded cashbook are implemented locally, with 320 tests passing across all
+34 web suites plus 17 database tests. Migration 0028 passed on a temporary Neon branch with
+37 existing tables preserved; hosted application/publication approval is pending.
+All 186 production-browser checks, TypeScript, scoped lint and the production build
+passed. The candidate is committed locally; hosted rollout still awaits explicit
+migration approval. See [accounting foundations](ACCOUNTING_FOUNDATIONS.md).
+The following Phase 3e evidence describes the current live release.
+
 - 187 automated tests passed across 17 focused suites, covering kitchen, wholesale,
   orders, serial/batch workflows and relevant transaction, dashboard, profile,
   analysis and security regressions.
@@ -82,8 +91,11 @@ Deliver each with its full data flow, permission checks and relevant acceptance
 before enabling it. Test new schema changes on a temporary branch and obtain the
 explicit migration approval required by the connected database tool.
 
-1. **Next — accounting foundations:** invoice-level settlement allocation and cashbook/
-   advance/refund records before adding invoice ageing or available-cash claims.
+1. **Phase 4a — verified candidate awaiting rollout:** bill settlement allocation and a
+   recorded cashbook. [Scope and evidence](ACCOUNTING_FOUNDATIONS.md).
+2. **Phase 4b — next:** general advances, return refunds and correction/reversal records.
+3. **Phase 4c:** reconciled opening cash/accounts, transfers and bank clearing before
+   verified invoice ageing or available-cash claims.
 
 This is the working order, not a committed delivery-date estimate.
 
@@ -105,10 +117,12 @@ See [delivery phases](release/PHASE_PLAN.md),
 
 ## Documentation and repository state
 
-Feature specifications, implementation, the consolidated summary, work log,
-release/admin notes, test-data reports and Phase 3e acceptance runners are committed
-and published. Ignored local evidence files retain detailed logs and screenshots;
-credentials and sessions are excluded. Unrelated test-account and tunnel tooling
+Implementation, feature specifications and acceptance runners through Phase 3e
+are committed and published, with release/admin notes and test-data reports.
+The verified Phase 4a accounting candidate is committed locally and awaits hosted
+migration/publication approval. Its scope, evidence and next phases are documented.
+Ignored local evidence retains logs and screenshots; credentials and sessions
+are excluded. Unrelated test-account and tunnel tooling
 remains a separate pending change. Documentation must state its
 publication and verification status explicitly.
 

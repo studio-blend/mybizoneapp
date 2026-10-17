@@ -1,4 +1,4 @@
-import { index, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { index, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { user } from './auth';
 import { businesses } from './businesses';
 import { suppliers } from './suppliers';
@@ -17,11 +17,13 @@ export const purchaseSettlements = pgTable(
     paymentMethod: text('payment_method').notNull(),
     referenceNo: text('reference_no'),
     notes: text('notes'),
+    requestHash: text('request_hash'),
     settledAt: timestamp('settled_at', { withTimezone: true }).notNull().defaultNow(),
     createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    partyUnique: unique('purchase_settlements_party_unique').on(t.id, t.businessId, t.supplierId),
     businessIdx: index('purchase_settlements_business_id_idx').on(t.businessId),
     supplierIdx: index('purchase_settlements_supplier_id_idx').on(t.supplierId),
     settledAtIdx: index('purchase_settlements_settled_at_idx').on(t.businessId, t.settledAt),

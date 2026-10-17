@@ -30,6 +30,7 @@ const definitions: { label: string; items: Entry[] }[] = [
       { href: '/quotations', label: 'Quotations', gate: 'create_sale' },
       { href: '/delivery-challans', label: 'Delivery Challans', gate: 'create_sale' },
       { href: '/settlements', label: 'Settlements', gate: 'manage_expenses' },
+      { href: '/cashbook', label: 'Cashbook', gate: 'manage_expenses' },
       { href: '/emi', label: 'EMI', gate: 'view_sales' },
     ],
   },

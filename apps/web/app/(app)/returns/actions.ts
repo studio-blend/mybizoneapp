@@ -3,6 +3,11 @@
 import { lockOrder, reconcileOrderReturn } from '@/lib/order-ledger';
 import { requirePermission } from '@/lib/require-permission';
 import { safeAction } from '@/lib/server-action';
+import {
+  settlementBillBalance,
+  unallocatedSettlements,
+  updateSettlementBillStatus,
+} from '@/lib/settlement-ledger';
 import { moveStockBatches } from '@/lib/stock-batches';
 import {
   auditLogs,
@@ -14,7 +19,6 @@ import {
   saleItems,
   sales,
   salesReturns,
-  salesSettlements,
 } from '@mybizone/db';
 import { financialYear, formatBillNo } from '@mybizone/domain/bill-series';
 import { round2 } from '@mybizone/domain/money';
@@ -102,17 +106,10 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
       .from(customers)
       .where(and(eq(customers.id, original.customerId), eq(customers.businessId, user.businessId)))
       .for('update');
-    const [settlement] = await tx
-      .select({ id: salesSettlements.id })
-      .from(salesSettlements)
-      .where(
-        and(
-          eq(salesSettlements.customerId, original.customerId),
-          eq(salesSettlements.businessId, user.businessId),
-        ),
-      )
-      .limit(1);
-    if (!customer || settlement || original.paymentStatus !== 'due') {
+    if (
+      !customer ||
+      (await unallocatedSettlements(tx, user.businessId, 'sales', original.customerId)) > 0
+    ) {
       throw new Error(
         'credit return requires payment allocation reconciliation before adjusting debt',
       );
@@ -147,6 +144,21 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
     if (costs.size > 1) throw new Error('return requires original-line cost reconciliation');
   }
   const total = round2(lines.reduce((n, line) => n + Number(line.lineTotal), 0));
+  if (
+    original.paymentMethod === 'credit' &&
+    (await settlementBillBalance(tx, user.businessId, 'sales', original.id)).unreconciledStatus
+  )
+    throw new Error(
+      'Credit bill payment history needs allocation reconciliation before adjusting debt',
+    );
+  if (
+    original.paymentMethod === 'credit' &&
+    Math.round(total * 100) >
+      (await settlementBillBalance(tx, user.businessId, 'sales', original.id)).remaining
+  )
+    throw new Error(
+      'Credit return exceeds unpaid bill value; a paid return requires refund reconciliation',
+    );
   const taxTotal = round2(lines.reduce((n, line) => n + Number(line.gstAmount), 0));
   const fy = financialYear(new Date());
   const [series] = await tx
@@ -242,6 +254,7 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
       .returning({ id: customers.id });
     if (!adjusted.length)
       throw new Error('credit return exceeds recorded debt; reconcile the balance');
+    await updateSettlementBillStatus(tx, user.businessId, original.id);
   }
   await tx.insert(auditLogs).values({
     businessId: user.businessId,
@@ -258,6 +271,8 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
   revalidatePath('/inventory/serials');
   revalidatePath('/warranties');
   revalidatePath('/customers');
+  revalidatePath('/settlements');
+  revalidatePath('/reports/due-bills');
   if (sourceOrder) {
     revalidatePath('/orders');
     revalidatePath(`/orders/${sourceOrder.id}`);

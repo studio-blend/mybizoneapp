@@ -1,245 +1,177 @@
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
-import { customers, purchaseSettlements, salesSettlements, suppliers } from '@mybizone/db';
+import { settlementRegister } from '@/lib/settlement-queries';
+import { customers, suppliers } from '@mybizone/db';
 import { withTenant } from '@mybizone/db/tenant';
-import { Card, CardContent } from '@mybizone/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@mybizone/ui/table';
-import { desc, eq } from 'drizzle-orm';
-import Link from 'next/link';
-import { PurchaseSettlementForm } from './_components/purchase-settlement-form';
-import { SalesSettlementForm } from './_components/sales-settlement-form';
-
+import { eq } from 'drizzle-orm';
+import { AllocationForm, PaymentForm } from './_components/payment-form';
 export const dynamic = 'force-dynamic';
-
-interface PageProps {
-  searchParams: Promise<{ tab?: string; customerId?: string }>;
-}
-
-function formatDate(d: Date | string | null) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function formatMethod(m: string) {
-  const labels: Record<string, string> = {
-    cash: 'Cash',
-    upi: 'UPI',
-    card: 'Card',
-    cheque: 'Cheque',
-    other: 'Other',
-  };
-  return labels[m] ?? m;
-}
-
-export default async function SettlementsPage(props: PageProps) {
-  const searchParams = await props.searchParams;
+export default async function SettlementsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    tab?: string;
+    customerId?: string;
+    supplierId?: string;
+    recorded?: string;
+    allocated?: string;
+  }>;
+}) {
+  const params = await searchParams;
   const user = await requireUser();
   await requirePermission(user, 'manage_expenses');
-  const tab = searchParams.tab === 'purchases' ? 'purchases' : 'sales';
-
-  const [customerList, supplierList, salesRows, purchaseRows] = await withTenant(
-    db,
-    user.businessId,
-    async (tx) => {
-      const cList = await tx
-        .select({
-          id: customers.id,
-          name: customers.name,
-          phone: customers.phone,
-          outstandingBalance: customers.outstandingBalance,
-        })
-        .from(customers)
-        .where(eq(customers.businessId, user.businessId));
-
-      const sList = await tx
-        .select({
-          id: suppliers.id,
-          name: suppliers.name,
-          phone: suppliers.phone,
-          outstandingBalance: suppliers.outstandingBalance,
-        })
-        .from(suppliers)
-        .where(eq(suppliers.businessId, user.businessId));
-
-      const sRows = await tx
-        .select({
-          id: salesSettlements.id,
-          amount: salesSettlements.amount,
-          paymentMethod: salesSettlements.paymentMethod,
-          referenceNo: salesSettlements.referenceNo,
-          settledAt: salesSettlements.settledAt,
-          customerName: customers.name,
-          customerPhone: customers.phone,
-        })
-        .from(salesSettlements)
-        .leftJoin(customers, eq(customers.id, salesSettlements.customerId))
-        .where(eq(salesSettlements.businessId, user.businessId))
-        .orderBy(desc(salesSettlements.settledAt))
-        .limit(50);
-
-      const pRows = await tx
-        .select({
-          id: purchaseSettlements.id,
-          amount: purchaseSettlements.amount,
-          paymentMethod: purchaseSettlements.paymentMethod,
-          referenceNo: purchaseSettlements.referenceNo,
-          settledAt: purchaseSettlements.settledAt,
-          supplierName: suppliers.name,
-          supplierPhone: suppliers.phone,
-        })
-        .from(purchaseSettlements)
-        .leftJoin(suppliers, eq(suppliers.id, purchaseSettlements.supplierId))
-        .where(eq(purchaseSettlements.businessId, user.businessId))
-        .orderBy(desc(purchaseSettlements.settledAt))
-        .limit(50);
-
-      return [cList, sList, sRows, pRows] as const;
-    },
-  );
-
+  const side = params.tab === 'purchases' ? 'purchases' : 'sales';
+  const data = await withTenant(db, user.businessId, async (tx) => {
+    const parties =
+      side === 'sales'
+        ? await tx
+            .select({
+              id: customers.id,
+              name: customers.name,
+              outstandingBalance: customers.outstandingBalance,
+            })
+            .from(customers)
+            .where(eq(customers.businessId, user.businessId))
+        : await tx
+            .select({
+              id: suppliers.id,
+              name: suppliers.name,
+              outstandingBalance: suppliers.outstandingBalance,
+            })
+            .from(suppliers)
+            .where(eq(suppliers.businessId, user.businessId));
+    return { parties, ...(await settlementRegister(tx, user.businessId, side)) };
+  });
+  const unallocated = data.payments.reduce((n, p) => n + Number(p.unallocated), 0);
+  const savedPayment = data.payments.find((p) => p.id === params.recorded);
+  const savedAllocation = data.allocations.find((a) => a.id === params.allocated);
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div>
         <h1 className="text-2xl font-semibold">Settlements</h1>
+        <p className="text-sm text-muted-foreground">
+          Record money once, then apply it to the correct credit bill.{' '}
+          <a href="/cashbook" className="underline">
+            Open cashbook
+          </a>
+        </p>
       </div>
-
-      {/* Tab bar */}
-      <div className="flex gap-1 border-b">
-        <Link
-          href="/settlements?tab=sales"
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
-            tab === 'sales'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
+      <nav className="flex flex-wrap gap-4">
+        <a
+          href="/settlements"
+          aria-current={side === 'sales' ? 'page' : undefined}
+          className="underline"
         >
           Sales settlements
-        </Link>
-        <Link
+        </a>
+        <a
           href="/settlements?tab=purchases"
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
-            tab === 'purchases'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
+          aria-current={side === 'purchases' ? 'page' : undefined}
+          className="underline"
         >
           Purchase settlements
-        </Link>
-      </div>
-
-      {tab === 'sales' ? (
-        <div className="space-y-6">
-          {/* Sales settlement form */}
-          <SalesSettlementForm
-            customers={customerList}
-            initialCustomerId={
-              customerList.some((customer) => customer.id === searchParams.customerId)
-                ? searchParams.customerId
-                : undefined
-            }
-          />
-
-          {/* Recent sales settlements table */}
-          {salesRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No sales settlements recorded yet.</p>
-          ) : (
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Reference</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {salesRows.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {formatDate(r.settledAt)}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {r.customerName ?? '—'}
-                          {r.customerPhone && (
-                            <span className="block text-xs text-muted-foreground">
-                              {r.customerPhone}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ₹{Number(r.amount).toFixed(2)}
-                        </TableCell>
-                        <TableCell>{formatMethod(r.paymentMethod)}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {r.referenceNo ?? '—'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Purchase settlement form */}
-          <PurchaseSettlementForm suppliers={supplierList} />
-
-          {/* Recent purchase settlements table */}
-          {purchaseRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No purchase settlements recorded yet.</p>
-          ) : (
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Reference</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {purchaseRows.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {formatDate(r.settledAt)}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {r.supplierName ?? '—'}
-                          {r.supplierPhone && (
-                            <span className="block text-xs text-muted-foreground">
-                              {r.supplierPhone}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ₹{Number(r.amount).toFixed(2)}
-                        </TableCell>
-                        <TableCell>{formatMethod(r.paymentMethod)}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {r.referenceNo ?? '—'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        </a>
+      </nav>
+      {savedPayment && (
+        <output className="block rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+          <span>Settlement recorded.</span> ₹{Number(savedPayment.amount).toFixed(2)} ·{' '}
+          {savedPayment.name}
+        </output>
       )}
+      {savedAllocation && (
+        <output className="block rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+          <span>Allocation saved. No new money was recorded.</span> {savedAllocation.billNo} · ₹
+          {Number(savedAllocation.amount).toFixed(2)}
+        </output>
+      )}
+      <div className="rounded-lg border bg-muted/30 p-4">
+        <p className="font-medium">₹{unallocated.toFixed(2)} awaiting bill allocation</p>
+        <p className="text-sm text-muted-foreground">
+          Earlier payments reduce party debt already. Until assigned, individual bill balances may
+          overstate what is still due. Opening-balance notes do not establish opening cash.
+        </p>
+      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <PaymentForm
+          key={`payment-${side}`}
+          side={side}
+          parties={data.parties}
+          bills={data.bills}
+          initialPartyId={side === 'sales' ? params.customerId : params.supplierId}
+        />
+        <AllocationForm
+          key={`allocation-${side}`}
+          side={side}
+          bills={data.bills}
+          payments={data.payments}
+        />
+      </div>
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Recorded payments</h2>
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="p-3">Date / party</th>
+                <th className="p-3">Amount</th>
+                <th className="p-3">Unallocated</th>
+                <th className="p-3">Method / reference</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.payments.slice(0, 100).map((p) => (
+                <tr className="border-b" key={p.id}>
+                  <td className="p-3">
+                    {new Date(p.settledAt).toLocaleDateString('en-IN', {
+                      timeZone: 'Asia/Kolkata',
+                    })}
+                    <br />
+                    {p.name}
+                  </td>
+                  <td className="p-3 tabular-nums">₹{Number(p.amount).toFixed(2)}</td>
+                  <td className="p-3 tabular-nums">₹{Number(p.unallocated).toFixed(2)}</td>
+                  <td className="p-3">
+                    {p.method}
+                    <br />
+                    {p.reference ?? '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!data.payments.length && (
+            <p className="p-4 text-sm text-muted-foreground">No settlements recorded.</p>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Latest 100 payments shown. All unallocated payments remain available in the allocation
+          form. Allocations are permanent evidence; confirm the bill before saving.
+        </p>
+      </section>
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Bill allocation history</h2>
+        <p className="text-xs text-muted-foreground">
+          Latest 100 allocations. These assign existing money; they are not additional receipts or
+          payments.
+        </p>
+        <div className="space-y-3">
+          {data.allocations.map((a) => (
+            <article key={a.id} className="rounded-lg border p-4 text-sm">
+              <p className="font-medium">
+                {a.billNo} · {a.name} · ₹{Number(a.amount).toFixed(2)}
+              </p>
+              <p className="break-words text-muted-foreground">{a.note}</p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(a.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+              </p>
+            </article>
+          ))}
+          {!data.allocations.length && (
+            <p className="text-sm text-muted-foreground">No bill allocations recorded yet.</p>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

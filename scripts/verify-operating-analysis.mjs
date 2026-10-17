@@ -98,9 +98,15 @@ try {
     await page.getByLabel('Customer', { exact: true }).inputValue(),
     collectionUrl.searchParams.get('customerId'),
   );
-  assert(Number(await page.getByLabel('Amount ₹', { exact: true }).inputValue()) > 0);
+  assert.equal(await page.getByLabel('Amount ₹', { exact: true }).inputValue(), '');
+  const collectionParty = await page
+    .getByLabel('Customer', { exact: true })
+    .locator('option:checked')
+    .textContent();
+  const shownBalance = collectionParty?.match(/₹([\d,.]+) due/);
+  assert(shownBalance && Number(shownBalance[1].replaceAll(',', '')) > 0);
   result.checks.push(
-    'Collection action opens the correct customer and balance without submitting a payment',
+    'Collection action preselects the customer and shows debt while leaving the receipt amount explicit',
   );
   await analysis(page);
   await page.locator('select[name="range"]').selectOption('today');

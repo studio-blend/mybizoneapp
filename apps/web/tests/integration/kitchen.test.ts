@@ -92,7 +92,7 @@ describe.skipIf(process.env.DATABASE_URL !== url)(
   () => {
     beforeAll(async () => {
       const [d] = await db.$client`SHOW data_directory`;
-      if (!d.data_directory.replaceAll('\\', '/').endsWith('/.cache/test-pgdata'))
+      if (!d?.data_directory.replaceAll('\\', '/').endsWith('/.cache/test-pgdata'))
         throw new Error('Unexpected database');
     });
     beforeEach(async () => {

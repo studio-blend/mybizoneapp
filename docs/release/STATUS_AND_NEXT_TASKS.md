@@ -1,5 +1,13 @@
 # MyBizOne — status and next tasks
 
+> **Accounting candidate, 17 October:** Phase 4a adds bill allocations and a
+> recorded cashbook; 320 web and 17 database tests pass. Migration 0028 preserved 37 existing
+> tables on a temporary Neon branch. All 186 production-browser checks, types,
+> scoped lint and the production build passed. The candidate is committed locally;
+> hosted migration and publication have not occurred. See
+> [the current accounting scope](../ACCOUNTING_FOUNDATIONS.md). General advances,
+> refunds, opening cash and bank clearing follow in later accounting phases.
+
 > **17 October 2026:** Start with [the current project status and roadmap](../PROJECT_STATUS.md).
 > Role dashboards, business profiles, operating analysis and feature Phases 3a–3e
 > (batch/expiry, serials/warranties, orders/advances/deliveries, wholesale and kitchen
