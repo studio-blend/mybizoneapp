@@ -1,9 +1,10 @@
 # Wholesale packs, credit terms and fulfilment — feature Phase 3d
 
-Status: local production acceptance passed; owner approved hosted rollout.
-Migration 0026 is applied and recorded and its temporary branch is removed.
-Application publication and hosted acceptance are in progress; Phase 3c remains
-the latest accepted application release until those checks finish.
+Status: published and verified on 17 October 2026. The owner approved rollout;
+migration 0026 is applied and recorded, and its temporary branch is removed.
+Application acceptance commit: `f5b0b6df2c1695803a836ea68a5c08f5a4c12184`.
+Vercel deployment `dpl_3pCRTn7LbvLmDNWT872Ui7ap74MN` reached READY and the
+public alias was verified. Documentation-only follow-ups preserve this application.
 
 Products retain one stock unit. Optional named packs convert whole pack counts
 plus loose quantities into that unit with exact integer arithmetic. All prices
@@ -87,8 +88,15 @@ conversion grants and frozen order terms passed. Hosted migration and publicatio
 are approved. Migration 0026 is applied and recorded, its temporary branch is
 removed, and all 25 fresh pre/post-migration existing-table hashes match.
 Hosted FORCE RLS and immutable conversion/frozen term grants passed. Unrelated
-subscription migration 0020 remains pending. Application publication and hosted
-acceptance follow. No financial or inventory fixtures were added to the hosted
-database. Detailed commands/evidence and the
+subscription migration 0020 remains pending.
+
+All **103 hosted browser checks passed**: 11 wholesale/register, 10 order/register,
+10 serial/register, nine batch, 21 workspace, 20 analysis and 22 seeded transaction,
+bill and report checks. All seven runners exited 0; the six with transport counters
+reported zero retries. Hosted phone layouts were inspected at 360px. No financial
+or inventory form was saved, product packs remain empty, and all 25 existing-table
+hashes still match the fresh pre-migration baseline after acceptance. Define actual
+pack conversions before using pack entry; no packaging sizes were invented.
+Detailed commands/evidence and the
 next phase are in [the work log](../RELEASE_WORK_LOG.md) and
 [project roadmap](PROJECT_STATUS.md).

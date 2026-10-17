@@ -26,9 +26,9 @@
    checks passed. Phase 3d [wholesale packs/credit/fulfilment](WHOLESALE_PACKS_AND_CREDIT.md)
    passed local acceptance with 162 automated, two PDF and 136 production-browser
    checks, plus build/types. Migration 0026 passed on a temporary branch with 25
-   checked existing tables preserved. The owner approved rollout; migration 0026
-   is applied/recorded and its temporary branch removed. Publication/hosted
-   acceptance are in progress. Restaurant
+   checked existing tables preserved. It is published with owner-approved migration
+   0026 applied/recorded, the temporary branch removed and all 103 hosted browser
+   checks passed. Restaurant
    capabilities remain a subsequent delivery.
 
 ## Phase 1 behaviour

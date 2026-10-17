@@ -909,3 +909,30 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   Unrelated subscription migration 0020 remains pending. Accepted application
   commit `ae0fc9469f866cde8ed58f651179383695297e44` is unchanged apart from rollout
   documentation. Publication and hosted acceptance follow.
+- Published application commit `f5b0b6df2c1695803a836ea68a5c08f5a4c12184`, tree
+  `8fc861ec484d4a25a08c6db3cad695dcf701768e`, identical to the accepted local
+  application plus migration-status documentation commit
+  `3729ddf1f3fbf089f087099c7b52e950fef000a4`. GitHub's guarded ref update and
+  read-only fetch/tree comparison passed. Local main was aligned without changing
+  unrelated working files. Vercel deployment `dpl_3pCRTn7LbvLmDNWT872Ui7ap74MN`
+  is READY and its public alias resolves to the published SHA. Read-only hosted
+  acceptance is in progress.
+- All **103 hosted browser checks passed**: 11 wholesale/register, 10 order/register,
+  10 serial/register, nine batch, 21 dashboard workspace, 20 operating analysis and
+  22 seeded transaction/bill/report checks. All seven runners exited 0; the six
+  with transport counters reported zero retries. Hosted pack/credit forms and
+  wholesale queue layouts were inspected at 360px. No financial/inventory form
+  was saved. Product packs remain empty, and all 25 checked table hashes still
+  match the fresh pre-migration baseline after hosted acceptance.
+- Final hosted evidence: `.cache/wholesale-hosted-preapply.json`,
+  `.cache/wholesale-hosted-migration-applied.json`,
+  `.cache/wholesale-hosted-postapply-hashes.json`,
+  `.cache/wholesale-hosted-schema-checks.json`,
+  `.cache/wholesale-hosted-final-hashes.json`,
+  `.cache/wholesale-application-deployment.json`,
+  `.cache/wholesale-hosted-acceptance.json` and seven
+  `.cache/wholesale-hosted-*.log` runner logs. Phase 3d is published and complete
+  within its documented scope. The final documentation-only follow-up records
+  acceptance without changing tested application code. Food-service recipes,
+  ingredient consumption, waste and kitchen tickets are the next product phase;
+  commercial launch gates remain separate and open.

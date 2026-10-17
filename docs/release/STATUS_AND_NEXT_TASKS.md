@@ -1,23 +1,19 @@
 # MyBizOne — status and next tasks
 
 > **17 October 2026:** Start with [the current project status and roadmap](../PROJECT_STATUS.md).
-> Role dashboards, business profiles, operating analysis and feature Phases 3a–3c
-> (batch/expiry, serials/warranties and orders/advances/deliveries) are live. The latest
-> release passed 137 automated tests, 108 local production-browser checks and 92
-> hosted browser checks, plus build/types. The dated entries below retain delivery and
+> Role dashboards, business profiles, operating analysis and feature Phases 3a–3d
+> (batch/expiry, serials/warranties, orders/advances/deliveries and wholesale) are live.
+> The latest release passed 162 automated tests, two PDF checks, 136 local
+> production-browser checks and 103 hosted browser checks, plus build/types.
+> The dated entries below retain delivery and
 > commercial-release history; their older deployment/test statements are historical.
 > Product feature phases and commercial delivery phases are separate. Razorpay is
 > still on hold, and email, installer, complete cloud recovery and launch gates remain open.
-> Migration 0025 is approved, applied and recorded; the temporary branch is removed.
-> All 19 checked existing-table hashes are preserved. Wholesale is the next
-> product feature rollout; commercial launch work remains separate.
-> See [the Phase 3c record](../CUSTOMER_ORDERS_AND_ADVANCES.md).
-> Phase 3d wholesale passed local acceptance: 162 automated, two native PDF and
-> 136 production-browser checks, plus build/types. Migration 0026 preserved all
-> 25 checked existing tables on a temporary branch. The owner approved rollout;
-> migration 0026 is applied/recorded and its branch removed. All 25 fresh hosted
-> pre/post-migration hashes match; publication/hosted acceptance are in progress.
-> See [the wholesale candidate](../WHOLESALE_PACKS_AND_CREDIT.md).
+> Migration 0026 is approved, applied and recorded; the temporary branch is removed.
+> All 25 checked existing-table hashes match before/after migration and hosted
+> acceptance. No packaging sizes or financial records were fabricated. Food service
+> is the next product feature phase; commercial launch work remains separate.
+> See [the wholesale release record](../WHOLESALE_PACKS_AND_CREDIT.md).
 
 Updated: 15 October 2026. Scope: Windows desktop/LAN and cloud.
 

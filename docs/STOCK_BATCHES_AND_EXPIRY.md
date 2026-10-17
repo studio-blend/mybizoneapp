@@ -5,7 +5,8 @@ mixed retailer can track perishable items while keeping furniture or utensils on
 aggregate stock. Changing a business profile never invents expiry dates or enables
 tracking automatically. [Serial inventory and recorded warranties](SERIAL_INVENTORY_AND_WARRANTIES.md)
 are delivered separately in Phase 3b. [Orders, advances and handovers](CUSTOMER_ORDERS_AND_ADVANCES.md)
-are delivered in Phase 3c. Wholesale packs and restaurant recipes remain later deliveries.
+are delivered in Phase 3c. [Wholesale pack conversions and credit](WHOLESALE_PACKS_AND_CREDIT.md)
+are delivered in Phase 3d. Restaurant recipes remain a later delivery.
 
 ## Daily workflow
 
