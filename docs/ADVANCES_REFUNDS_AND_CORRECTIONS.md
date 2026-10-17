@@ -1,9 +1,11 @@
 # Advances, refunds and corrections — Phase 4b
 
-Status, 17 October 2026: implemented, committed locally and verified; awaiting
-explicit hosted migration/publication approval. Phase 4a remains live. Migration
-0029 passed on a temporary Neon branch with all 39 checked existing tables
-preserved; it is not applied or recorded on the hosted database.
+Status, 17 October 2026: published and accepted on the hosted development app.
+Owner-approved migration 0029 is applied/recorded and its temporary branch removed.
+Application commit `6ee547529bea00ce9a7af0ea363a5563f1091a3d`, Vercel
+`dpl_GgRvhW9rUTnLYFdnJujANytygM2y` (READY, public alias verified).
+Migration preserved all 39 checked existing tables. Two later audited owner-account
+profile edits were retained. See [project status](PROJECT_STATUS.md).
 
 ## Operating workflow
 
@@ -112,16 +114,27 @@ remain: it is a management view, not a reconciled financial statement.
   `.local/test-accounts/pending-funds-migration.json`.
 
 Mutating financial browser checks were restricted to the exact guarded disposable
-local database. Hosted acceptance will be read-only after approved publication.
+local database. The published application passed **137 read-only hosted browser
+checks across 10 runners**: 12 funds, 12 accounting, 10 kitchen, 11 wholesale,
+10 orders, 10 serials, nine batches, 21 workspaces, 20 analysis and 22 seeded
+transaction/bill/report checks. All runners exited 0; nine transport counters were
+zero. No hosted financial forms were submitted. Hosted evidence is in
+`.cache/funds-hosted-acceptance.json`, the 10 `.cache/funds-hosted-*.log` files,
+`.cache/funds-hosted-final-hashes.json` and hosted phone screenshots.
 
 Migration 0029 adds one append-only event ledger and three nullable columns on each
 return table, plus supporting constraints/indexes. No previous return, payment,
 balance, stock or allocation is rewritten. Temporary branch validation preserved
 all 39 checked existing-table row counts and full old-column hashes. The new ledger
 is empty, and previous return snapshots/request hashes remain null. Existing money
-and allocation grants remain append-only. Applying the prepared migration requires
-the explicit approval required by Neon's completion tool; unrelated subscription
-migration 0020 remains pending.
+and allocation grants remain append-only. After explicit owner approval, migration
+0029 was applied and recorded and its temporary branch removed. All 39 checked
+old-column hashes matched immediately after migration. After hosted acceptance,
+38 table hashes still match. The business profile changed through two audited
+owner-account settings edits at 17:19 UTC (general retail → furniture → wholesale,
+selling model retail → wholesale); those edits and their timestamp were retained.
+No payments, return entitlements or financial fixtures were invented. Only 0029
+was recorded; unrelated subscription migration 0020 remains pending.
 
 ## Next phase
 

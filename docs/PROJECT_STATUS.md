@@ -6,15 +6,15 @@ behaviour, boundaries and verification remain in the linked feature/release note
 ## Current position
 
 The hosted development application is running at https://mybizoneapp.vercel.app.
-Latest application acceptance: commit `31c2e5c0d5bc41fda4ca0816a396d746311595b6`,
-Vercel deployment `dpl_G311kNYhe6iXmiz6bzBQBRew2zBm` (READY, public alias verified).
+Latest application acceptance: commit `6ee547529bea00ce9a7af0ea363a5563f1091a3d`,
+Vercel deployment `dpl_GgRvhW9rUTnLYFdnJujANytygM2y` (READY, public alias verified).
 Documentation-only follow-ups may have newer commit/deployment IDs; application
 code is unchanged from this accepted release.
 It is suitable for ongoing owner testing within its documented supported scope.
 **It is not yet accepted for commercial launch.**
 
 Product feature phases below are separate from the older delivery/release phases
-in `release/PHASE_PLAN.md`. Completing feature Phase 4a does not complete installer,
+in `release/PHASE_PLAN.md`. Completing feature Phase 4b does not complete installer,
 provider, recovery or commercial release acceptance.
 
 ## Delivered and live
@@ -32,56 +32,54 @@ provider, recovery or commercial release acceptance.
 | Feature Phase 3d | Optional pack conversions, customer-tier prices, credit terms/ceilings and wholesale partial fulfilment, with immutable receipt/bill notes | [Wholesale packs and credit](WHOLESALE_PACKS_AND_CREDIT.md) |
 | Feature Phase 3e | Immutable recipes, prep-to-stock kitchen tickets, ingredient consumption, actual yield/cost, batch trace and waste linked to existing loss reports | [Kitchen preparation and waste](KITCHEN_PREPARATION_AND_WASTE.md) |
 | Feature Phase 4a | Partial customer/supplier payments, explicit bill allocations and permanent evidence, return reconciliation guards and a recorded cashbook with daily/method charts | [Accounting foundations](ACCOUNTING_FOUNDATIONS.md) |
+| Feature Phase 4b | Separate customer/supplier advances, partial use/refunds, paid-return refund entitlements and linked full corrections, with cashbook and finance positions | [Advances, refunds and corrections](ADVANCES_REFUNDS_AND_CORRECTIONS.md) |
 
 Industry profiles set defaults and priorities; specialised workflows are separate
 capabilities. Choosing an industry does not activate an unfinished module. Existing
 products remain untracked until their physical lots or unit serials are explicitly reconciled.
 
-## Latest feature delivery — Phase 4a
+## Latest feature delivery — Phase 4b
 
-**Billing → Settlements and Cashbook** now supports partial customer receipts and
-supplier payments against specific credit bills, plus evidence-based assignment of
-earlier unallocated payments. Assigning money does not collect it again.
-The cashbook shows recorded money in/out, daily comparisons and payment-method
-totals with India-date filters. Net movement is not cleared or available cash.
+**Billing → Advances & refunds** is live. Record customer prepayments or supplier
+advances separately from debt, then apply partial amounts to specific credit bills
+without collecting or paying money again. Goods returns separate unpaid debt
+reduction from paid refund entitlement; record the actual refund when money moves.
+Linked full corrections preserve original evidence and restore the relevant debt,
+advance or refund position. Stock is not moved again by money commands.
 
-The owner approved migration 0028 and publication. It is applied/recorded and the
-temporary branch removed. All 125 read-only hosted browser checks passed, with
-all 37 checked existing tables preserved. Existing four customer and four supplier
-settlements remain unallocated until their bill evidence is reconciled. General
-advances, general return refunds and reversal records follow in Phase 4b. See
-[the workflow and supported limits](ACCOUNTING_FOUNDATIONS.md).
+Finance dashboards and the management balance-sheet show advance/refund positions
+separately from trade debt. Cashbook includes actual money and dated corrections,
+while excluding advance applications. Historical returns without verified payment
+snapshots still require reconciliation; no entitlements are guessed. Order/EMI
+ledgers, opening cash and bank-clearing limits remain separate. See
+[the supported workflow and limits](ADVANCES_REFUNDS_AND_CORRECTIONS.md).
 
 ## Latest verification
 
-**Phase 4b verified candidate, awaiting rollout approval:** general customer/supplier
-advances, partial use/refunds, paid-return refund entitlements, explicit refunds and
-linked corrections are implemented and committed locally. All **365 automated
-tests, 215 local production-browser checks**, production build, TypeScript and
-scoped lint passed. Migration 0029 preserved all 39 checked existing tables on a
-temporary Neon branch; hosted application/migration changes have not occurred.
-See [advances, refunds and corrections](ADVANCES_REFUNDS_AND_CORRECTIONS.md).
-
-The following bullets describe the current **live Phase 4a** release.
-
-- **337 automated tests passed:** 320 web tests across 34 suites and 17 database
-  tests across three suites, zero failures/skips. Includes 27 real PostgreSQL
-  accounting cases and three date-range cases.
-- **186 local production-browser checks passed** across 13 runners, including
-  accounting transactions, phone/role checks and previous feature regressions.
-- **125 read-only hosted browser checks passed** across nine runners: 12 accounting,
-  10 kitchen, 11 wholesale, 10 orders, 10 serials, nine batch, 21 workspace,
-  20 analysis and 22 seeded transaction/bill/report checks; all runners exited 0.
-- TypeScript, production build and scoped lint passed. Five existing return-helper
-  non-null warnings remain. New accounting layouts were inspected at 360px.
-- Approved migration 0028 was applied and recorded; its temporary branch was
-  removed. All 37 checked table hashes matched before/after migration and hosted
-  acceptance, preserving stock, transactions, balances and role grants. New
-  allocation tables remain empty; no hosted financial fixtures were created.
-- Migrations 0022–0027 are also applied. Unrelated subscription migration 0020 remains
+- **365 automated tests passed:** 348 web tests across all 34 suites and 17 database
+  tests across three suites, zero failures/skips. The accounting suite includes
+  55 real PostgreSQL cases for advances, refunds, retries, races and corrections.
+- **215 local production-browser checks passed** across 15 runners, including
+  17 new financial journeys, 12 funds phone/role checks and 186 prior regressions.
+- **137 read-only hosted browser checks passed** across 10 runners: 12 funds,
+  12 accounting, 10 kitchen, 11 wholesale, 10 orders, 10 serials, nine batches,
+  21 workspaces, 20 analysis and 22 seeded transaction/bill/report checks. All
+  runners exited 0; nine transport counters were zero.
+- Production build, application/database TypeScript and scoped lint passed. Five
+  existing return-helper non-null warnings remain. New layouts were inspected at
+  360px. Financial browser writes ran only on the guarded disposable local cluster;
+  cleanup preserved all 16 checked stock/financial tables.
+- Approved migration 0029 was applied/recorded and its temporary branch removed.
+  All 39 checked old-column table hashes matched immediately after migration.
+  After hosted acceptance, 38 still match; two audited owner-account business
+  profile edits (general retail → furniture → wholesale; retail → wholesale selling
+  model, at 17:19 UTC) were retained. The event ledger and old return snapshots
+  remain empty/null. Stock, transactions, balances, permissions and existing
+  allocations are preserved.
+- Migrations 0022–0028 are also applied. Unrelated subscription migration 0020 remains
   pending on the hosted database. Do not run all pending hosted migrations blindly.
 
-These are the current Phase 4a release results; historical feature counts remain
+These are the current Phase 4b release results; historical feature counts remain
 in their dated records. Commands, deployment IDs, fixes and evidence paths are in
 [the work log](../RELEASE_WORK_LOG.md). Credentials and sessions stay in ignored
 private files.
@@ -93,9 +91,7 @@ Deliver each with its full data flow, permission checks and relevant acceptance
 before enabling it. Test new schema changes on a temporary branch and obtain the
 explicit migration approval required by the connected database tool.
 
-1. **Phase 4b — verified candidate awaiting rollout:** general advances, return refunds
-   and correction/reversal records. [Scope and evidence](ADVANCES_REFUNDS_AND_CORRECTIONS.md).
-2. **Phase 4c — next:** reconciled opening cash/accounts, transfers and bank clearing before
+1. **Phase 4c — next:** reconciled opening cash/accounts, transfers and bank clearing before
    verified invoice ageing or available-cash claims.
 
 This is the working order, not a committed delivery-date estimate.
@@ -118,11 +114,10 @@ See [delivery phases](release/PHASE_PLAN.md),
 
 ## Documentation and repository state
 
-Implementation, feature specifications and acceptance runners through Phase 4a
+Implementation, feature specifications and acceptance runners through Phase 4b
 are committed, published and hosted-verified, with release/admin notes and test-data
 reports. Accounting scope, evidence and the next phases are documented.
-The verified Phase 4b candidate is committed locally; its prepared migration 0029
-and hosted publication await explicit rollout approval.
+Phase 4b migration/publication and hosted acceptance are complete.
 Ignored local evidence retains logs and screenshots; credentials and sessions
 are excluded. Unrelated test-account and tunnel tooling
 remains a separate pending change. Documentation must state its

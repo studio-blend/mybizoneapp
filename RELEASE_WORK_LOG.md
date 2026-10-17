@@ -1249,3 +1249,44 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   docs/ADVANCES_REFUNDS_AND_CORRECTIONS.md and the project/release status notes.
   Candidate is committed locally, awaiting explicit migration/publication approval.
   Next product phase: reconciled opening cash/accounts, transfers and clearing.
+
+
+## 17 October 2026 — Phase 4b approved hosted rollout and acceptance
+
+- Owner explicitly approved applying migration 0029 and publishing Phase 4b.
+  Captured a fresh 39-table hosted baseline, completed exact prepared migration
+  74fa2c84-4ae5-4e5f-9c30-79aa9dff6c29 and removed temporary branch
+  br-royal-mud-aovxzehu through Neon completion. Recorded only
+  0029_party_funds_and_refunds.sql; unrelated subscription 0020 stays pending.
+- All 39 checked full old-column row counts/hashes match immediately after migration.
+  Final comparison found only the businesses hash changed: the owner account made
+  two audited business.profile.update edits at 17:19:00 and 17:19:24 UTC, changing
+  general_retail/retail → furniture/retail → wholesale/wholesale. The settings action
+  updates only those two profile fields and updated_at. Those edits were preserved;
+  all other 38 table hashes still match, with no stock/financial/permission changes.
+  Subsequent final comparison uses this explicitly audited expected state while
+  retaining the original migration baseline. The event ledger and existing settlement/
+  allocation tables retain FORCE RLS and SELECT/INSERT without UPDATE/DELETE for
+  app_user. New ledger remains empty; old return snapshots/request hashes remain
+  null. Stock, transactions, balances, grants and existing allocations are preserved.
+- Published application commit `6ee547529bea00ce9a7af0ea363a5563f1091a3d`, exact tree
+  edd86c822f8aeb42aa54cf608a58b1122d14381f, matching accepted local candidate
+  cc9333e578d3dab207641174d994a95d85a5a65a. GitHub tree/commit and leased
+  fast-forward main update preserved unrelated local work; fetched/aligned the
+  identical tree. Vercel `dpl_GgRvhW9rUTnLYFdnJujANytygM2y` is READY and the public
+  mybizoneapp.vercel.app alias is verified.
+- All **137 read-only hosted browser checks / 10 runners** passed: 12 funds,
+  12 accounting, 10 kitchen, 11 wholesale, 10 orders, 10 serials, nine batches,
+  21 workspaces, 20 analysis and 22 seeded transaction/bill/report checks. Every
+  runner exited 0; nine transport counters were zero. Financial forms were never
+  submitted on the hosted app. Hosted phone layouts and role restrictions passed.
+- Accepted local evidence remains **365 automated tests** (348 web / 34 suites
+  plus 17 database / three suites), **215 production-browser checks / 15 runners**,
+  build, application/database TypeScript and scoped lint. Accepted source hashes
+  remain unchanged. Publication notes are a documentation-only follow-up.
+- Hosted evidence: .cache/funds-hosted-preapply.json,
+  .cache/funds-hosted-acceptance.json, 10 .cache/funds-hosted-*.log files,
+  .cache/funds-hosted-final-hashes.json and private pending migration context.
+  Status, workflow scope, release notes and roadmap now record Phase 4b as live.
+  Next product phase is 4c reconciled opening cash/accounts, transfers and clearing;
+  provider, installer, recovery and commercial launch gates remain open.

@@ -1,29 +1,21 @@
 # MyBizOne — status and next tasks
 
-> **Phase 4b verified candidate, 17 October:** Customer/supplier advances, partial
-> use/refunds, paid-return refund entitlements and linked corrections are implemented
-> and committed locally. All 365 automated tests and 215 production-browser checks
-> passed, plus TypeScript, scoped lint and production build. Migration 0029 preserved
-> all 39 checked existing tables on a temporary Neon branch. Hosted application and
-> migration rollout await explicit approval; Phase 4a remains live. See
-> [the new accounting scope](../ADVANCES_REFUNDS_AND_CORRECTIONS.md). Phase 4c
-> opening cash/transfers/clearing and commercial delivery gates remain separate.
-
-> **17 October 2026 — Phase 4a live:** Bill allocations, partial customer/supplier
-> payments and recorded cashbook charts are published and hosted-verified. All
-> **337 automated tests, 186 local production-browser checks and 125 read-only
-> hosted browser checks** passed, plus TypeScript, scoped lint and production build.
-> Owner-approved migration 0028 is applied/recorded and its temporary branch removed.
-> All 37 checked existing-table hashes match before/after migration and hosted
-> acceptance. No existing payments were guessed into bills or financial fixtures saved.
-> See [current project status](../PROJECT_STATUS.md) and
-> [accounting scope and next phases](../ACCOUNTING_FOUNDATIONS.md). Phase 4b adds
-> general advances, refunds and reversal records; opening cash/bank clearing follow.
+> **17 October 2026 — Phase 4b live:** Customer/supplier advances, partial use and
+> refunds, paid-return refund entitlements and linked corrections are published and
+> hosted-verified. All **365 automated tests, 215 local production-browser checks
+> and 137 read-only hosted browser checks** passed, plus build/types/scoped lint.
+> Owner-approved migration 0029 is applied/recorded and its temporary branch removed.
+> Migration preserved all 39 checked table hashes. After hosted acceptance, 38
+> still match; two audited owner-account business profile edits were retained.
+> No payments or refund entitlements were invented. See
+> [current project status](../PROJECT_STATUS.md) and
+> [advances, refunds and corrections](../ADVANCES_REFUNDS_AND_CORRECTIONS.md).
+> Phase 4c opening cash/accounts, transfers and clearing is next.
 >
-> Dashboards, profiles, analysis and feature Phases 3a–3e remain live. The dated
-> entries below retain historical delivery evidence. Product feature phases and
-> commercial delivery phases are separate. Razorpay remains on hold; migration
-> 0020, email, installer, complete cloud recovery and commercial gates remain open.
+> Earlier feature phases remain live. The dated entries below retain historical
+> delivery evidence. Product features and commercial delivery phases are separate.
+> Razorpay remains on hold; migration 0020, email, installer, complete cloud
+> recovery and commercial launch gates remain open.
 
 Updated: 15 October 2026. Scope: Windows desktop/LAN and cloud.
 
