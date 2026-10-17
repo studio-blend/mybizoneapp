@@ -1,8 +1,10 @@
 # Accounting foundations — Phase 4a
 
-Status, 17 October 2026: implemented and verified locally; migration 0028 tested on a temporary
-Neon branch, awaiting explicit hosted migration/publication approval. Phase 3e
-remains the live application. See [project status](PROJECT_STATUS.md).
+Status, 17 October 2026: published and accepted on the hosted development app.
+Owner-approved migration 0028 is applied and recorded; its temporary branch is
+removed. Application commit `31c2e5c0d5bc41fda4ca0816a396d746311595b6`, Vercel
+`dpl_G311kNYhe6iXmiz6bzBQBRew2zBm` (READY, public alias verified).
+See [project status](PROJECT_STATUS.md).
 
 ## Receipts, payments and bill allocation
 
@@ -104,7 +106,10 @@ are annotations and do not change party debt or establish cash history.
 - Migration 0028 preserved row counts and full existing-column hashes for all 37
   checked hosted tables on its temporary branch. New allocation tables are empty;
   legacy request hashes remain null. Composite FKs, FORCE RLS and append-only
-  grants passed. It has not been applied or recorded on the hosted branch.
+  grants passed. After explicit owner approval, it was applied and recorded on the
+  hosted branch and the temporary branch removed. All 37 existing-table hashes
+  matched immediately after migration and again after hosted browser acceptance.
+  Only migration 0028 was recorded; unrelated subscription migration 0020 remains pending.
 - The final production build, TypeScript and scoped lint passed, with five existing
   return-helper non-null warnings. All **186 production-browser checks** passed
   across 13 runners: nine accounting transactions, 12 finance/phone/role checks and
@@ -117,7 +122,15 @@ are annotations and do not change party debt or establish cash history.
   migration context stay in ignored local files. Hosted schema changes require
   the connected Neon completion tool's explicit user approval.
 
-The candidate is committed locally and has not been published. Evidence includes
+The published application passed **125 read-only hosted browser checks** across
+nine runners: 12 accounting/register, 10 kitchen, 11 wholesale, 10 orders,
+10 serials, nine batches, 21 workspaces, 20 analysis and 22 seeded transaction/
+bill/report checks. All runners exited 0; no financial forms were submitted.
+Existing unallocated settlements were preserved without invented bill mappings.
+Hosted evidence is in `.cache/accounting-hosted-acceptance.json`, the nine
+`.cache/accounting-hosted-*.log` files and `.cache/accounting-hosted-final-hashes.json`.
+
+Local acceptance evidence includes
 `.cache/accounting-all-tests-accepted.log`, `.cache/accounting-db-tests.log`,
 `.cache/accounting-build-accepted.log`, `.cache/accounting-lint-final.log`,
 `.cache/accounting-production-acceptance.json`, the 13 individual runner logs and

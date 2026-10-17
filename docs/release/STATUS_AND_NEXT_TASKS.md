@@ -1,29 +1,20 @@
 # MyBizOne — status and next tasks
 
-> **Accounting candidate, 17 October:** Phase 4a adds bill allocations and a
-> recorded cashbook; 320 web and 17 database tests pass. Migration 0028 preserved 37 existing
-> tables on a temporary Neon branch. All 186 production-browser checks, types,
-> scoped lint and the production build passed. The candidate is committed locally;
-> hosted migration and publication have not occurred. See
-> [the current accounting scope](../ACCOUNTING_FOUNDATIONS.md). General advances,
-> refunds, opening cash and bank clearing follow in later accounting phases.
-
-> **17 October 2026:** Start with [the current project status and roadmap](../PROJECT_STATUS.md).
-> Role dashboards, business profiles, operating analysis and feature Phases 3a–3e
-> (batch/expiry, serials/warranties, orders/advances/deliveries, wholesale and kitchen
-> preparation/waste) are live. The latest release passed 187 automated tests,
-> 165 local production-browser checks and 113 hosted browser checks, plus build/types.
-> The phone-only correction repeated all 10 kitchen checks with a width assertion;
-> all passed with zero retries.
-> The dated entries below retain delivery and
-> commercial-release history; their older deployment/test statements are historical.
-> Product feature phases and commercial delivery phases are separate. Razorpay is
-> still on hold, and email, installer, complete cloud recovery and launch gates remain open.
-> Migration 0027 is approved, applied and recorded; the temporary branch is removed.
-> All 26 checked existing-table hashes match before/after migration and hosted
-> acceptance. No kitchen/financial records were fabricated. Accounting foundations
-> are the next product feature phase; commercial launch work remains separate.
-> See [the kitchen release record](../KITCHEN_PREPARATION_AND_WASTE.md).
+> **17 October 2026 — Phase 4a live:** Bill allocations, partial customer/supplier
+> payments and recorded cashbook charts are published and hosted-verified. All
+> **337 automated tests, 186 local production-browser checks and 125 read-only
+> hosted browser checks** passed, plus TypeScript, scoped lint and production build.
+> Owner-approved migration 0028 is applied/recorded and its temporary branch removed.
+> All 37 checked existing-table hashes match before/after migration and hosted
+> acceptance. No existing payments were guessed into bills or financial fixtures saved.
+> See [current project status](../PROJECT_STATUS.md) and
+> [accounting scope and next phases](../ACCOUNTING_FOUNDATIONS.md). Phase 4b adds
+> general advances, refunds and reversal records; opening cash/bank clearing follow.
+>
+> Dashboards, profiles, analysis and feature Phases 3a–3e remain live. The dated
+> entries below retain historical delivery evidence. Product feature phases and
+> commercial delivery phases are separate. Razorpay remains on hold; migration
+> 0020, email, installer, complete cloud recovery and commercial gates remain open.
 
 Updated: 15 October 2026. Scope: Windows desktop/LAN and cloud.
 

@@ -1,9 +1,9 @@
 # S2 / S5 stabilization evidence — 18 September 2026
 
-This is dated historical evidence. The locally implemented Phase 4a candidate
+This is dated historical evidence. The published and hosted-verified Phase 4a release
 adds general bill allocation and a recorded cashbook; its scope and rollout state
 are in [accounting foundations](../ACCOUNTING_FOUNDATIONS.md). The old party-only
-settlement limits below describe the older release, not the tested candidate.
+settlement limits below describe the older release, not the current release.
 
 S2 and S5 are complete within the supported scope below. S3 and integrated acceptance remain open; this is not production or statutory-accounting approval. Work used the existing dirty working tree, preserving prior security, delivery and dependency work. No release commit, deployment, customer database operation or live payment was performed. Inherited AGENTS.md requested code-review-graph tools; none were available, so targeted source/diff inspection was used. No subagents were needed.
 

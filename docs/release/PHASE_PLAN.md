@@ -2,14 +2,17 @@
 
 > **17 October 2026:** This document tracks commercial delivery/release gates.
 > For current application progress and the separate product feature phases, read
-> [the project status and roadmap](../PROJECT_STATUS.md). Feature Phases 3a–3e are live;
+> [the project status and roadmap](../PROJECT_STATUS.md). Feature Phases 3a–3e and 4a are live;
 > this does not mark delivery Phase 3 or commercial launch complete. Older dated
 > deployment and verification statements below remain historical evidence.
 
-> Product Phase 4a (bill allocations and recorded cashbook) is a local candidate
-> awaiting hosted rollout approval. Its supported scope and follow-on accounting
-> work are in [accounting foundations](../ACCOUNTING_FOUNDATIONS.md). Commercial
-> phases below remain separate and open where previously recorded.
+> Product Phase 4a (bill allocations and recorded cashbook) is published and
+> hosted-verified: 337 automated tests, 186 local production-browser checks and
+> 125 read-only hosted checks passed. Approved migration 0028 is applied/recorded,
+> its temporary branch removed and all 37 checked existing tables preserved.
+> Phase 4b advances/refunds/reversals is next. Supported scope is in
+> [accounting foundations](../ACCOUNTING_FOUNDATIONS.md). Commercial phases below
+> remain separate and open where previously recorded.
 
 **15 October 2026 update:** Hosted development performance changes are deployed and verified with the saved Pro owner; 133 web + 17 DB tests, types, scoped lint and production build passed. Phase 1 remains complete within supported scope. Phase 2 retains deferred Razorpay and unverified cloud email gates. Windows installer and full cloud delivery/recovery acceptance remain pending; the working hosted development site does not complete those gates. See [current status](STATUS_AND_NEXT_TASKS.md) and [performance report](../PERFORMANCE_OPTIMIZATION.md).
 

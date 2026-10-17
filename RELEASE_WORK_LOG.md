@@ -1158,3 +1158,37 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   candidate is committed locally and awaits explicit approval to apply/record
   only migration 0028, remove its temporary branch and publish. Hosted Phase 3e
   remains unchanged; subscription migration 0020 and commercial gates remain open.
+
+
+## 17 October 2026 — Phase 4a approved hosted rollout and acceptance
+
+- Owner explicitly approved applying migration 0028 and publishing Phase 4a.
+  Captured a fresh hosted 37-table baseline, completed the exact prepared migration
+  c793d654-f12f-4c5c-8c01-621e3070f5ec and removed temporary branch
+  br-green-firefly-aoc9y1l7 through Neon completion. Recorded only
+  0028_settlement_allocations.sql; unrelated subscription 0020 remains pending.
+- All 37 old-column row counts/hashes match immediately after migration and after
+  hosted acceptance. Four settlement/allocation tables have FORCE RLS and
+  SELECT/INSERT without UPDATE/DELETE for app_user. New allocation tables remain
+  empty; existing request hashes remain null. Existing four customer and four
+  supplier settlements retain their original unallocated state.
+- Published application commit `31c2e5c0d5bc41fda4ca0816a396d746311595b6`, exact tree
+  d6bde9d62a28ed94bf121008562ced5d40985145, matching locally accepted candidate
+  cd94766191c34e4bef307111cf751a34bcf08d73. GitHub tree/commit plus a leased
+  fast-forward main update preserved unrelated local changes; fetched/aligned the
+  identical tree. Vercel `dpl_G311kNYhe6iXmiz6bzBQBRew2zBm` is READY and the public
+  mybizoneapp.vercel.app alias was verified.
+- All **125 read-only hosted browser checks** passed across nine runners: 12
+  accounting, 10 kitchen, 11 wholesale, 10 orders, 10 serials, nine batches,
+  21 workspaces, 20 analysis and 22 seeded transaction/bill/report checks. Every
+  runner exited 0. Financial forms were never submitted on the hosted app.
+- Local accepted evidence remains **337 automated tests** (320 web/34 suites and
+  17 database/three suites), **186 production-browser checks/13 runners**,
+  TypeScript, scoped lint and production build. Application source hashes remain
+  unchanged; publication notes are a documentation-only follow-up.
+- Hosted evidence: .cache/accounting-hosted-preapply.json,
+  .cache/accounting-hosted-acceptance.json, nine .cache/accounting-hosted-*.log
+  files, .cache/accounting-hosted-final-hashes.json and private pending migration
+  context. Updated current status, accounting scope, delivery notes and roadmap.
+  Next product work is Phase 4b general advances/refunds/reversals, followed by
+  Phase 4c reconciled opening cash/transfers/clearing. Commercial gates stay open.
