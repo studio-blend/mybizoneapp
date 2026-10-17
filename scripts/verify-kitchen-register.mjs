@@ -47,6 +47,10 @@ try {
   await page.getByText('No kitchen tickets match these filters.', { exact: true }).waitFor();
   assert.equal(await page.locator('article').count(), 0);
   await mobile(page, 'empty-queue');
+  for (const selector of ['select[name="store"]', 'select[name="view"]']) {
+    const box = await page.locator(selector).boundingBox();
+    assert(box && box.width >= 220, 'Phone kitchen filters must remain readable');
+  }
   result.checks.push('Owner opens the empty kitchen queue with no fabricated prep history');
   await navigate(page, `/kitchen?store=${seed.stores[0].id}&view=preparing`);
   assert.equal(await page.locator('select[name="store"]').inputValue(), seed.stores[0].id);

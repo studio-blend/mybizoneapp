@@ -24,7 +24,7 @@ export default async function KitchenPage(props: {
         </div>
       </header>
       <form method="get" className="flex flex-wrap items-end gap-4 rounded-xl border p-4">
-        <label className="min-w-0 flex-1 space-y-2 text-sm">
+        <label className="w-full min-w-0 space-y-2 text-sm sm:flex-1">
           <span className="block">Store</span>
           <select
             name="store"
@@ -39,7 +39,7 @@ export default async function KitchenPage(props: {
             ))}
           </select>
         </label>
-        <label className="min-w-0 flex-1 space-y-2 text-sm">
+        <label className="w-full min-w-0 space-y-2 text-sm sm:flex-1">
           <span className="block">Ticket status</span>
           <select
             name="view"
@@ -54,7 +54,7 @@ export default async function KitchenPage(props: {
             ))}
           </select>
         </label>
-        <button type="submit" className="h-10 rounded-md border px-4 text-sm">
+        <button type="submit" className="h-10 w-full rounded-md border px-4 text-sm sm:w-auto">
           Apply filters
         </button>
       </form>
