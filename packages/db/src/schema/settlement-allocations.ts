@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { user } from './auth';
@@ -36,6 +37,7 @@ export const salesSettlementAllocations = pgTable(
     saleId: uuid('sale_id').notNull(),
   },
   (t) => ({
+    tenantUnique: unique('sales_allocations_id_business_unique').on(t.id, t.businessId),
     receipt: foreignKey({
       columns: [t.settlementId, t.businessId, t.customerId],
       foreignColumns: [
@@ -65,6 +67,7 @@ export const purchaseSettlementAllocations = pgTable(
     purchaseId: uuid('purchase_id').notNull(),
   },
   (t) => ({
+    tenantUnique: unique('purchase_allocations_id_business_unique').on(t.id, t.businessId),
     payment: foreignKey({
       columns: [t.settlementId, t.businessId, t.supplierId],
       foreignColumns: [

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  accountingEvents,
   businesses,
   customerOrderPayments,
   customerOrders,
@@ -39,6 +40,9 @@ vi.mock('react', () => ({ cache: (fn: unknown) => fn }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 import { loadCashbook } from '@/lib/cashbook';
 import { db } from '@/lib/db';
+import { availableAdvance, returnRefundRemaining } from '@/lib/funds-ledger';
+import { fundsPosition } from '@/lib/funds-position';
+import { fundsRegister } from '@/lib/funds-queries';
 import { settlementRegister } from '@/lib/settlement-queries';
 import { createPurchaseReturnAction } from '../../app/(app)/purchase-returns/actions';
 import { createSalesReturnAction } from '../../app/(app)/returns/actions';
@@ -47,6 +51,7 @@ import {
   createPurchaseSettlementAction,
   createSalesSettlementAction,
 } from '../../app/(app)/settlements/actions';
+import { accountingCommandAction } from '../../app/(app)/settlements/funds/actions';
 const tenants: string[] = [];
 let customerId = '';
 let supplierId = '';
@@ -201,6 +206,7 @@ describe.skipIf(process.env.DATABASE_URL !== url)(
     });
     afterAll(async () => {
       for (const id of tenants) {
+        await db.delete(accountingEvents).where(eq(accountingEvents.businessId, id));
         await db
           .delete(salesSettlementAllocations)
           .where(eq(salesSettlementAllocations.businessId, id));
@@ -583,7 +589,333 @@ describe.skipIf(process.env.DATABASE_URL !== url)(
       expect(d.totals.outgoing).toBe('5.00');
       expect(d.methods.find((m) => m.method === 'unknown')?.incoming).toBe('20.00');
     });
+    const funds = (kind: string, extra: Record<string, unknown> = {}) =>
+      accountingCommandAction({
+        id: randomUUID(),
+        side: 'sales',
+        kind,
+        partyId: customerId,
+        amount: '40',
+        method: 'cash',
+        note: 'Confirmed source evidence',
+        ...extra,
+      });
+    const available = (id: string) =>
+      withTenant(db, state.businessId, (tx) => availableAdvance(tx, state.businessId, id));
+    const refundDue = (id: string, side: 'sales' | 'purchases' = 'sales') =>
+      withTenant(db, state.businessId, (tx) =>
+        returnRefundRemaining(tx, state.businessId, side, id),
+      );
+    it('keeps a customer advance separate from debt and records money once', async () => {
+      const a = ok(await funds('advance', { amount: '150' }));
+      expect(await available(a.id)).toBe(15000);
+      expect(await debt()).toBe('100.00');
+      expect((await book()).totals.incoming).toBe('150.00');
+    });
+    it('applies a partial advance without another cash movement', async () => {
+      const a = ok(await funds('advance', { amount: '100' }));
+      ok(await funds('advance_apply', { sourceId: a.id, billId: saleId, amount: '40' }));
+      expect(await debt()).toBe('60.00');
+      expect(await available(a.id)).toBe(6000);
+      expect((await book()).totals.incoming).toBe('100.00');
+      expect((await register()).bills[0]?.remaining).toBe('60.00');
+    });
+    it('handles supplier prepayments and applications with the opposite cash direction', async () => {
+      const a = ok(
+        await funds('advance', { side: 'purchases', partyId: supplierId, amount: '100' }),
+      );
+      ok(await funds('advance_apply', { side: 'purchases', sourceId: a.id, billId: purchaseId }));
+      expect(
+        (await db.select().from(suppliers).where(eq(suppliers.id, supplierId)))[0]
+          ?.outstandingBalance,
+      ).toBe('60.00');
+      expect(await available(a.id)).toBe(6000);
+      expect((await book()).totals.outgoing).toBe('100.00');
+    });
+    it('rejects use beyond either an advance or a credit bill', async () => {
+      const a = ok(await funds('advance', { amount: '150' }));
+      expect(
+        (await funds('advance_apply', { sourceId: a.id, billId: saleId, amount: '110' })).ok,
+      ).toBe(false);
+      expect((await funds('advance_refund', { sourceId: a.id, amount: '151' })).ok).toBe(false);
+      expect(await available(a.id)).toBe(15000);
+    });
+    it('serializes competing application and refund of the same advance', async () => {
+      const a = ok(await funds('advance'));
+      const result = await Promise.all([
+        funds('advance_apply', { sourceId: a.id, billId: saleId }),
+        funds('advance_refund', { sourceId: a.id }),
+      ]);
+      expect(result.filter((r) => r.ok)).toHaveLength(1);
+      expect(await available(a.id)).toBe(0);
+    });
+    it('replays a funds request once and rejects edited reuse', async () => {
+      const id = randomUUID();
+      ok(await funds('advance', { id }));
+      ok(await funds('advance', { id }));
+      expect((await funds('advance', { id, amount: '41' })).ok).toBe(false);
+      expect((await book()).totals.incoming).toBe('40.00');
+    });
+    it('supports partial unused-advance refunds and correction of a mistaken refund', async () => {
+      const a = ok(await funds('advance', { amount: '100' }));
+      const r = ok(await funds('advance_refund', { sourceId: a.id, amount: '25' }));
+      expect(await available(a.id)).toBe(7500);
+      ok(await funds('money_reverse', { sourceId: r.id }));
+      expect(await available(a.id)).toBe(10000);
+      const b = await book();
+      expect(b.totals.incoming).toBe('125.00');
+      expect(b.totals.outgoing).toBe('25.00');
+      expect(await debt()).toBe('100.00');
+    });
+    it('reverses a wholly unused advance and preserves the original record', async () => {
+      const a = ok(await funds('advance'));
+      ok(await funds('money_reverse', { sourceId: a.id }));
+      await expect(available(a.id)).rejects.toThrow();
+      const b = await book();
+      expect(b.totals.incoming).toBe('40.00');
+      expect(b.totals.outgoing).toBe('40.00');
+      expect(await debt()).toBe('100.00');
+      expect(
+        await db
+          .select()
+          .from(accountingEvents)
+          .where(eq(accountingEvents.businessId, state.businessId)),
+      ).toHaveLength(2);
+    });
+    it('requires reversing an application before reversing its advance', async () => {
+      const a = ok(await funds('advance'));
+      ok(await funds('advance_apply', { sourceId: a.id, billId: saleId }));
+      expect((await funds('money_reverse', { sourceId: a.id })).ok).toBe(false);
+    });
+    it('reverses allocation then settlement, restoring debt and correction cash movement', async () => {
+      const r = ok(await receipt());
+      const allocation = (await register()).allocations[0];
+      expect(allocation).toBeDefined();
+      expect((await funds('settlement_reverse', { sourceId: r.id })).ok).toBe(false);
+      ok(await funds('allocation_reverse', { sourceId: allocation?.id }));
+      expect((await register()).bills[0]?.remaining).toBe('100.00');
+      ok(await funds('settlement_reverse', { sourceId: r.id }));
+      expect(await debt()).toBe('100.00');
+      const b = await book();
+      expect(b.totals.incoming).toBe('40.00');
+      expect(b.totals.outgoing).toBe('40.00');
+      expect((await register()).payments[0]?.unallocated).toBe('0');
+    });
+    it('makes reversed allocation money available for an evidenced reassignment', async () => {
+      const r = ok(await receipt());
+      const a = (await register()).allocations[0];
+      ok(await funds('allocation_reverse', { sourceId: a?.id }));
+      ok(await allocate(r.id));
+      expect((await register()).bills[0]?.remaining).toBe('60.00');
+      expect(await debt()).toBe('60.00');
+    });
+    it('does not reverse the same document twice or assign its reversed money', async () => {
+      const r = ok(await receipt({ billId: undefined }));
+      ok(await funds('settlement_reverse', { sourceId: r.id }));
+      expect((await funds('settlement_reverse', { sourceId: r.id })).ok).toBe(false);
+      expect((await allocate(r.id)).ok).toBe(false);
+      expect(await debt()).toBe('100.00');
+    });
+    it('restores advance availability when an advance-funded settlement is reversed', async () => {
+      const a = ok(await funds('advance'));
+      const applied = ok(await funds('advance_apply', { sourceId: a.id, billId: saleId }));
+      ok(await funds('allocation_reverse', { sourceId: applied.id }));
+      ok(await funds('settlement_reverse', { sourceId: applied.id }));
+      expect(await available(a.id)).toBe(4000);
+      expect(await debt()).toBe('100.00');
+      const b = await book();
+      expect(b.totals.incoming).toBe('40.00');
+      expect(b.totals.outgoing).toBe('0');
+    });
+    it('splits a paid credit return between unpaid debt and a refund liability', async () => {
+      ok(await receipt({ amount: '60' }));
+      const r = ok(
+        await createSalesReturnAction({
+          id: randomUUID(),
+          allowRefundDue: true,
+          originalSaleId: saleId,
+          items: [{ productId, qty: '5' }],
+        }),
+      );
+      expect(await debt()).toBe('0.00');
+      expect(await refundDue(r.id)).toBe(1000);
+      expect((await register()).bills[0]?.remaining).toBe('0.00');
+      ok(await funds('return_refund', { sourceId: r.id, amount: '6' }));
+      expect(await refundDue(r.id)).toBe(400);
+      expect((await book()).totals.outgoing).toBe('6.00');
+      expect(await debt()).toBe('0.00');
+    });
+    it('records a cash return refund without consuming unrelated customer debt or moving stock twice', async () => {
+      await db
+        .update(sales)
+        .set({ paymentMethod: 'cash', paymentStatus: 'paid' })
+        .where(eq(sales.id, saleId));
+      const r = ok(
+        await createSalesReturnAction({ originalSaleId: saleId, items: [{ productId, qty: '2' }] }),
+      );
+      expect(await refundDue(r.id)).toBe(2000);
+      const before = (await db.select().from(products).where(eq(products.id, productId)))[0]
+        ?.inventory;
+      ok(await funds('return_refund', { sourceId: r.id, amount: '20' }));
+      expect(await debt()).toBe('100.00');
+      expect(
+        (await db.select().from(products).where(eq(products.id, productId)))[0]?.inventory,
+      ).toBe(before);
+    });
+    it('records an anonymous walk-in cash return refund', async () => {
+      await db
+        .update(sales)
+        .set({ customerId: null, paymentMethod: 'cash', paymentStatus: 'paid' })
+        .where(eq(sales.id, saleId));
+      const r = ok(
+        await createSalesReturnAction({ originalSaleId: saleId, items: [{ productId, qty: '1' }] }),
+      );
+      ok(await funds('return_refund', { sourceId: r.id, amount: '10' }));
+      expect(await refundDue(r.id)).toBe(0);
+      expect(await debt()).toBe('100.00');
+    });
+    it('collects supplier return refunds without reducing unrelated payables', async () => {
+      await db.update(purchases).set({ paymentMethod: 'cash' }).where(eq(purchases.id, purchaseId));
+      const r = ok(
+        await createPurchaseReturnAction({
+          originalPurchaseId: purchaseId,
+          items: [{ productId, qty: '2' }],
+        }),
+      );
+      ok(await funds('return_refund', { side: 'purchases', sourceId: r.id, amount: '20' }));
+      expect(await refundDue(r.id, 'purchases')).toBe(0);
+      expect((await book()).totals.incoming).toBe('20.00');
+      expect(
+        (await db.select().from(suppliers).where(eq(suppliers.id, supplierId)))[0]
+          ?.outstandingBalance,
+      ).toBe('100.00');
+    });
+    it('prevents concurrent over-refunds and restores entitlement on a full correction', async () => {
+      await db
+        .update(sales)
+        .set({ paymentMethod: 'cash', paymentStatus: 'paid' })
+        .where(eq(sales.id, saleId));
+      const r = ok(
+        await createSalesReturnAction({ originalSaleId: saleId, items: [{ productId, qty: '2' }] }),
+      );
+      const results = await Promise.all([
+        funds('return_refund', { sourceId: r.id, amount: '15' }),
+        funds('return_refund', { sourceId: r.id, amount: '15' }),
+      ]);
+      expect(results.filter((r) => r.ok)).toHaveLength(1);
+      expect(await refundDue(r.id)).toBe(500);
+      const refunded = results.find((r) => r.ok);
+      if (!refunded?.ok) throw new Error('Refund');
+      ok(await funds('money_reverse', { sourceId: refunded.data.id }));
+      expect(await refundDue(r.id)).toBe(2000);
+    });
+    it('does not infer refund entitlement for historical returns', async () => {
+      const r = ok(
+        await createSalesReturnAction({ originalSaleId: saleId, items: [{ productId, qty: '1' }] }),
+      );
+      await db.$client`UPDATE sales_returns SET debt_reduction_amount=NULL,refund_due_amount=NULL WHERE id=${r.id}`;
+      expect((await funds('return_refund', { sourceId: r.id, amount: '1' })).ok).toBe(false);
+    });
+    it('makes a stock return retry idempotent and rejects edited reuse', async () => {
+      const id = randomUUID();
+      const input = { id, originalSaleId: saleId, items: [{ productId, qty: '1' }] };
+      const a = ok(await createSalesReturnAction(input));
+      expect(ok(await createSalesReturnAction(input)).id).toBe(a.id);
+      expect(
+        (await createSalesReturnAction({ ...input, items: [{ productId, qty: '2' }] })).ok,
+      ).toBe(false);
+      expect(
+        (await db.select().from(products).where(eq(products.id, productId)))[0]?.inventory,
+      ).toBe('51.000');
+    });
+    it('blocks changing allocation evidence that supports a paid return', async () => {
+      ok(await receipt({ amount: '100' }));
+      const a = (await register()).allocations[0];
+      ok(
+        await createSalesReturnAction({
+          allowRefundDue: true,
+          originalSaleId: saleId,
+          items: [{ productId, qty: '1' }],
+        }),
+      );
+      expect((await funds('allocation_reverse', { sourceId: a?.id })).ok).toBe(false);
+    });
+    it('rejects an advance application against another party bill', async () => {
+      const a = ok(await funds('advance'));
+      const [c] = await db
+        .insert(customers)
+        .values({ businessId: state.businessId, name: 'Other', outstandingBalance: '100' })
+        .returning();
+      await db.update(sales).set({ customerId: c?.id }).where(eq(sales.id, saleId));
+      expect((await funds('advance_apply', { sourceId: a.id, billId: saleId })).ok).toBe(false);
+      expect(await available(a.id)).toBe(4000);
+    });
+    it('requires global finance permission for all new commands', async () => {
+      await db.update(user).set({ role: 'sales' }).where(eq(user.id, state.id));
+      state.role = 'sales';
+      expect((await funds('advance')).ok).toBe(false);
+      await db.update(user).set({ role: 'accounts' }).where(eq(user.id, state.id));
+      state.role = 'accounts';
+      ok(await funds('advance'));
+    });
+    it('enforces append-only event evidence and hides it across tenants', async () => {
+      const a = ok(await funds('advance'));
+      for (const statement of [
+        sql`UPDATE accounting_events SET amount=1 WHERE id=${a.id}::uuid`,
+        sql`DELETE FROM accounting_events WHERE id=${a.id}::uuid`,
+      ])
+        await expect(
+          withTenant(db, state.businessId, (tx) => tx.execute(statement)),
+        ).rejects.toThrow();
+      const [b] = await db.insert(businesses).values({ name: 'Hidden funds' }).returning();
+      if (!b) throw new Error('fixture');
+      tenants.push(b.id);
+      expect(await withTenant(db, b.id, (tx) => tx.select().from(accountingEvents))).toEqual([]);
+      const own = state.businessId;
+      state.businessId = b.id;
+      expect((await funds('advance_apply', { sourceId: a.id, billId: saleId })).ok).toBe(false);
+      state.businessId = own;
+    });
+    it('rejects zero amounts and missing refund payment evidence', async () => {
+      expect((await funds('advance', { amount: '0' })).ok).toBe(false);
+      expect((await funds('advance', { method: undefined })).ok).toBe(false);
+      expect((await funds('advance', { amount: '-1' })).ok).toBe(false);
+    });
+    it('registers available advances and refund due without netting them against debt', async () => {
+      ok(await funds('advance'));
+      const r = await withTenant(db, state.businessId, (tx) =>
+        fundsRegister(tx, state.businessId, 'sales'),
+      );
+      expect(r.events[0]?.available).toBe('40.00');
+      expect(r.parties[0]?.outstandingBalance).toBe('100.00');
+    });
+    it('keeps stock returns available without inventing a refund for an unpaid cash document', async () => {
+      await db
+        .update(sales)
+        .set({ paymentMethod: 'cash', paymentStatus: 'due' })
+        .where(eq(sales.id, saleId));
+      const r = ok(
+        await createSalesReturnAction({ originalSaleId: saleId, items: [{ productId, qty: '1' }] }),
+      );
+      expect((await funds('return_refund', { sourceId: r.id, amount: '10' })).ok).toBe(false);
+      expect(await debt()).toBe('100.00');
+    });
+    it('reports advance assets and liabilities at the requested event cutoff', async () => {
+      const a = ok(await funds('advance', { amount: '100' }));
+      ok(await funds('advance_refund', { sourceId: a.id, amount: '20' }));
+      ok(await funds('advance', { side: 'purchases', partyId: supplierId, amount: '30' }));
+      const now = await withTenant(db, state.businessId, (tx) =>
+        fundsPosition(tx, state.businessId, new Date('2099-01-01')),
+      );
+      expect(now.customerAdvances).toBe('80.00');
+      expect(now.supplierAdvances).toBe('30.00');
+      const before = await withTenant(db, state.businessId, (tx) =>
+        fundsPosition(tx, state.businessId, new Date('2020-01-01')),
+      );
+      expect(Number(before.customerAdvances)).toBe(0);
+    });
     it('paginates rows without truncating full-period totals and isolates tenants', async () => {
+      // Full-period summaries remain independent of the page size.
       await db.insert(expenseEntries).values(
         Array.from({ length: 101 }, (_, i) => ({
           businessId: state.businessId,

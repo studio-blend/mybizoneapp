@@ -141,7 +141,9 @@ Local acceptance evidence includes
 ## Next phases
 
 4b: general customer/supplier advances, explicit general return refunds and safe
-reversal/correction records, linked to original money and stock documents.
+reversal/correction records are implemented and verified locally, awaiting hosted
+rollout approval. See [the Phase 4b scope and evidence](ADVANCES_REFUNDS_AND_CORRECTIONS.md).
+The Phase 4a evidence above remains the current live application acceptance.
 
 4c: reconciled opening cash/accounts, transfers and bank/cheque clearing; then
 invoice ageing and available-cash reporting only where the underlying evidence

@@ -22,6 +22,8 @@ export default async function ReturnsPage() {
         returnNo: salesReturns.returnNo,
         customerName: salesReturns.customerName,
         total: salesReturns.total,
+        debtReductionAmount: salesReturns.debtReductionAmount,
+        refundDueAmount: salesReturns.refundDueAmount,
         reason: salesReturns.reason,
         status: salesReturns.status,
         createdAt: salesReturns.createdAt,
@@ -50,6 +52,7 @@ export default async function ReturnsPage() {
                 <TableHead>Date</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead className="text-right">Total (₹)</TableHead>
+                <TableHead>Debt reduction / refund entitlement (₹)</TableHead>
                 <TableHead>Reason</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
@@ -57,17 +60,22 @@ export default async function ReturnsPage() {
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                     No returns recorded yet.
                   </TableCell>
                 </TableRow>
               ) : (
                 rows.map((r) => (
-                  <TableRow key={r.id}>
+                  <TableRow key={r.id} id={`return-${r.id}`}>
                     <TableCell className="font-mono text-xs">{r.returnNo}</TableCell>
                     <TableCell>{formatDate(r.createdAt)}</TableCell>
                     <TableCell className="text-muted-foreground">{r.customerName ?? '—'}</TableCell>
                     <TableCell className="text-right">{r.total}</TableCell>
+                    <TableCell>
+                      {r.refundDueAmount === null
+                        ? 'Unverified payment — reconcile'
+                        : `${r.debtReductionAmount} debt / ${r.refundDueAmount} refundable`}
+                    </TableCell>
                     <TableCell className="text-muted-foreground max-w-xs truncate">
                       {r.reason ?? '—'}
                     </TableCell>

@@ -135,7 +135,7 @@ export async function loadOperatingAnalysis(
         : Promise.resolve([]),
       hasCollections
         ? tx.execute<CollectionPriority>(sql`SELECT c.id,c.name,c.outstanding_balance::float8 AS balance,c.credit_limit::float8 AS "creditLimit",
-        (SELECT MAX(ss.settled_at)::text FROM sales_settlements ss WHERE ss.customer_id=c.id AND ss.business_id=c.business_id AND ss.settled_at<=${now.toISOString()}::timestamptz) AS "lastCollection"
+        (SELECT MAX(ss.settled_at)::text FROM sales_settlements ss WHERE ss.customer_id=c.id AND ss.business_id=c.business_id AND ss.settled_at<=${now.toISOString()}::timestamptz AND NOT EXISTS(SELECT 1 FROM accounting_events e WHERE e.business_id=ss.business_id AND e.kind='settlement_reverse' AND e.sales_settlement_id=ss.id)) AS "lastCollection"
         FROM customers c WHERE c.business_id=${businessId}::uuid AND c.outstanding_balance>0
         ORDER BY c.outstanding_balance DESC,c.name,c.id LIMIT 8`)
         : Promise.resolve([]),

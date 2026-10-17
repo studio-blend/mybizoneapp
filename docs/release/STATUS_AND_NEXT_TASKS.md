@@ -1,5 +1,14 @@
 # MyBizOne — status and next tasks
 
+> **Phase 4b verified candidate, 17 October:** Customer/supplier advances, partial
+> use/refunds, paid-return refund entitlements and linked corrections are implemented
+> and committed locally. All 365 automated tests and 215 production-browser checks
+> passed, plus TypeScript, scoped lint and production build. Migration 0029 preserved
+> all 39 checked existing tables on a temporary Neon branch. Hosted application and
+> migration rollout await explicit approval; Phase 4a remains live. See
+> [the new accounting scope](../ADVANCES_REFUNDS_AND_CORRECTIONS.md). Phase 4c
+> opening cash/transfers/clearing and commercial delivery gates remain separate.
+
 > **17 October 2026 — Phase 4a live:** Bill allocations, partial customer/supplier
 > payments and recorded cashbook charts are published and hosted-verified. All
 > **337 automated tests, 186 local production-browser checks and 125 read-only

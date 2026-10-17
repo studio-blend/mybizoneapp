@@ -72,6 +72,9 @@ export default async function SettlementsPage({
         >
           Purchase settlements
         </a>
+        <a href={`/settlements/funds?tab=${side}`} className="underline">
+          Advances &amp; refunds
+        </a>
       </nav>
       {savedPayment && (
         <output className="block rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
@@ -121,13 +124,14 @@ export default async function SettlementsPage({
             </thead>
             <tbody>
               {data.payments.slice(0, 100).map((p) => (
-                <tr className="border-b" key={p.id}>
+                <tr className="border-b" key={p.id} id={`payment-${p.id}`}>
                   <td className="p-3">
                     {new Date(p.settledAt).toLocaleDateString('en-IN', {
                       timeZone: 'Asia/Kolkata',
                     })}
                     <br />
                     {p.name}
+                    {p.reversed && <span className="block text-xs">Reversed</span>}
                   </td>
                   <td className="p-3 tabular-nums">₹{Number(p.amount).toFixed(2)}</td>
                   <td className="p-3 tabular-nums">₹{Number(p.unallocated).toFixed(2)}</td>
@@ -146,7 +150,7 @@ export default async function SettlementsPage({
         </div>
         <p className="text-xs text-muted-foreground">
           Latest 100 payments shown. All unallocated payments remain available in the allocation
-          form. Allocations are permanent evidence; confirm the bill before saving.
+          form. Evidence is retained; use Advances &amp; refunds for linked corrections.
         </p>
       </section>
       <section className="space-y-3">
@@ -157,8 +161,9 @@ export default async function SettlementsPage({
         </p>
         <div className="space-y-3">
           {data.allocations.map((a) => (
-            <article key={a.id} className="rounded-lg border p-4 text-sm">
+            <article key={a.id} id={`allocation-${a.id}`} className="rounded-lg border p-4 text-sm">
               <p className="font-medium">
+                {a.reversed ? 'Reversed · ' : ''}
                 {a.billNo} · {a.name} · ₹{Number(a.amount).toFixed(2)}
               </p>
               <p className="break-words text-muted-foreground">{a.note}</p>

@@ -1,13 +1,12 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { lockOrder, reconcileOrderReturn } from '@/lib/order-ledger';
+import { requestHash } from '@/lib/order-ledger';
 import { requirePermission } from '@/lib/require-permission';
+import { returnMoneySnapshot } from '@/lib/return-money';
 import { safeAction } from '@/lib/server-action';
-import {
-  settlementBillBalance,
-  unallocatedSettlements,
-  updateSettlementBillStatus,
-} from '@/lib/settlement-ledger';
+import { unallocatedSettlements, updateSettlementBillStatus } from '@/lib/settlement-ledger';
 import { moveStockBatches } from '@/lib/stock-batches';
 import {
   auditLogs,
@@ -29,6 +28,8 @@ import { z } from 'zod/v3';
 
 const Input = z
   .object({
+    id: z.string().uuid().default(randomUUID),
+    allowRefundDue: z.boolean().default(false),
     originalSaleId: z.string().uuid().optional(),
     originalBillNo: z.string().trim().max(80).optional(),
     customerId: z.string().uuid().optional(),
@@ -99,6 +100,16 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
   if (original.status !== 'completed') throw new Error('only completed sales can be returned');
   if (original.paymentMethod === 'credit' && !original.customerId)
     throw new Error('credit return requires the original customer and debt reconciliation');
+  const hash = requestHash(input);
+  const [prior] = await tx
+    .select()
+    .from(salesReturns)
+    .where(and(eq(salesReturns.id, input.id), eq(salesReturns.businessId, user.businessId)));
+  if (prior) {
+    if (prior.requestHash !== hash)
+      throw new Error('This return request was already used with different details');
+    return { id: prior.id, returnNo: prior.returnNo, total: prior.total };
+  }
   if (original.paymentMethod === 'credit' && original.customerId) {
     // Same party lock as settlement: the check and debt reduction must serialize.
     const [customer] = await tx
@@ -144,21 +155,14 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
     if (costs.size > 1) throw new Error('return requires original-line cost reconciliation');
   }
   const total = round2(lines.reduce((n, line) => n + Number(line.lineTotal), 0));
-  if (
-    original.paymentMethod === 'credit' &&
-    (await settlementBillBalance(tx, user.businessId, 'sales', original.id)).unreconciledStatus
-  )
-    throw new Error(
-      'Credit bill payment history needs allocation reconciliation before adjusting debt',
-    );
-  if (
-    original.paymentMethod === 'credit' &&
-    Math.round(total * 100) >
-      (await settlementBillBalance(tx, user.businessId, 'sales', original.id)).remaining
-  )
-    throw new Error(
-      'Credit return exceeds unpaid bill value; a paid return requires refund reconciliation',
-    );
+  const money = await returnMoneySnapshot(
+    tx,
+    user.businessId,
+    'sales',
+    original,
+    total.toFixed(2),
+    input.allowRefundDue,
+  );
   const taxTotal = round2(lines.reduce((n, line) => n + Number(line.gstAmount), 0));
   const fy = financialYear(new Date());
   const [series] = await tx
@@ -180,6 +184,9 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
   const [row] = await tx
     .insert(salesReturns)
     .values({
+      id: input.id,
+      requestHash: hash,
+      ...money,
       businessId: user.businessId,
       originalSaleId: original.id,
       customerId: original.customerId,
@@ -241,14 +248,14 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
     const adjusted = await tx
       .update(customers)
       .set({
-        outstandingBalance: sql`${customers.outstandingBalance} - ${total.toFixed(2)}::numeric`,
+        outstandingBalance: sql`${customers.outstandingBalance} - ${money.debtReductionAmount}::numeric`,
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(customers.id, original.customerId),
           eq(customers.businessId, user.businessId),
-          gte(customers.outstandingBalance, total.toFixed(2)),
+          gte(customers.outstandingBalance, money.debtReductionAmount ?? '0'),
         ),
       )
       .returning({ id: customers.id });
@@ -272,6 +279,7 @@ export const createSalesReturnAction = safeAction(Input, async (input, { user, t
   revalidatePath('/warranties');
   revalidatePath('/customers');
   revalidatePath('/settlements');
+  revalidatePath('/settlements/funds');
   revalidatePath('/reports/due-bills');
   if (sourceOrder) {
     revalidatePath('/orders');

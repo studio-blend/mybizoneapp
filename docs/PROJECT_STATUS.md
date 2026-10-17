@@ -54,6 +54,16 @@ advances, general return refunds and reversal records follow in Phase 4b. See
 
 ## Latest verification
 
+**Phase 4b verified candidate, awaiting rollout approval:** general customer/supplier
+advances, partial use/refunds, paid-return refund entitlements, explicit refunds and
+linked corrections are implemented and committed locally. All **365 automated
+tests, 215 local production-browser checks**, production build, TypeScript and
+scoped lint passed. Migration 0029 preserved all 39 checked existing tables on a
+temporary Neon branch; hosted application/migration changes have not occurred.
+See [advances, refunds and corrections](ADVANCES_REFUNDS_AND_CORRECTIONS.md).
+
+The following bullets describe the current **live Phase 4a** release.
+
 - **337 automated tests passed:** 320 web tests across 34 suites and 17 database
   tests across three suites, zero failures/skips. Includes 27 real PostgreSQL
   accounting cases and three date-range cases.
@@ -83,8 +93,9 @@ Deliver each with its full data flow, permission checks and relevant acceptance
 before enabling it. Test new schema changes on a temporary branch and obtain the
 explicit migration approval required by the connected database tool.
 
-1. **Phase 4b — next:** general advances, return refunds and correction/reversal records.
-2. **Phase 4c:** reconciled opening cash/accounts, transfers and bank clearing before
+1. **Phase 4b — verified candidate awaiting rollout:** general advances, return refunds
+   and correction/reversal records. [Scope and evidence](ADVANCES_REFUNDS_AND_CORRECTIONS.md).
+2. **Phase 4c — next:** reconciled opening cash/accounts, transfers and bank clearing before
    verified invoice ageing or available-cash claims.
 
 This is the working order, not a committed delivery-date estimate.
@@ -110,6 +121,8 @@ See [delivery phases](release/PHASE_PLAN.md),
 Implementation, feature specifications and acceptance runners through Phase 4a
 are committed, published and hosted-verified, with release/admin notes and test-data
 reports. Accounting scope, evidence and the next phases are documented.
+The verified Phase 4b candidate is committed locally; its prepared migration 0029
+and hosted publication await explicit rollout approval.
 Ignored local evidence retains logs and screenshots; credentials and sessions
 are excluded. Unrelated test-account and tunnel tooling
 remains a separate pending change. Documentation must state its

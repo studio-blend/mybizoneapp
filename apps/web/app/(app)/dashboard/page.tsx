@@ -609,6 +609,28 @@ export default async function DashboardPage({
                   </div>
                 ))}
               </dl>
+              {data.funds && (
+                <div className="mt-6 border-t pt-4">
+                  <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {[
+                      ['Customer advances held', data.funds.customerAdvances],
+                      ['Supplier advances prepaid', data.funds.supplierAdvances],
+                      ['Customer refunds payable', data.funds.customerRefunds],
+                      ['Supplier refunds receivable', data.funds.supplierRefunds],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-xs text-muted-foreground">{label}</dt>
+                        <dd className="mt-2 text-lg font-semibold tabular-nums">
+                          {money(Number(value))}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <a href="/settlements/funds" className="mt-3 inline-block text-xs underline">
+                    Resolve advances and refunds
+                  </a>
+                </div>
+              )}
               {actions.length > 2 && (
                 <div className="mt-6 flex flex-wrap gap-3 border-t pt-4">
                   {actions.slice(2).map((action) => (

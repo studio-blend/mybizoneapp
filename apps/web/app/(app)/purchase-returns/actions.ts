@@ -1,8 +1,11 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
+import { requestHash } from '@/lib/order-ledger';
 import { requirePermission } from '@/lib/require-permission';
+import { returnMoneySnapshot } from '@/lib/return-money';
 import { safeAction } from '@/lib/server-action';
-import { settlementBillBalance, unallocatedSettlements } from '@/lib/settlement-ledger';
+import { unallocatedSettlements } from '@/lib/settlement-ledger';
 import { moveStockBatches } from '@/lib/stock-batches';
 import {
   auditLogs,
@@ -23,6 +26,8 @@ import { z } from 'zod/v3';
 
 const Input = z
   .object({
+    id: z.string().uuid().default(randomUUID),
+    allowRefundDue: z.boolean().default(false),
     originalPurchaseId: z.string().uuid().optional(),
     originalBillNo: z.string().trim().max(80).optional(),
     supplierId: z.string().uuid().optional(),
@@ -63,6 +68,16 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
   await requirePermission(user, 'manage_purchases');
   if (original.paymentMethod === 'credit' && !original.supplierId)
     throw new Error('credit return requires the original supplier and debt reconciliation');
+  const hash = requestHash(input);
+  const [prior] = await tx
+    .select()
+    .from(purchaseReturns)
+    .where(and(eq(purchaseReturns.id, input.id), eq(purchaseReturns.businessId, user.businessId)));
+  if (prior) {
+    if (prior.requestHash !== hash)
+      throw new Error('This return request was already used with different details');
+    return { id: prior.id, returnNo: prior.returnNo, total: prior.total };
+  }
   if (original.paymentMethod === 'credit' && original.supplierId) {
     const [supplier] = await tx
       .select()
@@ -102,14 +117,14 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
     );
   const lines = calculateReturnLines(sourceItems, previous, input.items);
   const total = round2(lines.reduce((n, line) => n + Number(line.lineTotal), 0));
-  if (
-    original.paymentMethod === 'credit' &&
-    Math.round(total * 100) >
-      (await settlementBillBalance(tx, user.businessId, 'purchases', original.id)).remaining
-  )
-    throw new Error(
-      'Credit return exceeds unpaid bill value; a paid return requires refund reconciliation',
-    );
+  const money = await returnMoneySnapshot(
+    tx,
+    user.businessId,
+    'purchases',
+    original,
+    total.toFixed(2),
+    input.allowRefundDue,
+  );
   const taxTotal = round2(lines.reduce((n, line) => n + Number(line.gstAmount), 0));
   const fy = financialYear(new Date());
   const [series] = await tx
@@ -131,6 +146,9 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
   const [row] = await tx
     .insert(purchaseReturns)
     .values({
+      id: input.id,
+      requestHash: hash,
+      ...money,
       businessId: user.businessId,
       originalPurchaseId: original.id,
       supplierId: original.supplierId,
@@ -191,14 +209,14 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
     const adjusted = await tx
       .update(suppliers)
       .set({
-        outstandingBalance: sql`${suppliers.outstandingBalance} - ${total.toFixed(2)}::numeric`,
+        outstandingBalance: sql`${suppliers.outstandingBalance} - ${money.debtReductionAmount}::numeric`,
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(suppliers.id, original.supplierId),
           eq(suppliers.businessId, user.businessId),
-          gte(suppliers.outstandingBalance, total.toFixed(2)),
+          gte(suppliers.outstandingBalance, money.debtReductionAmount ?? '0'),
         ),
       )
       .returning({ id: suppliers.id });
@@ -220,5 +238,6 @@ export const createPurchaseReturnAction = safeAction(Input, async (input, { user
   revalidatePath('/inventory/serials');
   revalidatePath('/suppliers');
   revalidatePath('/settlements');
+  revalidatePath('/settlements/funds');
   return { id: row.id, returnNo, total: total.toFixed(2) };
 });

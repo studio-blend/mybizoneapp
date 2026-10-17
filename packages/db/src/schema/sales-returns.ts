@@ -1,4 +1,6 @@
-import { index, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { check } from 'drizzle-orm/pg-core';
+import { index, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
 import { customers } from './customers';
 import { products } from './products';
@@ -19,11 +21,21 @@ export const salesReturns = pgTable(
     subtotal: numeric('subtotal', { precision: 12, scale: 2 }).notNull(),
     taxTotal: numeric('tax_total', { precision: 12, scale: 2 }).notNull().default('0'),
     total: numeric('total', { precision: 12, scale: 2 }).notNull(),
+    debtReductionAmount: numeric('debt_reduction_amount', { precision: 12, scale: 2 }),
+    refundDueAmount: numeric('refund_due_amount', { precision: 12, scale: 2 }),
+    requestHash: text('request_hash'),
     // status: 'completed' | 'voided'
     status: text('status').notNull().default('completed'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    moneySnapshot: check(
+      'sales_returns_money_snapshot_check',
+      sql.raw(
+        '(debt_reduction_amount IS NULL AND refund_due_amount IS NULL) OR (debt_reduction_amount IS NOT NULL AND refund_due_amount IS NOT NULL AND debt_reduction_amount>=0 AND refund_due_amount>=0 AND debt_reduction_amount+refund_due_amount=total)',
+      ),
+    ),
+    tenantUnique: unique('sales_returns_id_business_unique').on(t.id, t.businessId),
     businessIdx: index('sales_returns_business_id_idx').on(t.businessId),
     originalSaleIdx: index('sales_returns_original_sale_id_idx').on(t.originalSaleId),
     businessCreatedIdx: index('sales_returns_business_created_at_idx').on(

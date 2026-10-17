@@ -1192,3 +1192,60 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   context. Updated current status, accounting scope, delivery notes and roadmap.
   Next product work is Phase 4b general advances/refunds/reversals, followed by
   Phase 4c reconciled opening cash/transfers/clearing. Commercial gates stay open.
+
+
+## 17 October 2026 — Phase 4b advances, refunds and corrections candidate
+
+- Continued the approved phased roadmap after hosted Phase 4a acceptance. Required
+  code-review-graph tools are unavailable; source/dependency searches, transaction
+  tracing and scoped diff review were used. No subagents were used.
+- Added an append-only accounting event ledger, separate customer/supplier advances,
+  partial use against ordinary credit bills, unused-fund refunds, explicit goods
+  return refunds and linked full correction records. Original documents remain
+  unchanged. Stable request IDs/payload hashes and request/bill/party locks protect
+  retries, competing uses/refunds and duplicate corrections.
+- New returns snapshot unpaid debt reduction separately from paid refund entitlement.
+  Stock and debt change once; later money refunds do not move stock again. Browser
+  returns retain stable request IDs and use full navigation after saves. Historical
+  payments/returns are not guessed into refundable entitlements or advance balances.
+  Orders/EMI keep their existing ledgers. Allocations supporting paid returns require
+  reconciliation before correction; stock-return cancellation is outside this phase.
+- Cashbook excludes advance-funded settlement/application rows, includes actual
+  advances/refunds and opposite corrections on their recorded dates/methods, and
+  retains its available-cash/bank-clearing limits. Bill balances and due-bill reports
+  use live allocations and debt reductions. Finance dashboard/management balance-
+  sheet show separate advance assets/liabilities and refunds receivable/payable.
+  Existing settlement period summaries exclude advance use and include corrections;
+  collection recency excludes reversed settlements.
+- Early focused accounting acceptance passed 53 database cases. The first full web
+  run found an older cash document marked due: its physical return must still work
+  without inventing paid refund entitlement. Kept its stock return and null money
+  snapshot; added coverage plus an event-cutoff position regression. Final accounting
+  suite has 55 real PostgreSQL cases.
+- Final gates: **348 web tests / 34 suites plus 17 database tests / three suites**
+  passed, zero failures/skips. Production build and application/database TypeScript
+  passed. Scoped lint passed with five existing return-helper non-null warnings.
+  Declaration style changes were restricted to reviewed finance files/scripts;
+  unrelated test-account, Playwright and release/tunnel work remains untouched.
+- **215 local production-browser checks / 15 runners** passed: 17 new financial
+  journeys, 12 funds phone/role checks, nine accounting, 12 accounting/register,
+  19 kitchen, 10 kitchen/register, 17 wholesale, 11 wholesale/register, 19 orders,
+  10 orders/register, 12 batches, 16 serials, 10 serial/register, 21 workspace and
+  20 analysis checks. All runners exited 0; eight transport counters were zero.
+  Inspected 360px customer/supplier/correction screenshots. New fixture cleanup
+  preserved all 16 checked stock/financial tables byte for byte.
+- Prepared migration 0029 on Neon temporary branch br-royal-mud-aovxzehu, migration
+  74fa2c84-4ae5-4e5f-9c30-79aa9dff6c29. All **39** old-table row counts/full old-
+  column hashes match hosted parent. New event ledger is empty; old return snapshots
+  and request hashes remain null. FORCE RLS, append-only grants and supporting
+  tenant constraints/indexes are verified; existing settlement/allocation grants
+  remain unchanged. It is not applied or recorded on the hosted branch. Migration
+  0020 remains unrelated and pending. Exact context stays in ignored
+  .local/test-accounts/pending-funds-migration.json.
+- Evidence: .cache/funds-web-tests-accepted.log, .cache/funds-db-tests.log,
+  .cache/funds-build.log, .cache/funds-lint.log, .cache/funds-production-acceptance.json,
+  15 .cache/funds-production-*.log files, .cache/funds-accepted-source.json and
+  .cache/funds-temporary-validation.json. Scope and roadmap are documented in
+  docs/ADVANCES_REFUNDS_AND_CORRECTIONS.md and the project/release status notes.
+  Candidate is committed locally, awaiting explicit migration/publication approval.
+  Next product phase: reconciled opening cash/accounts, transfers and clearing.

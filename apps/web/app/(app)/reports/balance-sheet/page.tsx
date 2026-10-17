@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { fundsPosition } from '@/lib/funds-position';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
 import { indiaToday, validExpiry } from '@/lib/stock-batch-policy';
@@ -167,6 +168,7 @@ export default async function BalanceSheetPage(props: PageProps) {
       (COALESCE((SELECT sum(CASE kind WHEN 'receipt' THEN amount ELSE -amount END) FROM customer_order_payments WHERE business_id=${user.businessId}::uuid AND created_at<${asOfDate.toISOString()}::timestamptz),0)
       -COALESCE((SELECT sum(amount) FROM customer_order_allocations WHERE business_id=${user.businessId}::uuid AND created_at<${asOfDate.toISOString()}::timestamptz),0))::text AS total`);
     return {
+      funds: await fundsPosition(tx, user.businessId, asOfDate),
       orderAdvances: Number(advances?.total ?? 0),
       stockValue: Number(stockRows[0]?.stockValue ?? 0),
       tradeReceivables: Number(receivablesRows[0]?.total ?? 0),
@@ -184,8 +186,20 @@ export default async function BalanceSheetPage(props: PageProps) {
     data.cumulativeRevenue - data.cumulativeReturns - data.cumulativeCogs - data.cumulativeExpenses,
   );
 
-  const totalAssets = round2(data.stockValue + data.tradeReceivables + data.obCustomer);
-  const totalLiabilities = round2(data.tradePayables + data.obSupplier + data.orderAdvances);
+  const totalAssets = round2(
+    data.stockValue +
+      data.tradeReceivables +
+      data.obCustomer +
+      Number(data.funds.supplierAdvances) +
+      Number(data.funds.supplierRefunds),
+  );
+  const totalLiabilities = round2(
+    data.tradePayables +
+      data.obSupplier +
+      data.orderAdvances +
+      Number(data.funds.customerAdvances) +
+      Number(data.funds.customerRefunds),
+  );
   const totalEquity = retainedEarnings;
   const liabilitiesPlusEquity = round2(totalLiabilities + totalEquity);
 
@@ -237,6 +251,14 @@ export default async function BalanceSheetPage(props: PageProps) {
               indent
             />
             <SectionRow label="Opening Bal. (Customers)" amount={data.obCustomer} indent />
+            <SectionRow
+              label="Unused supplier advances"
+              amount={Number(data.funds.supplierAdvances)}
+            />
+            <SectionRow
+              label="Supplier return refunds receivable"
+              amount={Number(data.funds.supplierRefunds)}
+            />
             <SectionRow label="Total Assets" amount={totalAssets} bold />
           </CardContent>
         </Card>
@@ -251,6 +273,14 @@ export default async function BalanceSheetPage(props: PageProps) {
               <SectionRow label="Trade Payables (Suppliers)" amount={data.tradePayables} />
               <SectionRow label="Opening Bal. (Suppliers)" amount={data.obSupplier} indent />
               <SectionRow label="Customer order advances held" amount={data.orderAdvances} />
+              <SectionRow
+                label="Unused general customer advances"
+                amount={Number(data.funds.customerAdvances)}
+              />
+              <SectionRow
+                label="Customer return refunds payable"
+                amount={Number(data.funds.customerRefunds)}
+              />
               <SectionRow label="Total Liabilities" amount={totalLiabilities} bold />
             </CardContent>
           </Card>

@@ -1,4 +1,4 @@
-import { index, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { index, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { businesses } from './businesses';
 
 export const suppliers = pgTable(
@@ -23,6 +23,7 @@ export const suppliers = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    tenantUnique: unique('suppliers_id_business_unique').on(t.id, t.businessId),
     businessIdx: index('suppliers_business_id_idx').on(t.businessId),
     businessNameIdx: index('suppliers_business_name_idx').on(t.businessId, t.name),
   }),

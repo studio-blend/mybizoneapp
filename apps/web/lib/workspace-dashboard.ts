@@ -5,6 +5,7 @@ import { BUSINESS_PROFILES, effectiveProfile } from './business-profile';
 import type { DashboardGrant, DashboardSelection } from './dashboard-policy';
 import { dashboardSalesQueries, loadDashboardContext, scopeCondition } from './dashboard-queries';
 import { loadDashboardStockInsights } from './dashboard-stock-insights';
+import { fundsPosition } from './funds-position';
 import { loadDashboardOrders } from './order-queries';
 
 export interface SalesSummary {
@@ -248,8 +249,8 @@ export async function loadWorkspaceDashboard(
         'payables',(SELECT COALESCE(SUM(GREATEST(outstanding_balance,0)),0) FROM suppliers WHERE business_id=${businessId}::uuid),
         'expenses',(SELECT COALESCE(SUM(amount),0) FROM expense_entries WHERE business_id=${businessId}::uuid AND type='expense' AND entry_date>=${start}::timestamptz AND entry_date<${end}::timestamptz),
         'previousExpenses',(SELECT COALESCE(SUM(amount),0) FROM expense_entries WHERE business_id=${businessId}::uuid AND type='expense' AND entry_date>=${previousStart}::timestamptz AND entry_date<${start}::timestamptz),
-        'collections',(SELECT COALESCE(SUM(amount),0) FROM sales_settlements WHERE business_id=${businessId}::uuid AND settled_at>=${start}::timestamptz AND settled_at<${end}::timestamptz),
-        'supplierPayments',(SELECT COALESCE(SUM(amount),0) FROM purchase_settlements WHERE business_id=${businessId}::uuid AND settled_at>=${start}::timestamptz AND settled_at<${end}::timestamptz),
+        'collections',((SELECT COALESCE(SUM(p.amount),0) FROM sales_settlements p WHERE p.business_id=${businessId}::uuid AND p.settled_at>=${start}::timestamptz AND p.settled_at<${end}::timestamptz AND NOT EXISTS(SELECT 1 FROM accounting_events a WHERE a.business_id=p.business_id AND a.kind='advance_apply' AND a.sales_settlement_id=p.id))-(SELECT COALESCE(SUM(e.amount),0) FROM accounting_events e WHERE e.business_id=${businessId}::uuid AND e.kind='settlement_reverse' AND e.sales_settlement_id IS NOT NULL AND e.created_at>=${start}::timestamptz AND e.created_at<${end}::timestamptz AND NOT EXISTS(SELECT 1 FROM accounting_events a WHERE a.business_id=e.business_id AND a.kind='advance_apply' AND a.sales_settlement_id=e.sales_settlement_id))),
+        'supplierPayments',((SELECT COALESCE(SUM(p.amount),0) FROM purchase_settlements p WHERE p.business_id=${businessId}::uuid AND p.settled_at>=${start}::timestamptz AND p.settled_at<${end}::timestamptz AND NOT EXISTS(SELECT 1 FROM accounting_events a WHERE a.business_id=p.business_id AND a.kind='advance_apply' AND a.purchase_settlement_id=p.id))-(SELECT COALESCE(SUM(e.amount),0) FROM accounting_events e WHERE e.business_id=${businessId}::uuid AND e.kind='settlement_reverse' AND e.purchase_settlement_id IS NOT NULL AND e.created_at>=${start}::timestamptz AND e.created_at<${end}::timestamptz AND NOT EXISTS(SELECT 1 FROM accounting_events a WHERE a.business_id=e.business_id AND a.kind='advance_apply' AND a.purchase_settlement_id=e.purchase_settlement_id))),
         'emiOverdue',(SELECT COUNT(*) FROM emi_payments WHERE business_id=${businessId}::uuid AND status='pending' AND due_date<${period.today}::date)
       ) AS value`)
         : Promise.resolve([]),
@@ -329,6 +330,7 @@ export async function loadWorkspaceDashboard(
       trend: dailyTrend,
       methods: Array.from(methods),
       ledger: ledgerRows[0]?.value ?? null,
+      funds: hasLedger ? await fundsPosition(tx, businessId, now) : null,
       customers: customerRows[0]?.value ?? null,
       movements: Array.from(movements),
       profile: { ...profile, mixed: mixedProfiles },

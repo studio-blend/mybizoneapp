@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { auditLogs } from '@mybizone/db';
 import { sql } from 'drizzle-orm';
+import { activeAllocation, activePayment } from './accounting-evidence';
 import { type OrderTx, requestHash } from './order-ledger';
 import { centsText, moneyCents } from './order-policy';
 
@@ -65,8 +66,8 @@ export async function settlementBillBalance(
     paymentStatus: string | null;
   }>(sql`
     SELECT b.total::text,${side === 'sales' ? sql`b.payment_status` : sql`NULL::text`} AS "paymentStatus",
-    COALESCE((SELECT sum(r.total) FROM ${t.returns} r WHERE r.business_id=b.business_id AND r.${t.original}=b.id AND r.status='completed'),0)::text AS returned,
-    COALESCE((SELECT sum(a.amount) FROM ${t.allocations} a WHERE a.business_id=b.business_id AND a.${t.billId}=b.id),0)::text AS allocated
+    COALESCE((SELECT sum(r.total-COALESCE(r.refund_due_amount,0)) FROM ${t.returns} r WHERE r.business_id=b.business_id AND r.${t.original}=b.id AND r.status='completed'),0)::text AS returned,
+    COALESCE((SELECT sum(a.amount) FROM ${t.allocations} a WHERE a.business_id=b.business_id AND a.${t.billId}=b.id AND ${activeAllocation(side)}),0)::text AS allocated
     FROM ${t.bills} b WHERE b.id=${id}::uuid AND b.business_id=${businessId}::uuid`);
   if (!row) throw new Error('Bill not found');
   const net = moneyCents(row.total) - moneyCents(row.returned);
@@ -86,7 +87,7 @@ export async function unallocatedSettlements(
 ) {
   const t = settlementTables(side);
   const [row] = await tx.execute<{ amount: string }>(
-    sql`SELECT COALESCE(sum(p.amount-COALESCE((SELECT sum(a.amount) FROM ${t.allocations} a WHERE a.settlement_id=p.id AND a.business_id=p.business_id),0)),0)::text AS amount FROM ${t.payments} p WHERE p.business_id=${businessId}::uuid AND p.${t.partyId}=${partyId}::uuid`,
+    sql`SELECT COALESCE(sum(p.amount-COALESCE((SELECT sum(a.amount) FROM ${t.allocations} a WHERE a.settlement_id=p.id AND a.business_id=p.business_id AND ${activeAllocation(side)}),0)),0)::text AS amount FROM ${t.payments} p WHERE p.business_id=${businessId}::uuid AND p.${t.partyId}=${partyId}::uuid AND ${activePayment(side)}`,
   );
   return moneyCents(row?.amount ?? '0');
 }
@@ -124,7 +125,7 @@ export async function allocateSettlement(
     sql`SELECT id FROM ${t.parties} WHERE id=${bill.partyId}::uuid AND business_id=${input.businessId}::uuid FOR UPDATE`,
   );
   const [payment] = await tx.execute<{ amount: string; partyId: string }>(
-    sql`SELECT amount::text,${t.partyId} AS "partyId" FROM ${t.payments} WHERE id=${input.settlementId}::uuid AND business_id=${input.businessId}::uuid`,
+    sql`SELECT p.amount::text,p.${t.partyId} AS "partyId" FROM ${t.payments} p WHERE p.id=${input.settlementId}::uuid AND p.business_id=${input.businessId}::uuid AND ${activePayment(input.side)}`,
   );
   if (!payment || payment.partyId !== bill.partyId)
     throw new Error('Payment and bill must belong to the same party');
@@ -137,7 +138,7 @@ export async function allocateSettlement(
     return { id: input.id };
   }
   const [used] = await tx.execute<{ amount: string }>(
-    sql`SELECT COALESCE(sum(amount),0)::text AS amount FROM ${t.allocations} WHERE settlement_id=${input.settlementId}::uuid AND business_id=${input.businessId}::uuid`,
+    sql`SELECT COALESCE(sum(a.amount),0)::text AS amount FROM ${t.allocations} a WHERE a.settlement_id=${input.settlementId}::uuid AND a.business_id=${input.businessId}::uuid AND ${activeAllocation(input.side)}`,
   );
   const balance = await settlementBillBalance(tx, input.businessId, input.side, input.billId);
   const amount = moneyCents(input.amount);

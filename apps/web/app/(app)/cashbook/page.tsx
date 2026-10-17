@@ -94,10 +94,10 @@ export default async function CashbookPage({
       </div>
       <p className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
         Net movement is not cash available or a cleared bank balance. Opening cash, transfers, bank
-        clearing and general return refunds are not recorded here. Order receipts include advances;
-        only explicit order refunds are money out. Bill allocations never add money again. EMI down
-        payments have an unknown method; instalments include interest. This register follows the
-        current source documents, including editable expense entries.
+        clearing are not recorded here. Advances, explicit return refunds and linked money
+        corrections appear once. Applying an advance or assigning a bill never adds money again. EMI
+        down payments have an unknown method; instalments include interest. This register follows
+        the current source documents, including editable expense entries.
       </p>
       <section className="space-y-3 rounded-lg border p-4">
         <h2 className="font-semibold">Daily money movement</h2>

@@ -17,7 +17,6 @@ import { Label } from '@mybizone/ui/label';
 import { Select } from '@mybizone/ui/select';
 import { Textarea } from '@mybizone/ui/textarea';
 import { useToast } from '@mybizone/ui/use-toast';
-import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { createSalesReturnAction } from '../actions';
 
@@ -46,9 +45,9 @@ interface ItemRow {
 }
 
 export function ReturnForm({ products, customers, originalSale }: Props) {
-  const router = useRouter();
   const { toast } = useToast();
 
+  const requestId = useRef('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,7 +93,11 @@ export function ReturnForm({ products, customers, originalSale }: Props) {
 
     setPending(true);
 
+    const key = requestId.current || crypto.randomUUID();
+    requestId.current = key;
     const result = await createSalesReturnAction({
+      id: key,
+      allowRefundDue: true,
       originalBillNo,
       originalSaleId: originalSale?.id ?? undefined,
       customerId: customerId || undefined,
@@ -105,7 +108,10 @@ export function ReturnForm({ products, customers, originalSale }: Props) {
         qty: it.qty,
         serialNumbers: parseSerialText(it.serialText ?? ''),
       })),
-    });
+    }).catch(() => ({
+      ok: false as const,
+      error: 'Could not confirm the save. Retry this form to check the same request safely.',
+    }));
 
     setPending(false);
 
@@ -118,8 +124,7 @@ export function ReturnForm({ products, customers, originalSale }: Props) {
       title: 'Return created',
       description: `${result.data.returnNo} — ₹${result.data.total}`,
     });
-    router.push('/returns');
-    router.refresh();
+    window.location.assign('/returns');
   }
 
   return (
@@ -133,6 +138,10 @@ export function ReturnForm({ products, customers, originalSale }: Props) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Unpaid value reduces debt. Paid value becomes a refund due; record the actual money
+            separately in Advances &amp; refunds.
+          </p>
           <div className="space-y-2">
             <Label htmlFor="originalBillNo">Original bill number</Label>
             <Input

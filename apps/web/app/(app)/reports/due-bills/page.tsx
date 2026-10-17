@@ -1,3 +1,4 @@
+import { activeAllocation } from '@/lib/accounting-evidence';
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/require-permission';
 import { requireUser } from '@/lib/session';
@@ -35,8 +36,8 @@ export default async function DueBillsReportPage(props: PageProps) {
          -COALESCE((SELECT sum(r.total) FROM sales_returns r WHERE r.business_id="sales".business_id AND r.original_sale_id="sales".id AND r.status='completed'),0)
          -COALESCE((SELECT sum(a.amount) FROM customer_order_allocations a JOIN customer_order_deliveries d ON d.id=a.delivery_id AND d.business_id=a.business_id WHERE d.sale_id="sales".id AND d.business_id="sales".business_id),0))
          WHEN "sales".payment_method='credit' THEN GREATEST(0,"sales".total
-         -COALESCE((SELECT sum(r.total) FROM sales_returns r WHERE r.business_id="sales".business_id AND r.original_sale_id="sales".id AND r.status='completed'),0)
-         -COALESCE((SELECT sum(a.amount) FROM sales_settlement_allocations a WHERE a.business_id="sales".business_id AND a.sale_id="sales".id),0)) ELSE "sales".total END::text`,
+         -COALESCE((SELECT sum(r.total-COALESCE(r.refund_due_amount,0)) FROM sales_returns r WHERE r.business_id="sales".business_id AND r.original_sale_id="sales".id AND r.status='completed'),0)
+         -COALESCE((SELECT sum(a.amount) FROM sales_settlement_allocations a WHERE a.business_id="sales".business_id AND a.sale_id="sales".id AND ${activeAllocation('sales')}),0)) ELSE "sales".total END::text`,
         orderId: sql<
           string | null
         >`(SELECT d.order_id FROM customer_order_deliveries d WHERE d.sale_id="sales".id AND d.business_id="sales".business_id)`,

@@ -23,6 +23,7 @@ export const purchaseSettlements = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    tenantIdUnique: unique('purchase_settlements_id_business_unique').on(t.id, t.businessId),
     partyUnique: unique('purchase_settlements_party_unique').on(t.id, t.businessId, t.supplierId),
     businessIdx: index('purchase_settlements_business_id_idx').on(t.businessId),
     supplierIdx: index('purchase_settlements_supplier_id_idx').on(t.supplierId),
