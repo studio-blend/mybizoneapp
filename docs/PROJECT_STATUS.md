@@ -6,15 +6,15 @@ behaviour, boundaries and verification remain in the linked feature/release note
 ## Current position
 
 The hosted development application is running at https://mybizoneapp.vercel.app.
-Latest application acceptance: commit `62e3ca5bdf983e0a7c06dfdcc82f4a8d8c76b16a`,
-Vercel deployment `dpl_H8ANzvuiPo4jMfzrnzGM8SMFwYDa` (READY, public alias verified).
+Latest application acceptance: commit `4ef78ec84b6f9909308a9416402f87b3828048aa`,
+Vercel deployment `dpl_E1xh2C2CzKscMwberF36GYfKHTE7` (READY, public alias verified).
 Documentation-only follow-ups may have newer commit/deployment IDs; application
 code is unchanged from this accepted release.
 It is suitable for ongoing owner testing within its documented supported scope.
 **It is not yet accepted for commercial launch.**
 
 Product feature phases below are separate from the older delivery/release phases
-in `release/PHASE_PLAN.md`. Completing feature Phase 3b does not complete installer,
+in `release/PHASE_PLAN.md`. Completing feature Phase 3c does not complete installer,
 provider, recovery or commercial release acceptance.
 
 ## Delivered and live
@@ -28,38 +28,37 @@ provider, recovery or commercial release acceptance.
 | Feature Phase 2 | GST-exclusive gross-profit trends, sales heatmap, collection priorities, adjustments and scoped bill drill-downs | [Operating analysis](OPERATING_ANALYSIS.md) |
 | Feature Phase 3a | Optional product batch reconciliation, expiry control, earliest-expiry checkout, return quarantine/inspection, supplier returns, batch damage and dashboard alerts | [Batch stock and expiry](STOCK_BATCHES_AND_EXPIRY.md) |
 | Feature Phase 3b | Optional serial reconciliation, exact-unit receipts/sales/returns/damage, inspection quarantine, immutable sale warranty records, scoped lookup and dashboard alerts | [Serial inventory and recorded warranties](SERIAL_INVENTORY_AND_WARRANTIES.md) |
+| Feature Phase 3c | Customer orders, immutable price/tax agreements, advances, partial handovers, exact bill allocation, returns/refunds, cancellation and dashboard priorities | [Orders, advances and deliveries](CUSTOMER_ORDERS_AND_ADVANCES.md) |
 
 Industry profiles set defaults and priorities; specialised workflows are separate
 capabilities. Choosing an industry does not activate an unfinished module. Existing
 products remain untracked until their physical lots or unit serials are explicitly reconciled.
 
-## Latest feature delivery — Phase 3b
+## Latest feature delivery — Phase 3c
 
-Serial-number inventory and recorded warranties are live across
-purchases, checkout, customer/supplier returns, inspection and damage. Warranty
-lookup retains sale-specific terms and store permissions; owner dashboards include
-serial inspection priorities. See [the feature specification](SERIAL_INVENTORY_AND_WARRANTIES.md).
-110 focused automated tests and 79 local browser checks passed, including the
-final production build and phone layouts. The owner approved rollout. Migration
-0024 is applied and recorded, and its temporary branch is removed. All 82 hosted
-browser checks passed. All 13 checked existing table hashes match before migration,
-after migration and after hosted acceptance. No existing product was activated or
-assigned invented serials/warranty terms. Use Inventory → Serial inventory to
-reconcile real unit identities before enabling tracking.
+Customer orders, advances and partial deliveries are live at **Billing → Customer
+orders**. Booking records an agreement without moving stock or creating revenue
+or customer debt. Physical handovers create normal bills; exact order receipts,
+returns and refunds preserve advance liabilities and delivered bill balances.
+The owner approved migration 0025 and publication. It is applied and recorded,
+and its temporary branch is removed. All 92 read-only hosted browser checks
+passed, and all 19 checked existing-table hashes match before migration, after
+migration and after hosted acceptance. No fabricated order/payment records were
+added. See [the feature specification](CUSTOMER_ORDERS_AND_ADVANCES.md).
 
 ## Latest verification
 
-- 110 automated tests passed across 11 focused suites, covering serial/batch
+- 137 automated tests passed across 13 focused suites, covering orders, serial/batch
   workflows and relevant transaction, dashboard, profile, analysis and security regressions.
-- 79 local production-browser checks and 82 hosted browser checks passed. The hosted
-  checks comprise 10 serial/register, nine batch, 21 workspace, 20 analysis and
-  22 seeded transaction/bill/report checks; all five runners exited 0.
+- 108 local production-browser checks and 92 hosted browser checks passed. The hosted
+  checks comprise 10 order/register, 10 serial/register, nine batch, 21 workspace,
+  20 analysis and 22 seeded transaction/bill/report checks; all six runners exited 0.
 - TypeScript, scoped lint and the isolated production build passed. Phone layouts
-  were inspected at 360px, including expanded reconciliation forms.
-- Approved migration 0024 was applied and recorded; its temporary Neon branch was
-  removed. All 13 checked table hashes matched before and after migration and
+  were inspected at 360px, including order booking and expanded reconciliation forms.
+- Approved migration 0025 was applied and recorded; its temporary Neon branch was
+  removed. All 19 checked table hashes matched before and after migration and
   hosted acceptance, preserving stock, transactions, balances and role grants.
-- Migrations 0022 and 0023 are also applied. Unrelated subscription migration 0020 remains
+- Migrations 0022–0024 are also applied. Unrelated subscription migration 0020 remains
   pending on the hosted database. Do not run all pending hosted migrations blindly.
 
 These are the latest targeted release results, not a claim that every historical
@@ -69,27 +68,15 @@ Credentials and sessions stay in ignored private files.
 
 ## Product roadmap
 
-Feature **Phase 3c — customer orders, advances and deliveries** passed local
-production acceptance and the owner approved rollout. [Its specification and rollout
-status](CUSTOMER_ORDERS_AND_ADVANCES.md) document the money/stock boundaries.
-Migration 0025 passed on a temporary Neon branch with 19 existing tables preserved;
-it is now applied and recorded on the hosted database, with the temporary branch
-removed and all 19 fresh pre-migration table hashes preserved. All **137 automated tests and 108
-production-browser checks passed**, along with TypeScript, scoped lint and build.
-Publication and read-only hosted acceptance are in progress. Phase 3b remains
-the latest accepted hosted application until those checks finish.
-
 The following capabilities are **not implemented by the latest hosted release**.
 Deliver each with its full data flow, permission checks and relevant acceptance
 before enabling it. Test new schema changes on a temporary branch and obtain the
 explicit migration approval required by the connected database tool.
 
-1. **Approved rollout in progress — furniture:** orders, customer advances and delivery allocation,
-   with separate agreement, funds, handover and unpaid delivery states.
-2. **Wholesale:** pack/unit conversions, credit terms and fulfilment. Keep the
+1. **Next — wholesale:** pack/unit conversions, credit terms and fulfilment. Keep the
    existing retail/wholesale selling-model setting independent of these workflows.
-3. **Food service:** recipes, ingredient consumption, waste and kitchen tickets.
-4. **Accounting foundations:** invoice-level settlement allocation and cashbook/
+2. **Food service:** recipes, ingredient consumption, waste and kitchen tickets.
+3. **Accounting foundations:** invoice-level settlement allocation and cashbook/
    advance/refund records before adding invoice ageing or available-cash claims.
 
 This is the working order, not a committed delivery-date estimate.
@@ -113,7 +100,7 @@ See [delivery phases](release/PHASE_PLAN.md),
 ## Documentation and repository state
 
 Feature specifications, implementation, the consolidated summary, work log,
-release/admin notes, test-data reports and Phase 3b acceptance runners are committed
+release/admin notes, test-data reports and Phase 3c acceptance runners are committed
 and published. Ignored local evidence files retain detailed logs and screenshots;
 credentials and sessions are excluded. Unrelated test-account and tunnel tooling
 remains a separate pending change. Documentation must state its

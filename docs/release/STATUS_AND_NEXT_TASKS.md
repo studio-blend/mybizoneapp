@@ -1,16 +1,16 @@
 # MyBizOne — status and next tasks
 
 > **17 October 2026:** Start with [the current project status and roadmap](../PROJECT_STATUS.md).
-> Role dashboards, business profiles, operating analysis, feature Phase 3a
-> batch/expiry tracking and Phase 3b serials/recorded warranties are live. The latest
-> release passed 110 focused automated tests and 82 hosted browser checks. The dated entries below retain delivery and
+> Role dashboards, business profiles, operating analysis and feature Phases 3a–3c
+> (batch/expiry, serials/warranties and orders/advances/deliveries) are live. The latest
+> release passed 137 automated tests, 108 local production-browser checks and 92
+> hosted browser checks, plus build/types. The dated entries below retain delivery and
 > commercial-release history; their older deployment/test statements are historical.
 > Product feature phases and commercial delivery phases are separate. Razorpay is
 > still on hold, and email, installer, complete cloud recovery and launch gates remain open.
-> Phase 3c orders/advances/deliveries are now implemented locally; 137 automated
-> tests and 108 production-browser checks passed, including build/types. Migration 0025 is
-> approved, applied and recorded; the temporary branch is removed. Publication
-> and read-only hosted acceptance are in progress.
+> Migration 0025 is approved, applied and recorded; the temporary branch is removed.
+> All 19 checked existing-table hashes are preserved. Wholesale is the next planned
+> product feature phase; commercial launch work remains separate.
 > See [the Phase 3c record](../CUSTOMER_ORDERS_AND_ADVANCES.md).
 
 Updated: 15 October 2026. Scope: Windows desktop/LAN and cloud.

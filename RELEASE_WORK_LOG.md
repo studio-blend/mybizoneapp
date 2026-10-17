@@ -809,3 +809,27 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   Unrelated subscription migration 0020 remains pending. Accepted local feature
   commit `a0515d044a51cb43af51284276ba86055b738cc6` is unchanged apart from this
   documentation follow-up. Publication and hosted acceptance follow.
+- Published application commit `4ef78ec84b6f9909308a9416402f87b3828048aa`, tree
+  `01035831528a7a106ffa5a490255327f78856a50`, identical to local feature plus
+  migration-status documentation commit `b810fef21a803db2ae0af0b2179ce6e2a25eb28e`.
+  Guarded GitHub ref update and read-only fetch/tree comparison passed; local main
+  was aligned without modifying unrelated working files. Vercel deployment
+  `dpl_E1xh2C2CzKscMwberF36GYfKHTE7` is READY and its public alias resolves to that SHA.
+- All **92 hosted browser checks passed**: 10 order/register, 10 serial/register,
+  nine batch, 21 dashboard workspace, 20 operating-analysis and 22 seeded
+  transaction/bill/report checks. All six runners exited 0; the five with transport
+  counters reported zero retries. Hosted phone order forms/registers were visually
+  inspected at 360px. No financial/inventory form was saved. All six new order
+  tables remain empty, and all 19 checked table hashes still match the fresh
+  pre-migration baseline after acceptance. Existing stock, transactions, balances
+  and role grants are preserved.
+- Final hosted evidence: `.cache/customer-orders-hosted-preapply.json`,
+  `.cache/customer-orders-hosted-migration-applied.json`,
+  `.cache/customer-orders-hosted-schema-checks.json`,
+  `.cache/customer-orders-hosted-final-hashes.json`,
+  `.cache/customer-orders-hosted-acceptance.json` and six
+  `.cache/customer-orders-hosted-*.log` runner logs. Phase 3c is published and
+  complete within its documented scope. The final documentation-only follow-up
+  records acceptance without changing tested application code. Wholesale
+  packs/units/credit/fulfilment is the next product phase; commercial launch gates
+  remain separate and open.

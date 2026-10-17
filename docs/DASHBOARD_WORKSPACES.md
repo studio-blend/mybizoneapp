@@ -69,7 +69,7 @@ or performance percentages invented by the UI.
 
 ## Verification
 
-Phase 3c candidate (local production acceptance passed, not yet hosted): handover priorities show
+Phase 3c is published and hosted acceptance passed: handover priorities show
 late/open orders and remaining lines within each workspace's scope, independent
 of the activity period. Department inventory views omit customer and money fields.
 Financial workspaces with whole-store scope show period order receipts/refunds

@@ -1,8 +1,10 @@
 # Customer orders, advances and deliveries — feature Phase 3c
 
-Status: owner approved rollout on 17 October 2026. Migration 0025 is applied and
-recorded, and its temporary branch is removed. Publication and read-only hosted
-acceptance are in progress. Entry point: **Billing → Customer orders**.
+Status: published and verified on 17 October 2026. The owner approved rollout;
+migration 0025 is applied and recorded, and its temporary branch is removed.
+Application acceptance commit: `4ef78ec84b6f9909308a9416402f87b3828048aa`.
+Vercel deployment `dpl_E1xh2C2CzKscMwberF36GYfKHTE7` reached READY and the public
+alias was verified. Entry point: **Billing → Customer orders**.
 
 Orders are an optional workflow across industries, including furniture. An order
 records the agreed products, prices/tax terms, customer, address and promised
@@ -82,8 +84,15 @@ All seven runners exited 0; the read-only runners reported zero transport retrie
 The full workflow used guarded disposable local fixtures and cleaned them up.
 No fabricated orders, advances, deliveries or refunds were added to the hosted account.
 
-Apply and record migration 0025 before deploying the application, because dashboard
-queries use its new tables. Then publish the exact accepted source and repeat
-read-only hosted order/report/dashboard/stock acceptance. Do not run all pending
+All **92 hosted browser checks passed**: 10 order/register, 10 serial/register,
+nine batch, 21 workspace, 20 analysis and 22 seeded transaction/bill/report checks.
+All six runners exited 0; the five with transport counters reported zero retries.
+Hosted phone booking/register layouts were inspected. No financial or inventory
+form was saved, all six new tables remain empty, and all 19 existing-table hashes
+still match the fresh pre-migration baseline after acceptance.
+
+Migration 0025 was applied and recorded before publishing the exact accepted
+application tree, because dashboard queries use its new tables. Documentation-only
+follow-ups do not change that application source. Do not run all pending
 hosted migrations: subscription migration 0020 is unrelated and still pending.
 Evidence and release commands are recorded in [the work log](../RELEASE_WORK_LOG.md).
