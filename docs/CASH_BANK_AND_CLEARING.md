@@ -1,8 +1,10 @@
 # Cash, bank accounts and payment clearing — feature Phase 4c
 
-Status, 20 October 2026: locally accepted; awaiting migration/publication approval.
-Migration 0030 is tested on a temporary Neon branch. Hosted application and
-database remain at accepted Phase 4b until explicit migration/publication approval.
+Status, 20 October 2026: published and accepted on the hosted development app.
+Owner-approved migration 0030 is applied/recorded and its temporary branch removed.
+Application commit `f8b6dfd1563fa64e83c88ca29bb51ab9ba058827`, Vercel deployment
+`dpl_EBwZ1XfApdpEhW1NYzqRi3aBmndt` (READY, public alias verified). Its tree
+`66511ecb79f4b22ffda12a094ededca29b11f8d2` matches accepted local candidate `0508b1f`.
 
 Local acceptance completed on 17–18 October: **401 automated tests** (384 web /
 35 suites, including 36 new money regressions; 17 database / three suites), production
@@ -13,13 +15,22 @@ browser checks**. The other 215 scenarios cover unchanged code. Financial fixtur
 cleanup preserved all 46 checked stock/financial/account table hashes. Phone layouts
 were visually inspected at 360px. All 20 accepted source hashes still match on
 20 October; the prepared SQL and 40 preserved temporary-branch table hashes were
-rechecked without changing data. Hosted acceptance remains pending publication.
+rechecked without changing data. All **149 read-only hosted checks / 11 runners**
+passed: 12 money, 12 funds, 12 accounting, 10 kitchen, 11 wholesale, 10 orders,
+10 serials, nine batches, 21 workspaces, 20 analysis and 22 seeded transactions.
+Ten transport counters were zero. All 40 existing table hashes still match the
+fresh hosted pre-apply baseline after acceptance; all six new ledger tables remain
+empty. No hosted financial form was submitted. Hosted phone layouts and role
+restrictions passed. Commercial release gates remain separate.
 
 Evidence: `.cache/money-all-tests-final.log`, `.cache/money-db-tests-final.log`,
 `.cache/money-build-final.log`, `.cache/money-lint-final.log`,
 `.cache/money-production-acceptance.json`, `.cache/money-final-acceptance.json`,
 their individual runner logs/screenshots, `.cache/money-accepted-source.json` and
-`.cache/money-temporary-validation.json`. Credentials/migration context remain
+`.cache/money-temporary-validation.json`. Hosted evidence is in
+`.cache/money-hosted-preapply.json`, `.cache/money-hosted-acceptance.json`, the
+11 individual runner logs/screenshots and `.cache/money-hosted-final-hashes.json`.
+Credentials/migration context remain
 in ignored private files. Public runners are `scripts/verify-money.mjs` (guarded
 local financial writes) and `scripts/verify-money-register.mjs` (read-only).
 
@@ -152,11 +163,13 @@ no success banner. Initial setup and every command require evidence.
 The migration passed on temporary branch `br-solitary-wildflower-ao4hv2u9`:
 all **40 existing table row counts/full-row hashes** match the fresh hosted baseline;
 all six new tables have the required RLS/grants and no fabricated financial data.
-Only this migration may be applied after approval. Subscription migration 0020
-remains intentionally pending and must not be included in an all-pending rollout.
+After explicit owner approval, only migration 0030 was applied and recorded;
+the temporary branch was removed. Existing profile settings, stock, balances,
+transactions and permissions remain unchanged. Subscription migration 0020 remains
+intentionally pending and must not be included in an all-pending rollout.
 
 Final validation and publication state are maintained in
 [project status](PROJECT_STATUS.md) and [the work log](../RELEASE_WORK_LOG.md).
 Financial mutation tests and browser fixtures run only against the exact guarded
-local disposable cluster. The read-only acceptance runner can later verify hosted
+local disposable cluster. The read-only acceptance runner verifies hosted
 pages/roles without submitting a financial command. Credentials remain ignored.

@@ -1357,3 +1357,38 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   Migration and publication approval are still pending. No hosted/default data was
   changed, no new hosted browser acceptance is claimed, and unrelated local work
   remains excluded. Updated feature/project/release documents for this handoff.
+
+## 20 October 2026 — Phase 4c approved hosted rollout and acceptance
+
+- Owner explicitly approved applying migration 0030, removing its temporary branch
+  and publishing Phase 4c. Captured a fresh full-row 40-table hosted baseline, then
+  completed exact prepared migration b62f6800-f8b0-4861-be81-d33941473ff6. Temporary
+  branch br-solitary-wildflower-ao4hv2u9 was deleted through Neon completion. Recorded
+  only 0030_money_accounts_and_clearing.sql; subscription migration 0020 stays pending.
+- All 40 checked existing table row counts/hashes match immediately after migration
+  and again after hosted acceptance. Existing stock, debt, transactions, profile
+  settings and permissions remain preserved. All six new tables enforce FORCE RLS
+  with app_user SELECT/INSERT and no UPDATE/DELETE; the new money ledger remains
+  empty, with no invented account openings, clearings or financial test fixtures.
+- Published application commit f8b6dfd1563fa64e83c88ca29bb51ab9ba058827, exact tree
+  66511ecb79f4b22ffda12a094ededca29b11f8d2 matching accepted local candidate
+  0508b1f2924c8ba4d1e1cbf6e508491a9abcc848. Created GitHub tree/commit and used a
+  leased non-forced main update, then fetched/aligned the identical tree. Unrelated
+  dirty work was preserved. Vercel dpl_EBwZ1XfApdpEhW1NYzqRi3aBmndt is READY;
+  mybizoneapp.vercel.app resolves to the accepted deployment.
+- All **149 read-only hosted browser checks / 11 runners** passed: 12 money,
+  12 funds, 12 accounting, 10 kitchen, 11 wholesale, 10 orders, 10 serials, nine batches,
+  21 workspaces, 20 analysis and 22 seeded bill/transaction/report checks. All runners
+  exited 0; ten transport counters were zero. No hosted financial command was
+  submitted. Owner/admin/accounts access, denied staff access, phone layouts and
+  qualified credit bill evidence passed; hosted phone screenshots were inspected.
+- Local acceptance remains 401 automated tests, 240 production-browser checks plus
+  25 affected final-build finance rechecks, production build, application/database
+  types and scoped lint. All 20 accepted source hashes remain unchanged. Updated
+  feature/project/release notes are a documentation-only follow-up to accepted code.
+- Hosted evidence: .cache/money-hosted-preapply.json,
+  .cache/money-application-deployment.json, .cache/money-hosted-acceptance.json,
+  11 .cache/money-hosted-*.log files, phone screenshots and
+  .cache/money-hosted-final-hashes.json. Credentials and pending/completed migration
+  context stay ignored. Operator/accountant adoption and provider, installer,
+  recovery and commercial launch acceptance remain separate work.

@@ -3,37 +3,39 @@
 Updated: **20 October 2026**. This is the current project summary. Detailed
 behaviour, boundaries and verification remain in the linked feature/release notes.
 
-## Phase 4c candidate — locally accepted, awaiting rollout approval
+## Latest feature delivery — Phase 4c live
 
 Cash/bank accounts, verified openings and append-only corrections, source
 assignments, transfers, clearing/bounces and linked noncash reconciliation are
-implemented locally. The finance dashboard shows current account positions and a
+published and hosted-verified. The finance dashboard shows current account positions and a
 new credit bill report qualifies invoice-age figures against allocation/clearing
-evidence. **This candidate is not published yet.**
+evidence. Open **Billing → Cash & bank** to enter verified account openings.
 
 All 401 automated tests pass (384 web / 35 suites, including 36 new money
 regressions, plus 17 database / three suites). Production build, application/database
 types and scoped lint pass. All 240 production-browser checks / 17 runners passed;
 the 25 affected finance checks passed again on the final build after the legacy
 over-allocation guard. These runs completed on 17–18 October; all 20 accepted source
-hashes still match on 20 October. Migration
-0030 passed on a temporary Neon branch with all 40 checked existing table hashes
-and required immutable tenant permissions preserved. Hosted application/database
-are unchanged; exact migration approval and publication remain pending.
+hashes still match on 20 October. All **149 read-only hosted browser checks / 11
+runners** passed with zero reported transport retries. Owner-approved migration
+0030 is applied/recorded and its temporary branch removed. All 40 checked existing
+table hashes still match the fresh pre-apply baseline after hosted acceptance;
+the six new ledger tables remain empty. Existing stock, debt, transactions, profile
+settings and permissions are preserved. Subscription migration 0020 remains pending.
 See [Cash, bank and clearing](CASH_BANK_AND_CLEARING.md).
 
 ## Current hosted position
 
 The hosted development application is running at https://mybizoneapp.vercel.app.
-Latest application acceptance: commit `6ee547529bea00ce9a7af0ea363a5563f1091a3d`,
-Vercel deployment `dpl_GgRvhW9rUTnLYFdnJujANytygM2y` (READY, public alias verified).
+Latest application acceptance: commit `f8b6dfd1563fa64e83c88ca29bb51ab9ba058827`,
+Vercel deployment `dpl_EBwZ1XfApdpEhW1NYzqRi3aBmndt` (READY, public alias verified).
 Documentation-only follow-ups may have newer commit/deployment IDs; application
 code is unchanged from this accepted release.
 It is suitable for ongoing owner testing within its documented supported scope.
 **It is not yet accepted for commercial launch.**
 
 Product feature phases below are separate from the older delivery/release phases
-in `release/PHASE_PLAN.md`. Completing feature Phase 4b does not complete installer,
+in `release/PHASE_PLAN.md`. Completing feature Phase 4c does not complete installer,
 provider, recovery or commercial release acceptance.
 
 ## Delivered and live
@@ -52,12 +54,13 @@ provider, recovery or commercial release acceptance.
 | Feature Phase 3e | Immutable recipes, prep-to-stock kitchen tickets, ingredient consumption, actual yield/cost, batch trace and waste linked to existing loss reports | [Kitchen preparation and waste](KITCHEN_PREPARATION_AND_WASTE.md) |
 | Feature Phase 4a | Partial customer/supplier payments, explicit bill allocations and permanent evidence, return reconciliation guards and a recorded cashbook with daily/method charts | [Accounting foundations](ACCOUNTING_FOUNDATIONS.md) |
 | Feature Phase 4b | Separate customer/supplier advances, partial use/refunds, paid-return refund entitlements and linked full corrections, with cashbook and finance positions | [Advances, refunds and corrections](ADVANCES_REFUNDS_AND_CORRECTIONS.md) |
+| Feature Phase 4c | Verified cash/bank openings, immutable corrections, partial/split account assignments, transfers, clearing/bounces, linked noncash reconciliation and qualified ordinary credit bill ageing | [Cash, bank and clearing](CASH_BANK_AND_CLEARING.md) |
 
 Industry profiles set defaults and priorities; specialised workflows are separate
 capabilities. Choosing an industry does not activate an unfinished module. Existing
 products remain untracked until their physical lots or unit serials are explicitly reconciled.
 
-## Latest feature delivery — Phase 4b
+## Previous feature delivery — Phase 4b
 
 **Billing → Advances & refunds** is live. Record customer prepayments or supplier
 advances separately from debt, then apply partial amounts to specific credit bills
@@ -105,17 +108,12 @@ private files.
 
 ## Product roadmap
 
-The following capabilities are **not implemented by the latest hosted release**.
-Deliver each with its full data flow, permission checks and relevant acceptance
-before enabling it. Test new schema changes on a temporary branch and obtain the
-explicit migration approval required by the connected database tool.
-
-1. **Phase 4c — local implementation; acceptance/rollout pending:** verified account
-   openings, transfers, payment clearing and qualified ordinary credit bill evidence.
-   Local acceptance passed. Obtain exact migration/publication approval, apply only
-   migration 0030, publish, then run read-only hosted acceptance.
-
-This is the working order, not a committed delivery-date estimate.
+Feature phases 1–4c are live within their documented supported scope. Next is
+owner/accountant acceptance of actual opening balances, cash counts, statement
+clearing and legacy credit-bill reconciliation. Broader historical stock/cost or
+accounting claims need their own design and evidence before implementation.
+No further product phase or delivery date is assumed. Future schema changes must
+be tested on a temporary branch and receive the database tool's required approval.
 
 ## Commercial release gates still open
 
@@ -135,11 +133,12 @@ See [delivery phases](release/PHASE_PLAN.md),
 
 ## Documentation and repository state
 
-Implementation, feature specifications and acceptance runners through Phase 4b
+Implementation, feature specifications and acceptance runners through Phase 4c
 are committed, published and hosted-verified, with release/admin notes and test-data
 reports. Accounting scope, evidence and the next phases are documented.
-Phase 4b migration/publication and hosted acceptance are complete. Phase 4c remains
-a local candidate until its documented acceptance and rollout steps finish.
+Phase 4c migration/publication and hosted acceptance are complete. The published
+application tree matches accepted local candidate `0508b1f`; final status notes are
+a documentation-only follow-up.
 Ignored local evidence retains logs and screenshots; credentials and sessions
 are excluded. Unrelated test-account and tunnel tooling
 remains a separate pending change. Documentation must state its

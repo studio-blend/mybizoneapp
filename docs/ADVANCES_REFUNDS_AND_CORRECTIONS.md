@@ -143,7 +143,7 @@ followed by invoice ageing and available-cash reporting only when supported by
 complete evidence. Commercial launch gates stay separate in
 [project status](PROJECT_STATUS.md).
 
-The Phase 4c implementation is a local candidate. Its bounced-money workflow
+The Phase 4c implementation is published and hosted-verified. Its bounced-money workflow
 uses these allocation/settlement corrections, followed by a provenance-linked
 noncash reconciliation entry. See [Cash, bank and clearing](CASH_BANK_AND_CLEARING.md)
-for full supported scope and current acceptance/rollout state.
+for full supported scope and accepted rollout evidence.
