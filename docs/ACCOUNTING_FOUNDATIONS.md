@@ -149,3 +149,7 @@ The Phase 4a evidence above describes its earlier accepted release.
 invoice ageing and available-cash reporting only where the underlying evidence
 supports those claims. Existing P&L/cost/tax limits and commercial launch gates
 remain as documented; this phase does not introduce double-entry accounting.
+
+Phase 4c is now a local candidate with these flows implemented. See
+[Cash, bank and clearing](CASH_BANK_AND_CLEARING.md) for its evidence requirements,
+qualified credit bill report, supported corrections and pending rollout state.

@@ -6,6 +6,7 @@ import type { DashboardGrant, DashboardSelection } from './dashboard-policy';
 import { dashboardSalesQueries, loadDashboardContext, scopeCondition } from './dashboard-queries';
 import { loadDashboardStockInsights } from './dashboard-stock-insights';
 import { fundsPosition } from './funds-position';
+import { moneyRegister } from './money-queries';
 import { loadDashboardOrders } from './order-queries';
 
 export interface SalesSummary {
@@ -331,6 +332,7 @@ export async function loadWorkspaceDashboard(
       methods: Array.from(methods),
       ledger: ledgerRows[0]?.value ?? null,
       funds: hasLedger ? await fundsPosition(tx, businessId, now) : null,
+      money: hasLedger ? await moneyRegister(tx, businessId) : null,
       customers: customerRows[0]?.value ?? null,
       movements: Array.from(movements),
       profile: { ...profile, mixed: mixedProfiles },

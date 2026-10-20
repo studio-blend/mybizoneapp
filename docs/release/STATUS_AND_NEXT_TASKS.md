@@ -1,5 +1,17 @@
 # MyBizOne — status and next tasks
 
+> **20 October 2026 — Phase 4c locally accepted:** Cash/bank accounts, verified
+> openings, source assignments, transfers, clearing/bounces and qualified credit
+> bill evidence are implemented. All 401 automated tests, production build, types
+> and scoped lint pass. All 240 production-browser checks passed, followed by 25
+> affected finance rechecks on the final build. Acceptance ran on 17–18 October;
+> all accepted source hashes still match on 20 October. Migration
+> 0030 passed on a temporary Neon branch preserving all 40 checked existing tables
+> and tenant permissions. Hosted application/database remain at accepted Phase 4b;
+> exact migration/publication approval is pending. See
+> [Cash, bank and clearing](../CASH_BANK_AND_CLEARING.md). Older entries below
+> describe their dated releases; commercial delivery gates stay open.
+
 > **17 October 2026 — Phase 4b live:** Customer/supplier advances, partial use and
 > refunds, paid-return refund entitlements and linked corrections are published and
 > hosted-verified. All **365 automated tests, 215 local production-browser checks

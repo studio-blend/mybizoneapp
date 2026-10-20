@@ -631,6 +631,37 @@ export default async function DashboardPage({
                   </a>
                 </div>
               )}
+              {data.money && (
+                <div className="mt-6 border-t pt-4">
+                  <h3 className="text-sm font-medium">Cash &amp; bank · current position</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {!data.money.accounts.length
+                      ? 'Set up verified opening balances to see account positions.'
+                      : data.money.ready
+                        ? 'Recorded sources reconciled. Confirm balances against cash counts and bank statements.'
+                        : `${data.money.unassigned.length} unassigned money sources · ${data.money.stale.length} changed sources. Account amounts remain provisional.`}
+                  </p>
+                  <dl className="mt-3 grid gap-4 sm:grid-cols-2">
+                    {data.money.accounts.map((a) => (
+                      <div key={a.id}>
+                        <dt className="text-xs text-muted-foreground">
+                          {a.name} · recorded cleared
+                        </dt>
+                        <dd className="mt-1 text-lg font-semibold tabular-nums">
+                          {money(Number(a.cleared))}
+                        </dd>
+                        <p className="text-xs text-muted-foreground">
+                          Reserved outgoing {money(Number(a.pending_out))} · pending incoming{' '}
+                          {money(Number(a.pending_in))}
+                        </p>
+                      </div>
+                    ))}
+                  </dl>
+                  <a href="/money" className="mt-3 inline-block text-xs underline">
+                    Manage cash &amp; bank clearing
+                  </a>
+                </div>
+              )}
               {actions.length > 2 && (
                 <div className="mt-6 flex flex-wrap gap-3 border-t pt-4">
                   {actions.slice(2).map((action) => (

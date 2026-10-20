@@ -1290,3 +1290,70 @@ JavaScript is about 50.6 KB smaller compressed. Full evidence and limitations:
   Status, workflow scope, release notes and roadmap now record Phase 4b as live.
   Next product phase is 4c reconciled opening cash/accounts, transfers and clearing;
   provider, installer, recovery and commercial launch gates remain open.
+
+## 17 October 2026 — Phase 4c account ledger and clearing candidate
+
+- Owner instructed proceeding with account openings, transfers and bank clearing.
+  Implemented Billing → Cash & bank with verified start-of-day cash/bank openings,
+  immutable revisions, partial/split source assignments, atomic linked transfers,
+  pending reservations, dated clearing, bounces, cancellation and reversals.
+  No stock/debt/cashbook income or expense is duplicated by account assignment.
+- Added financial source fingerprints and stale/deleted-source reconciliation,
+  provenance-linked noncash offsets for bounced operational corrections, current
+  finance-dashboard account positions and qualified ordinary credit bill invoice-age
+  bars. Report flags unknown historical allocation/clearing evidence, mixed order/EMI
+  parties, mismatched balances and over-allocated legacy bills; due dates are never
+  inferred from invoice age. Account positions are current, not historical snapshots.
+- Commands reuse stable request IDs/hashes, sorted source/account transaction locks,
+  mutable-source row locks, tenant foreign keys and existing global manage_expenses
+  permission. Original openings/entries and all corrections retain evidence/actor.
+  Mobile forms use full-width controls, pending states and full fresh navigation.
+- Parent AGENTS requested graph-first exploration/review. No code-review-graph
+  tools were exposed in this session's tool inventory, so source/rg/diff review was
+  used as its documented fallback. Applied existing frontend/Neon guidance; no
+  subagents were spawned. Unrelated dirty test-account/tunnel/release tooling was
+  preserved and excluded from this phase.
+- Local migration 0030 is restricted to the exact disposable PostgreSQL URL and
+  /.cache/test-pgdata directory. Hosted migration was prepared only on temporary
+  branch br-solitary-wildflower-ao4hv2u9, migration b62f6800-f8b0-4861-be81-d33941473ff6.
+  All 40 checked full-row table hashes match the fresh hosted baseline. All six new
+  tables enforce FORCE RLS and SELECT/INSERT-only app_user grants. No financial
+  fixtures were inserted into hosted/default or temporary hosted data. The first
+  preparation rejected the DO-block SQL splitter; explicit per-table statements
+  succeeded, and branch listing confirmed no orphan from that rejected attempt.
+- Production build/types/scoped lint and the initial 400-test integrated suite
+  passed. An initial high-parallelism existing password test exceeded its five-second
+  limit; the complete suite passed with two workers, without changing that test.
+  Review added an over-allocated legacy-bill guard and its regression: all 36 new
+  money tests pass. Final rebuild/affected acceptance and final evidence counts are
+  recorded below. Interrupted preliminary builds are not counted as passes.
+- The first 25 new production-browser checks passed; mutation fixture cleanup
+  preserved all 46 checked stock/financial/account table hashes. Existing 215
+  production-browser scenarios also passed. Feature scope is in
+  docs/CASH_BANK_AND_CLEARING.md. Hosted Phase 4b stays unchanged pending exact
+  migration approval, publication and read-only hosted acceptance. Subscription
+  migration 0020 and commercial release gates remain separate.
+
+## 20 October 2026 — Phase 4c acceptance finalisation and approval handoff
+
+- Resumed the unchanged candidate. All 20 source hashes match the saved final
+  manifest. Final acceptance from 17–18 October is **401 automated tests**, zero
+  failures/skips: 384 web / 35 suites (36 money regressions) and 17 DB / three suites.
+  Production build, application/database types and scoped lint passed (19 files,
+  zero errors/warnings). Only the initially clean Next-generated configuration
+  files were restored after building. Local migration 0030 is applied/recorded.
+- Full production-browser acceptance passed **240 checks / 17 runners**. The legacy
+  over-allocation guard was the only subsequent production-code refinement; final
+  full automated acceptance/build and **25 affected finance browser rechecks** passed.
+  Other 215 scenarios exercise unchanged code. Money fixture cleanup preserved all
+  46 checked table hashes. Owner/admin/accounts access, denied direct staff access,
+  nine command modes, genuine saved confirmations and 360px layouts were verified.
+- Evidence: .cache/money-all-tests-final.log, .cache/money-db-tests-final.log,
+  .cache/money-build-final.log, .cache/money-lint-final.log,
+  .cache/money-production-acceptance.json, .cache/money-final-acceptance.json,
+  individual runner logs/screenshots and .cache/money-accepted-source.json.
+- Read-only recheck confirmed the existing temporary Neon branch remains available,
+  exact prepared SQL is unchanged and all 40 original table hashes still match.
+  Migration and publication approval are still pending. No hosted/default data was
+  changed, no new hosted browser acceptance is claimed, and unrelated local work
+  remains excluded. Updated feature/project/release documents for this handoff.

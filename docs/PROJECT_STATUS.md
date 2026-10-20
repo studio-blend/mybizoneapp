@@ -1,9 +1,28 @@
 # MyBizOne — current status and roadmap
 
-Updated: **17 October 2026**. This is the current project summary. Detailed
+Updated: **20 October 2026**. This is the current project summary. Detailed
 behaviour, boundaries and verification remain in the linked feature/release notes.
 
-## Current position
+## Phase 4c candidate — locally accepted, awaiting rollout approval
+
+Cash/bank accounts, verified openings and append-only corrections, source
+assignments, transfers, clearing/bounces and linked noncash reconciliation are
+implemented locally. The finance dashboard shows current account positions and a
+new credit bill report qualifies invoice-age figures against allocation/clearing
+evidence. **This candidate is not published yet.**
+
+All 401 automated tests pass (384 web / 35 suites, including 36 new money
+regressions, plus 17 database / three suites). Production build, application/database
+types and scoped lint pass. All 240 production-browser checks / 17 runners passed;
+the 25 affected finance checks passed again on the final build after the legacy
+over-allocation guard. These runs completed on 17–18 October; all 20 accepted source
+hashes still match on 20 October. Migration
+0030 passed on a temporary Neon branch with all 40 checked existing table hashes
+and required immutable tenant permissions preserved. Hosted application/database
+are unchanged; exact migration approval and publication remain pending.
+See [Cash, bank and clearing](CASH_BANK_AND_CLEARING.md).
+
+## Current hosted position
 
 The hosted development application is running at https://mybizoneapp.vercel.app.
 Latest application acceptance: commit `6ee547529bea00ce9a7af0ea363a5563f1091a3d`,
@@ -91,8 +110,10 @@ Deliver each with its full data flow, permission checks and relevant acceptance
 before enabling it. Test new schema changes on a temporary branch and obtain the
 explicit migration approval required by the connected database tool.
 
-1. **Phase 4c — next:** reconciled opening cash/accounts, transfers and bank clearing before
-   verified invoice ageing or available-cash claims.
+1. **Phase 4c — local implementation; acceptance/rollout pending:** verified account
+   openings, transfers, payment clearing and qualified ordinary credit bill evidence.
+   Local acceptance passed. Obtain exact migration/publication approval, apply only
+   migration 0030, publish, then run read-only hosted acceptance.
 
 This is the working order, not a committed delivery-date estimate.
 
@@ -117,7 +138,8 @@ See [delivery phases](release/PHASE_PLAN.md),
 Implementation, feature specifications and acceptance runners through Phase 4b
 are committed, published and hosted-verified, with release/admin notes and test-data
 reports. Accounting scope, evidence and the next phases are documented.
-Phase 4b migration/publication and hosted acceptance are complete.
+Phase 4b migration/publication and hosted acceptance are complete. Phase 4c remains
+a local candidate until its documented acceptance and rollout steps finish.
 Ignored local evidence retains logs and screenshots; credentials and sessions
 are excluded. Unrelated test-account and tunnel tooling
 remains a separate pending change. Documentation must state its

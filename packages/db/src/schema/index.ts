@@ -38,3 +38,4 @@ export * from './customer-orders';
 export * from './kitchen';
 export * from './settlement-allocations';
 export * from './accounting-events';
+export * from './money-accounts';

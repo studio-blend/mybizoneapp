@@ -43,6 +43,10 @@ export default async function CashbookPage({
           <a href="/settlements" className="underline">
             Manage bill allocations
           </a>
+          {' · '}
+          <a href="/money" className="underline">
+            Cash &amp; bank clearing
+          </a>
         </p>
       </div>
       <form className="flex flex-wrap items-end gap-4 rounded-lg border p-4">

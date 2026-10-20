@@ -1,5 +1,13 @@
 # Release phases
 
+> **Phase 4c locally accepted, 20 October 2026:** cash/bank accounts and payment
+> clearing are implemented locally; 401 automated tests, production build, types
+> and scoped lint pass. All 240 production-browser checks and 25 affected final-build
+> finance rechecks passed on 17–18 October; source hashes remain unchanged.
+> Approved hosted rollout remains pending. Migration 0030 passed on a temporary branch with 40 checked
+> tables preserved. This does not finish the commercial delivery phases below.
+> See [scope and rollout](../CASH_BANK_AND_CLEARING.md).
+
 > **17 October 2026:** This document tracks commercial delivery/release gates.
 > For current application progress and separate product feature phases, read
 > [project status](../PROJECT_STATUS.md). Features through Phase 4b are live; this

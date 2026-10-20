@@ -31,6 +31,12 @@ const definitions: { label: string; items: Entry[] }[] = [
       { href: '/delivery-challans', label: 'Delivery Challans', gate: 'create_sale' },
       { href: '/settlements', label: 'Settlements', gate: 'manage_expenses' },
       { href: '/cashbook', label: 'Cashbook', gate: 'manage_expenses' },
+      { href: '/money', label: 'Cash & bank', gate: 'manage_expenses' },
+      {
+        href: '/reports/credit-ageing',
+        label: 'Credit bill reconciliation',
+        gate: 'manage_expenses',
+      },
       { href: '/settlements/funds', label: 'Advances & refunds', gate: 'manage_expenses' },
       { href: '/emi', label: 'EMI', gate: 'view_sales' },
     ],
